@@ -2,10 +2,9 @@ import sys
 import pymysql
 import getpass
 
-# a few globals
 _MYSQL_CONFIG = {'host':'dlgreenmysqlv.stsci.edu',
                 'port':43306,
-                'user':'antares',
+                'user':'gnarayan',
                 'db':'yse',
                 'password':None}
 
@@ -27,26 +26,69 @@ def get_sql_password():
         raise RuntimeError(message)
 
 
-def check_sql_table_for_release(data_release):
+def check_sql_db_for_table(table_name):
     """
     Check if a MySQL Table exists for this data_release
     """
     query = 'show tables'
     result = exec_sql_query(query)
-    print(result)
+    existing_tables = [table[0] for table in result]
+    if table_name in existing_tables:
+        return True 
+    else:
+        return False
 
 
-def create_sql_table_for_release(data_release):
+def drop_sql_table_from_db(table_name):
+    """
+    Drops a MySQL Table from the table (assumes it exists)
+    """
+    query = 'drop table {}'.format(table_name)
+    result = exec_sql_query(query)
+    return result
+
+
+def get_index_table_name_for_release(data_release):
+    """
+    Some datareleases are defined purely as ints which make invalid MySQL table names
+    Fix that here by always prefixing release_ to the data_release name to make the MySQL table_name
+    """
+    table_name = 'release_{}'.format(data_release)
+    return table_name
+
+
+def create_sql_index_table_for_release(data_release, redo=False):
     """
     Creates a MySQL Table to hold useful data from HEAD.fits files from the
-    PLASTICC sim
+    PLASTICC sim. Checks if the table exists already. Drop if redo.
+
+    Returns a table_name
     """
-    query = 'CREATE TABLE {} (id varchar(50), ptrobs_min int, ptrobs_max int, mwebv float, mwebv_err float,\
-            hostgal_photoz float, hostgal_photoz_err float, sntype int, peakmjd float)'.format(data_release) 
-    return exec_sql_query(query)
+
+    table_name = get_index_table_name_for_release(data_release)
+    result = check_sql_db_for_table(table_name)
+    if result:
+        print("Table {} exists.".format(table_name))
+        if redo:
+            print("Clobbering table {}.".format(table_name))
+            drop_sql_table_from_db(table_name)
+        else:
+            return table_name
+
+    query = 'CREATE TABLE {} (objid VARCHAR(50), ptrobs_min BIGINT UNSIGNED, ptrobs_max BIGINT UNSIGNED, mwebv FLOAT, mwebv_err FLOAT, hostgal_photoz FLOAT, hostgal_photoz_err FLOAT, sntype SMALLINT UNSIGNED, peakmjd FLOAT)'.format(table_name) 
+    result =  exec_sql_query(query)
+    print("Created Table {}.".format(table_name))
+    return table_name
 
 
 def exec_sql_query(query):
+    """
+    Executes a supplied MySQL query using the configuration _MYSQL_CONFIG. 
+    The config defines the context of the query. If config does not include a
+    MySQL password, the user is prompted for it.
+
+    Returns the result of the query (if any)
+    """
 
     password = _MYSQL_CONFIG.get('password')
     if password is None:
