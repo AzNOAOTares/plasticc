@@ -2,11 +2,13 @@ import sys
 import pymysql
 import getpass
 
+_SQL_FLAVOR = 'mysql'
 _MYSQL_CONFIG = {'host':'dlgreenmysqlv.stsci.edu',
                 'port':43306,
                 'user':'gnarayan',
                 'db':'yse',
                 'password':None}
+
 
 def get_sql_password():
     """
@@ -61,10 +63,8 @@ def create_sql_index_table_for_release(data_release, redo=False):
     """
     Creates a MySQL Table to hold useful data from HEAD.fits files from the
     PLASTICC sim. Checks if the table exists already. Drop if redo.
-
     Returns a table_name
     """
-
     table_name = get_index_table_name_for_release(data_release)
     result = check_sql_db_for_table(table_name)
     if result:
@@ -75,27 +75,48 @@ def create_sql_index_table_for_release(data_release, redo=False):
         else:
             return table_name
 
-    query = 'CREATE TABLE {} (objid VARCHAR(50), ptrobs_min BIGINT UNSIGNED, ptrobs_max BIGINT UNSIGNED, mwebv FLOAT, mwebv_err FLOAT, hostgal_photoz FLOAT, hostgal_photoz_err FLOAT, sntype SMALLINT UNSIGNED, peakmjd FLOAT)'.format(table_name) 
+    query = 'CREATE TABLE {} (objid TINYTEXT, ptrobs_min BIGINT UNSIGNED, ptrobs_max BIGINT UNSIGNED, mwebv FLOAT, mwebv_err FLOAT, hostgal_photoz FLOAT, hostgal_photoz_err FLOAT, sntype SMALLINT UNSIGNED, peakmjd FLOAT)'.format(table_name) 
     result =  exec_sql_query(query)
     print("Created Table {}.".format(table_name))
     return table_name
 
 
-def exec_sql_query(query):
+def write_rows_to_index_table(index_entries, table_name):
     """
-    Executes a supplied MySQL query using the configuration _MYSQL_CONFIG. 
-    The config defines the context of the query. If config does not include a
+    Write rows to an index table
+    Returns number of rows written
+    """
+    con = get_mysql_connection()
+    query = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)'.format(table_name)
+    cursor = con.cursor()
+    number_of_rows = cursor.executemany(query, index_entries)
+    con.commit()
+    con.close()
+    return number_of_rows
+
+
+def get_mysql_connection():
+    """
+    Get a  MySQL connection object. The config variable _MYSQL_CONFIG defines
+    the context/parameters of the connection. If config does not include a
     MySQL password, the user is prompted for it.
-
-    Returns the result of the query (if any)
+    Returns a MySQL connection object.
     """
-
     password = _MYSQL_CONFIG.get('password')
     if password is None:
         get_sql_password()
-
     con = pymysql.connect(**_MYSQL_CONFIG)
+    return con
+
+
+def exec_sql_query(query):
+    """
+    Executes a supplied MySQL query. The context of the query is defined by
+    _MYSQL_CONFIG and the connection object returned by get_mysql_connection() 
+    Returns the result of the query (if any)
+    """
     result = None
+    con = get_mysql_connection()
     try:
         cursor = con.cursor()
         cursor.execute(query)
