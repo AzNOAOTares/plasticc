@@ -19,10 +19,9 @@ import sys
 import os
 import warnings
 import glob
+import numpy as np
 import astropy.io.fits as afits
 import astropy.table as at
-import numpy as np
-import h5py
 from . import database
 
 ROOT_DIR = os.getenv('PLASTICC_DIR')
@@ -36,22 +35,31 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
     if data_dir is None:
         data_dir = os.path.join(ROOT_DIR, 'plasticc_data')
 
+    # get the list of files we processed already so we can skip in case something dies mid-processing
     processed_table_file = os.path.join(data_dir, data_release, 'processed_{}.txt'.format(data_release))
     try:
-        processed_tables = at.Table.read(processed_table_file, format='ascii.commented_header')
+        processed_tables = at.Table.read(processed_table_file, names=('filename',),  format='ascii')
         used_files = processed_tables['filename'].tolist()
         if redo:
             raise RuntimeError('Clobbering')
     except Exception as e:
         used_files = []
 
+    # if we have no list or we are clobbering, open the same file for output
+    if len(used_files) == 0:
+        proc_table = open(processed_table_file, 'w')
+
+    # make a mysql table for this data
     table_name = database.create_sql_index_table_for_release(data_release, redo=redo)
 
+    # get a list of the header files in the data release
     filepattern = '*/*HEAD.FITS'
     fullpattern = os.path.join(data_dir, data_release, filepattern)
     files = glob.glob(fullpattern)
 
+    # most of the header columns are junk - save only the relevant ones
     header_fields = ['SNID', 'PTROBS_MIN', 'PTROBS_MAX', 'MWEBV', 'MWEBV_ERR','HOSTGAL_PHOTOZ', 'HOSTGAL_PHOTOZ_ERR', 'SNTYPE', 'PEAKMJD']
+
     for header_file in files:
         # skip processed files
         if header_file in used_files:
@@ -63,70 +71,65 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
             message = 'Header file {} exists but no corresponding photometry file {}'.format(header_file, phot_file)
             warnings.warn(message, RuntimeWarning)
             continue
+
+        # do some string munging so we can set a more useful ID name
+        basename = os.path.basename(header_file)
         dirname = os.path.split(os.path.dirname(header_file))[DIRNAMES]
         fieldname, modelname = dirname.replace('LSST_', '').split('_')
+        modelname = modelname.replace('MODEL','')
+        basename = basename.replace('LSST_','').replace(fieldname+'_','').replace('_HEAD.FITS','')
     
-        # Save header data
-        #header_HDU = afits.open(header_file)
-        #header_data = header_HDU[1].data
-        #header_out = [header_data[field] for field in header_fields]
-        #header_out = [row.encode('UTF') if row.dtype == np.dtype('U16') else row for row in header_out]
+        # get the header data
+        try:
+            header_HDU = afits.open(header_file)
+            header_data = header_HDU[1].data
+        except Exception as e:
+            message = '{}\nSomething went wrong reading header file {}. SKIPPING!'.format(e, header_file)
+            warnings.warn(message, RuntimeWarning)
+            continue
 
-        # we just need to go to MySQL here
-        #header_out = at.Table(header_out, names=header_fields)
-        print(header_file)
+        # fix the object IDs to be useful
+        snid = header_data['SNID']
+        newobjid = ['{}_{}_{}_{}'.format(fieldname, modelname, basename, x) for x in snid]
+        newobjid = np.array(newobjid)
+        header_out = [newobjid,]
 
+        # get the rest of the useful fields from the header 
+        try:
+            header_out += [header_data[field] for field in header_fields[1:]]
+            header_out = [row.encode('UTF') if row.dtype == np.dtype('U16') else row for row in header_out]
+        except Exception as e:
+            message = '{}\nSomething went wrong processing header file {}. SKIPPING!'.format(e, header_file)
+            warnings.warn(message, RuntimeWarning)
+            continue
+
+        # fix the column names 
+        keys = ['objid',] + [x.lower() for x in header_fields[1:]]
+        header_out = at.Table(header_out, names=keys)
+        header_out = np.array(header_out).tolist()
+        
+        # and save to mysql 
+        try:
+            nrows = database.write_rows_to_index_table(header_out, table_name)
+        except Exception as e:
+            message = '{}\nSomething went wrong writing header file {} to MySQL. SKIPPING!'.format(e, header_file)
+            warnings.warn(message, RuntimeWarning)
+            continue
+
+        message = "Wrote {} from header file {} to MySQL table {}".format(nrows, header_file, table_name)
+        print(message)
+
+        # make an entry in the processed file table for this file
+        proc_table.write(header_file+'\n')
+
+        # save that we've already processed this file
         used_files.append(header_file)
 
-    out_table = at.Table()
-    out_table['filename'] = used_files 
-    out_table.write(processed_table_file, format='ascii.commented_header', overwrite=True)  
+    proc_table.close()
     return used_files 
 
 
 def main():
     data_dir = os.path.join(ROOT_DIR, 'plasticc_data')
     for data_release in next(os.walk(data_dir))[DIRNAMES]:
-        make_index_for_release(data_release, data_dir=data_dir, redo=True)
-
-
-
-class GetData(object):
-    """ Read .hdf5 file """
-    def __init__(self, data_file, data_release):
-        self.data = h5py.File(data_file, 'r')
-        self.header = self.data[data_release]['header']
-        self.phot = self.data[data_release]['phot']
-
-    def get_field(self, fieldname):
-        """Return a field from the .hdf5 file. E.g. get_field('SNID')"""
-        try:
-            return self.header[fieldname]
-        except AttributeError:
-            return self.phot[fieldname]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-if __name__=='__main__':
-    sys.exit(main())
-
+        make_index_for_release(data_release, data_dir=data_dir, redo=False)
