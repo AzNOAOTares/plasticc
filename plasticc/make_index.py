@@ -45,7 +45,7 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
     except Exception as e:
         used_files = []
 
-    database.check_sql_table_for_release(data_release)
+    table_name = database.create_sql_index_table_for_release(data_release, redo=redo)
 
     filepattern = '*/*HEAD.FITS'
     fullpattern = os.path.join(data_dir, data_release, filepattern)
