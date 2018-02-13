@@ -23,55 +23,72 @@ import astropy.io.fits as afits
 import astropy.table as at
 import numpy as np
 import h5py
+from . import database
+
+ROOT_DIR = os.getenv('PLASTICC_DIR')
+DIRNAMES = 1
+
+
+def make_index_for_release(data_release, data_dir=None, redo=False):
+    """
+    Make an index for a single release
+    """
+    if data_dir is None:
+        data_dir = os.path.join(ROOT_DIR, 'plasticc_data')
+
+    processed_table_file = os.path.join(data_dir, data_release, 'processed_{}.txt'.format(data_release))
+    try:
+        processed_tables = at.Table.read(processed_table_file, format='ascii.commented_header')
+        used_files = processed_tables['filename'].tolist()
+        if redo:
+            raise RuntimeError('Clobbering')
+    except Exception as e:
+        used_files = []
+
+    database.check_sql_table_for_release(data_release)
+
+    filepattern = '*/*HEAD.FITS'
+    fullpattern = os.path.join(data_dir, data_release, filepattern)
+    files = glob.glob(fullpattern)
+
+    header_fields = ['SNID', 'PTROBS_MIN', 'PTROBS_MAX', 'MWEBV', 'MWEBV_ERR','HOSTGAL_PHOTOZ', 'HOSTGAL_PHOTOZ_ERR', 'SNTYPE', 'PEAKMJD']
+    for header_file in files:
+        # skip processed files
+        if header_file in used_files:
+            continue
+
+        # sanity check for phot file existence
+        phot_file = header_file.replace('HEAD', 'PHOT')
+        if not os.path.exists(phot_file):
+            message = 'Header file {} exists but no corresponding photometry file {}'.format(header_file, phot_file)
+            warnings.warn(message, RuntimeWarning)
+            continue
+        dirname = os.path.split(os.path.dirname(header_file))[DIRNAMES]
+        fieldname, modelname = dirname.replace('LSST_', '').split('_')
+    
+        # Save header data
+        #header_HDU = afits.open(header_file)
+        #header_data = header_HDU[1].data
+        #header_out = [header_data[field] for field in header_fields]
+        #header_out = [row.encode('UTF') if row.dtype == np.dtype('U16') else row for row in header_out]
+
+        # we just need to go to MySQL here
+        #header_out = at.Table(header_out, names=header_fields)
+        print(header_file)
+
+        used_files.append(header_file)
+
+    out_table = at.Table()
+    out_table['filename'] = used_files 
+    out_table.write(processed_table_file, format='ascii.commented_header', overwrite=True)  
+    return used_files 
 
 
 def main():
-    saved_data_file = 'data.hdf5'
-    # try:
-    #     os.remove(saved_data_file)
-    # except OSError:
-    #     pass
-
-    root_dir = os.getenv('PLASTICC_DIR')
-    data_dir = os.path.join(root_dir, 'plasticc_data')
-    DIRNAMES = 1
-    filepattern = '*/*HEAD.FITS'
-
-    header_fields = ['SNID', 'PTROBS_MIN', 'PTROBS_MAX', 'MWEBV', 'MWEBV_ERR','HOSTGAL_PHOTOZ', 'HOSTGAL_PHOTOZ_ERR', 'SNTYPE', 'PEAKMJD']
-    phot_fields = ['MJD', 'FLT', 'MAG', 'MAGERR']
-
+    data_dir = os.path.join(ROOT_DIR, 'plasticc_data')
     for data_release in next(os.walk(data_dir))[DIRNAMES]:
-        fullpattern = os.path.join(data_dir, data_release, filepattern)
-        files = glob.glob(fullpattern)
-        header_table = at.Table()
-        phot_table = at.Table()
-        for header_file in files:
-            phot_file = header_file.replace('HEAD', 'PHOT')
-            if not os.path.exists(phot_file):
-                message = 'Header file {} exists but no corresponding photometry file {}'.format(header_file, phot_file)
-                warnings.warn(message, RuntimeWarning)
-                continue
-            dirname = os.path.split(os.path.dirname(header_file))[DIRNAMES]
-            fieldname, modelname = dirname.replace('LSST_', '').split('_')
+        make_index_for_release(data_release, data_dir=data_dir, redo=True)
 
-            # Save header data
-            header_HDU = afits.open(header_file)
-            header_data = header_HDU[1].data
-            header_out = [header_data[field] for field in header_fields]
-            header_out = [row.encode('UTF') if row.dtype == np.dtype('U16') else row for row in header_out]  # Replace unicode types with utf strings before saving as HDF5
-            header_out = at.Table(header_out, names=header_fields)
-            header_table = at.vstack([header_table, header_out])  # Combine headers from each model
-
-            # Save phot data
-            photo_HDU = afits.open(phot_file)
-            phot_data = photo_HDU[1].data
-            phot_out = [phot_data[field] for field in phot_fields]
-            phot_out = [row.encode('UTF') if row.dtype in (np.dtype('U16'), np.dtype('U2')) else row for row in phot_out]
-            phot_out = at.Table(phot_out, names=phot_fields)
-            phot_table = at.vstack([phot_table, phot_out])  # Combine headers from each model
-
-        header_table.write(saved_data_file, path=data_release+'/header', compression=True)
-        phot_table.write(saved_data_file, path=data_release+'/phot', append=True, compression=True)
 
 
 class GetData(object):
