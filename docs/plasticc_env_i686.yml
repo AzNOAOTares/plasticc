@@ -25,6 +25,8 @@ dependencies:
 - gmp=6.1.2=h6c8ec71_1
 - gst-plugins-base=1.12.4=h33fb286_0
 - gstreamer=1.12.4=hb53b477_0
+- h5py=2.7.1=py36h3585f63_0
+- hdf5=1.10.1=h9caa474_1
 - html5lib=1.0.1=py36h2f9c1c0_0
 - icu=58.2=h9c2bf20_1
 - intel-openmp=2018.0.0=hc7b2577_8
@@ -62,6 +64,7 @@ dependencies:
 - notebook=5.4.0=py36_0
 - numpy=1.14.0=py36h3dfced4_1
 - openssl=1.0.2n=hb7f436b_0
+- pandas=0.22.0=py36hf484d3e_0
 - pandoc=1.19.2.1=hea2e7c5_1
 - pandocfilters=1.4.2=py36ha6701b7_1
 - parso=0.1.1=py36h35f843b_0
