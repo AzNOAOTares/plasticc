@@ -5,7 +5,7 @@ import getpass
 _SQL_FLAVOR = 'mysql'
 _MYSQL_CONFIG = {'host':'dlgreenmysqlv.stsci.edu',
                 'port':43306,
-                'user':'gnarayan',
+                'user':'antares',
                 'db':'yse',
                 'password':None}
 
