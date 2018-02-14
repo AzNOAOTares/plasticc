@@ -36,7 +36,13 @@ class GetData(object):
 
         return phot_out
 
-    def get_transient_data(self, field='%', model="%", base="%", snid="%", sntype="%"):
+    def get_sntypes(self):
+        """ Returns a list of the different transient classes in the database. """
+        sntypes = database.exec_sql_query("SELECT DISTINCT sntype FROM {};".format(self.data_release))
+
+        return sorted([sntype[0] for sntype in sntypes])
+
+    def get_transient_data(self, field='%', model='%', base='%', snid='%', sntype='%', get_num_lightcurves=False):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
         Parameters
@@ -51,6 +57,9 @@ class GetData(object):
             The transient id. E.g. snid='87287'. The default is '%' indicating that all snids will be included.
         sntype : str, optional
             The transient type/class. E.g. sntype='3'. The default is '%' indicating that all sntypes will be included.
+        get_num_lightcurves : boolean, optional
+            If this is True, then the return value is just a single iteration genrator stating the number of
+            light curves that satisfied the given conditions.
 
         Return
         -------
@@ -60,19 +69,22 @@ class GetData(object):
             A generator containing an array of numpy arrays [mjd_date array, filter array, mag array, mag_err array]
         """
 
-       
+        sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
         header = database.exec_sql_query(
-            "SELECT * FROM {0} WHERE objid LIKE '{1}%' AND objid LIKE '%{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}' AND sntype={5};".format(
-                self.data_release, field, model, base, snid, sntype))
+            "SELECT * FROM {0} WHERE objid LIKE '{1}%' AND objid LIKE '%{2}%' AND objid LIKE '%{3}%' "
+            "AND objid LIKE '%{4}' {5};".format(self.data_release, field, model, base, snid, sntype_command))
 
- 
         objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*header))
         num_lightcurves = len(objid)
 
-        for i in range(num_lightcurves):
-            phot_data = self.get_light_curve(objid[i], ptrobs_min[i], ptrobs_max[i])
+        if get_num_lightcurves:
+            yield num_lightcurves
+            return
+        else:
+            for i in range(num_lightcurves):
+                phot_data = self.get_light_curve(objid[i], ptrobs_min[i], ptrobs_max[i])
 
-            yield header[i], phot_data
+                yield header[i], phot_data
 
 
 if __name__ == '__main__':
@@ -82,3 +94,4 @@ if __name__ == '__main__':
     # objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*head))
     # mjd, filt, mag, mag_err = phot
     print(head, phot)
+
