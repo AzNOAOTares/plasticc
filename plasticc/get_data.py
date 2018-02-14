@@ -28,11 +28,11 @@ class GetData(object):
         field, model, base, snid = objid.split('_')
         filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
         phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
-        
+
         phot_HDU = afits.open(phot_file)
         phot_data = phot_HDU[1].data[ptrobs_min : ptrobs_max]
 
-        phot_out = np.array([phot_data[field] for field in self.phot_fields])
+        phot_out = [phot_data[field] for field in self.phot_fields]
 
         return phot_out
 
@@ -58,7 +58,7 @@ class GetData(object):
         sntype : str, optional
             The transient type/class. E.g. sntype='3'. The default is '%' indicating that all sntypes will be included.
         get_num_lightcurves : boolean, optional
-            If this is True, then the return value is just a single iteration genrator stating the number of
+            If this is True, then the return value is just a single iteration generator stating the number of
             light curves that satisfied the given conditions.
 
         Return
@@ -74,17 +74,19 @@ class GetData(object):
             "SELECT * FROM {0} WHERE objid LIKE '{1}%' AND objid LIKE '%{2}%' AND objid LIKE '%{3}%' "
             "AND objid LIKE '%{4}' {5};".format(self.data_release, field, model, base, snid, sntype_command))
 
-        objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*header))
-        num_lightcurves = len(objid)
-
+        num_lightcurves = len(header)
         if get_num_lightcurves:
             yield num_lightcurves
             return
-        else:
+        try:
+            objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*header))
+
             for i in range(num_lightcurves):
                 phot_data = self.get_light_curve(objid[i], ptrobs_min[i], ptrobs_max[i])
 
                 yield header[i], phot_data
+        except ValueError:
+            print("No light curves in the database satisfy the given arguments")
 
 
 if __name__ == '__main__':
