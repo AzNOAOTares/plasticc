@@ -36,7 +36,7 @@ class GetData(object):
 
         return phot_out
 
-    def get_transient_data(self, field='%', model="%", base="%", snid="%"):
+    def get_transient_data(self, field='%', model="%", base="%", snid="%", sntype="%"):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
         Parameters
@@ -49,6 +49,8 @@ class GetData(object):
             The base name. E.g. base='NONIa'. The default is '%' indicating that all base names will be included.
         snid : str, optional
             The transient id. E.g. snid='87287'. The default is '%' indicating that all snids will be included.
+        sntype : str, optional
+            The transient type/class. E.g. sntype='3'. The default is '%' indicating that all sntypes will be included.
 
         Return
         -------
@@ -58,10 +60,12 @@ class GetData(object):
             A generator containing an array of numpy arrays [mjd_date array, filter array, mag array, mag_err array]
         """
 
+       
         header = database.exec_sql_query(
-            "SELECT * FROM {0} WHERE objid LIKE '{1}%' AND objid LIKE '%{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}';".format(
-                self.data_release, field, model, base, snid))
-        
+            "SELECT * FROM {0} WHERE objid LIKE '{1}%' AND objid LIKE '%{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}' AND sntype={5};".format(
+                self.data_release, field, model, base, snid, sntype))
+
+ 
         objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*header))
         num_lightcurves = len(objid)
 
