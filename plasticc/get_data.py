@@ -63,7 +63,11 @@ class GetData(object):
         """ Returns a list of the different transient classes in the database. """
         sntypes = database.exec_sql_query("SELECT DISTINCT sntype FROM {};".format(self.data_release))
 
-        return sorted([sntype[0] for sntype in sntypes])
+        sntypes_map = {1: 'SN1a', 2: 'CC', 3: 'SNIbc', 4: 'IIn', 42: 'SNIa-91bg', 45: 'pointIa', 50: 'Kilonova',
+                        60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira',
+                        90:'BSR', 91: 'String'}
+
+        return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
     def get_transient_data(self, field='%', model='%', base='%', snid='%', sntype='%', get_num_lightcurves=False):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
