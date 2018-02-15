@@ -74,7 +74,7 @@ def get_class_distributions(field, sntype, getdata):
 
 def get_distributions_multiprocessing(data_release, fig_dir):
     getdata = GetData(data_release)
-    fields = ['DDF' 'WFD']
+    fields = ['DDF', 'WFD']
     sntypes, sntypes_map = getdata.get_sntypes()
     sntype_names = [sntypes_map[i] for i in sntypes]
     sntypes_and_fields = list(itertools.product(fields, sntypes))
