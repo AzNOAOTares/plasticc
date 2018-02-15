@@ -4,8 +4,8 @@ Get PLASTICC data from SQL database
 """
 import os
 import numpy as np
+import pandas as pd
 import astropy.io.fits as afits
-import astropy.table as at
 import database
 
 ROOT_DIR = os.getenv('PLASTICC_DIR')
@@ -24,15 +24,38 @@ class GetData(object):
         return obj_ids
 
     def get_light_curve(self, objid, ptrobs_min, ptrobs_max):
-        """ Get lightcurve from fits file """
+        """ Get lightcurve from fits file
+
+        Parameters
+        ----------
+        objid : str
+            The object ID. E.g. objid='DDF_04_NONIa-0004_87287'
+        ptrobs_min : int
+            Min index of object in _PHOT.FITS.
+        ptrobs_max : int
+            Max index of object in _PHOT.FITS.
+
+        Return
+        -------
+        phot_out: pandas DataFrame
+            A DataFrame containing the MJD, FLT, MAG, MAGERR seperated by each filter.
+            E.g. Access the magnitude in the z filter with phot_out['z']['MAG'].
+        """
         field, model, base, snid = objid.split('_')
         filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
         phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
 
         phot_HDU = afits.open(phot_file)
-        phot_data = phot_HDU[1].data[ptrobs_min : ptrobs_max]
+        phot_data = phot_HDU[1].data[ptrobs_min:ptrobs_max]
 
-        phot_out = [phot_data[field] for field in self.phot_fields]
+        phot_dict = {}
+        filters = list(set(phot_data['FLT']))  # e.g. ['i', 'r', 'Y', 'u', 'g', 'z']
+        for f in filters:
+            fIndexes = np.where(phot_data['FLT'] == f)[0]
+            phot_dict[f] = {}
+            for pfield in self.phot_fields:
+                phot_dict[f][pfield] = phot_data[pfield][fIndexes]
+        phot_out = pd.DataFrame(phot_dict)
 
         return phot_out
 
@@ -65,8 +88,9 @@ class GetData(object):
         -------
         result: tuple
             A generator tuple containing (objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd)
-        phot_data : numpy array
-            A generator containing an array of numpy arrays [mjd_date array, filter array, mag array, mag_err array]
+        phot_data : pandas DataFrame
+            A generator containing a DataFrame with the MJD, FLT, MAG, MAGERR as rows and the the filter names as columns.
+            E.g. Access the magnitude in the z filter with phot_data['z']['MAG'].
         """
 
         sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
@@ -86,7 +110,8 @@ class GetData(object):
 
                 yield header[i], phot_data
         except ValueError:
-            print("No light curves in the database satisfy the given arguments")
+            print("No light curves in the database satisfy the given arguments. "
+                  "field: {}, model: {}, base: {}, snid: {}, sntype: {}".format(field, model, base, snid, sntype))
             return
 
 
@@ -97,5 +122,4 @@ if __name__ == '__main__':
     # objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*head))
     # mjd, filt, mag, mag_err = phot
     print(head, phot)
-
 
