@@ -9,18 +9,22 @@ ROOT_DIR = os.getenv('PLASTICC_DIR')
 def get_class_distributions(data_release, fig_dir):
     getdata = GetData(data_release)
     sntypes = getdata.get_sntypes()
-    sntype_stats = {'nobjects': {'DDF': {}, 'WFD': {}}, 'mean_mwebv': {'DDF': {}, 'WFD': {}}, 
+    sntype_stats = {'nobjects': {'DDF': {}, 'WFD': {}}, 'mean_mwebv': {'DDF': {}, 'WFD': {}},
                     'mean_epoch_range': {'DDF': {}, 'WFD': {}}, 'mean_cadence': {'DDF': {}, 'WFD': {}}}
 
     # Get population stats for each field and sntype
     for field in ['DDF', 'WFD']:
         for sntype in sntypes:
+            print(field, sntype)
             # Get the number of objects for each sntype
             result = getdata.get_transient_data(field=field, sntype=sntype, get_num_lightcurves=True)
             sntype_stats['nobjects'][field][sntype] = next(result)
 
+            print("nobjects done", sntype_stats['nobjects'][field][sntype])
+
             n, sum_mwebv, sum_epoch_range, sum_cadence = 0, 0, 0, 0
             result = getdata.get_transient_data(field=field, sntype=sntype, get_num_lightcurves=False)
+            print("got result")
             for head, phot in result:
                 objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = head
                 mjd, flt, mag, magerr = phot
@@ -30,17 +34,31 @@ def get_class_distributions(data_release, fig_dir):
                 sum_epoch_range += (mjd.max() - mjd.min())
                 sum_cadence += np.median(np.diff(mjd))
 
-            sntype_stats['mean_mwebv'][field][sntype] = sum_mwebv/n
-            sntype_stats['mean_epoch_range'][field][sntype] = sum_epoch_range / n
-            sntype_stats['mean_cadence'][field][sntype] = sum_cadence / n
+                if n % 100 == 0:
+                    print(n, sum_mwebv, sum_epoch_range, sum_cadence)
+
+            if n == 0:
+                sntype_stats['mean_mwebv'][field][sntype] = 0
+                sntype_stats['mean_epoch_range'][field][sntype] = 0
+                sntype_stats['mean_cadence'][field][sntype] = 0
+            else:
+                sntype_stats['mean_mwebv'][field][sntype] = sum_mwebv / n
+                sntype_stats['mean_epoch_range'][field][sntype] = sum_epoch_range / n
+                sntype_stats['mean_cadence'][field][sntype] = sum_cadence / n
 
         # Plot the histogram for each statistic
         for stat in sntype_stats:
+            plt.figure()
+            print(stat, sntype_stats[stat][field].values())
             plt.bar(range(len(sntypes)), sntype_stats[stat][field].values(), align='center')
             plt.xticks(range(len(sntypes)), sntypes)
             plt.xlabel('sntype')
             plt.ylabel(stat)
+            print("saving...")
             plt.savefig("{0}/{1}_{2}.png".format(fig_dir, field, stat))
+
+        print(field)
+    print("before return")
 
     return sntype_stats
 
@@ -51,5 +69,7 @@ if __name__ == '__main__':
         os.makedirs(fig_dir)
 
     get_class_distributions(data_release='20180112', fig_dir=fig_dir)
+    print('about to show')
     plt.show()
+
 

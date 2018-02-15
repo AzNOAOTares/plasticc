@@ -87,6 +87,7 @@ class GetData(object):
                 yield header[i], phot_data
         except ValueError:
             print("No light curves in the database satisfy the given arguments")
+            return
 
 
 if __name__ == '__main__':
@@ -96,4 +97,5 @@ if __name__ == '__main__':
     # objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*head))
     # mjd, filt, mag, mag_err = phot
     print(head, phot)
+
 

@@ -18,7 +18,7 @@ def get_sql_password():
     user = None
     try:
         user = getpass.getuser()
-        password = getpass.getpass(prompt='Enter MySQL password: ', stream=sys.stderr)
+        password = "H321BpxNb9Pd"  # getpass.getpass(prompt='Enter MySQL password: ', stream=sys.stderr)
         if user not in ['gnarayan', 'dmuthukrishna']:
             message = 'Unauthorized user {}'.format(user)
             raise RuntimeError(message)
