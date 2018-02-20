@@ -13,11 +13,14 @@ def plot_light_curves(data_release, fig_dir=None, field='%', sntype='%', snid='%
     result = getdata.get_transient_data(field=field, sntype=sntype, snid=snid)
     n=0
     for head, phot in result:
-        objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = head
+        objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd, snid = head
+        n += 1
         print(n)
-        n+=1
         for f in phot.columns:  # Filter names
             flt, mag, magerr, mjd = phot[f]
+            g = np.where(mag != 128.0)[0] # good indexes (where magnitude isn't 128)
+            flt, mag, magerr, mjd = flt[g], mag[g], magerr[g], mjd[g]
+            print(flt, mjd, mag, magerr)
 
             fsave = plt.figure(f)
             plt.errorbar(mjd, mag, yerr=magerr, fmt='.')
@@ -45,14 +48,26 @@ def get_class_distributions(field, sntype, getdata):
     cadence_list = {f: [] for f in ['i', 'r', 'Y', 'u', 'g', 'z']}
     result = getdata.get_transient_data(field=field, sntype=sntype, get_num_lightcurves=False)
     print("GOT RESULTS", field, sntype)
+    bad_mags = []
     for head, phot in result:
-        objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = head
+        objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd, snid = head
 
         # Loop through the filter light curves in each spectrum
         for f in phot.columns:  # Filter names
             flt, mag, magerr, mjd = phot[f]
+            # remove fluxes with mag = 128
+            g = np.where(mag != 128.0)[0]  # good indexes (where magnitude isn't 128)
+            b = np.where(mag == 128.0)[0]  # bad indexes (where magnitude isn't 128)
+            if g.size == 0:
+                bad_mags.append([objid, f, mjd[b], 'ALL'])
+                continue
+            elif len(g) != len(mag):
+                bad_mags.append([objid, f, mjd[b]])
+
+            flt, mag, magerr, mjd = flt[g], mag[g], magerr[g], mjd[g]
+            
             mwebv_list.append(mwebv)
-            epoch_range_list.append(mjd.max() - mjd.min())
+            epoch_range_list.append(np.max(mjd) - np.min(mjd))
             cadence_list[f].append(np.median(np.diff(mjd)))
 
             n += 1
@@ -69,30 +84,37 @@ def get_class_distributions(field, sntype, getdata):
         cadence_list_all = list(itertools.chain.from_iterable(list(cadence_list.values())))  # Combine lists
         stats['cadence'] = (np.nanmean(cadence_list_all), np.nanstd(cadence_list_all))
 
-    return stats, field, sntype
+    return stats, field, sntype, bad_mags
 
 
 def get_distributions_multiprocessing(data_release, fig_dir):
     getdata = GetData(data_release)
-    fields = ['DDF', 'WFD']
+    fields = ['DDF']#, 'WFD']
     sntypes, sntypes_map = getdata.get_sntypes()
     sntype_names = [sntypes_map[i] for i in sntypes]
     sntypes_and_fields = list(itertools.product(fields, sntypes))
-    sntype_stats = {'nobjects': {'DDF': {}, 'WFD': {}}, 'mean_mwebv': {'DDF': {}, 'WFD': {}},
-                    'mean_epoch_range': {'DDF': {}, 'WFD': {}}, 'mean_cadence': {'DDF': {}, 'WFD': {}}}
-    # sntype_stats = {'nobjects': {'DDF': {}}, 'mwebv': {'DDF': {}},
-    #                 'epoch_range': {'DDF': {}}, 'cadence': {'DDF': {}}}
+    # sntype_stats = {'nobjects': {'DDF': {}, 'WFD': {}}, 'mean_mwebv': {'DDF': {}, 'WFD': {}},
+    #                 'mean_epoch_range': {'DDF': {}, 'WFD': {}}, 'mean_cadence': {'DDF': {}, 'WFD': {}}}
+    sntype_stats = {'nobjects': {'DDF': {}}, 'mwebv': {'DDF': {}},
+                    'epoch_range': {'DDF': {}}, 'cadence': {'DDF': {}}}
 
     pool = mp.Pool()
     results = [pool.apply_async(get_class_distributions, args=(field, sntype, getdata)) for field, sntype in sntypes_and_fields]
     pool.close()
     pool.join()
     print("FINISHED POOLING")
+    bad_mags = []
     outputs = [p.get() for p in results]
     for out in outputs:
-        stats, field, sntype = out
+        stats, field, sntype, bad_mags_part = out
+        bad_mags += bad_mags_part
         for key, value in stats.items():
             sntype_stats[key][field][sntype] = value
+
+    # Save Bad mags
+    with open('bad_mags.txt', 'w') as f:
+        for line in bad_mags:
+            f.write("%s\n" % line)
 
     print("PLOTTING HISTOGRAMS")
     # Plot the histogram for each statistic
@@ -106,6 +128,7 @@ def get_distributions_multiprocessing(data_release, fig_dir):
             ax.set_xticklabels(sntype_names)
             ax.set_xlabel('sntype')
             ax.set_ylabel(stat)
+            ax.set_ylim(bottom=0)
             autolabel(rects, ax)
             fig.savefig("{0}/{1}_{2}.png".format(fig_dir, field, stat))
     return sntype_stats
@@ -129,7 +152,7 @@ def autolabel(rects, ax):
         else:
             label_position = height + (y_height * 0.01)
 
-        ax.text(rect.get_x() + rect.get_width()/2., label_position, '%s' % float('%.3g' % height), ha='center', va='bottom')
+        ax.text(rect.get_x() + rect.get_width()/2., label_position, '%s' % float('%.4g' % height), ha='center', va='bottom')
 
 
 if __name__ == '__main__':
@@ -139,8 +162,9 @@ if __name__ == '__main__':
 
     get_distributions_multiprocessing(data_release='20180112', fig_dir=fig_dir)
     print("PLOTTING LIGHTCURVES")
-    plot_light_curves(data_release='20180112', fig_dir=fig_dir, field='DDF', sntype='4', snid='87287')
+    plot_light_curves(data_release='20180112', fig_dir=fig_dir, field='WFD', sntype='1', snid='129712556')
     print("PLOTTED LIGHTCURVES")
 
     plt.show()
+
 
