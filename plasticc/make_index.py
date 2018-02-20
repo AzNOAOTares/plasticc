@@ -61,7 +61,7 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
     files = glob.glob(fullpattern)
 
     # most of the header columns are junk - save only the relevant ones
-    header_fields = ['SNID', 'PTROBS_MIN', 'PTROBS_MAX', 'MWEBV', 'MWEBV_ERR','HOSTGAL_PHOTOZ', 'HOSTGAL_PHOTOZ_ERR', 'SNTYPE', 'PEAKMJD']
+    header_fields = ['PTROBS_MIN', 'PTROBS_MAX', 'MWEBV', 'MWEBV_ERR','HOSTGAL_PHOTOZ', 'HOSTGAL_PHOTOZ_ERR', 'SNTYPE', 'PEAKMJD', 'SNID']
 
     for header_file in files:
         # skip processed files
@@ -99,7 +99,7 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
 
         # get the rest of the useful fields from the header 
         try:
-            header_out += [header_data[field] for field in header_fields[1:]]
+            header_out += [header_data[field] for field in header_fields]
             header_out = [row.encode('UTF') if row.dtype == np.dtype('U16') else row for row in header_out]
         except Exception as e:
             message = '{}\nSomething went wrong processing header file {}. SKIPPING!'.format(e, header_file)
@@ -107,7 +107,7 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
             continue
 
         # fix the column names 
-        keys = ['objid',] + [x.lower() for x in header_fields[1:]]
+        keys = ['objid',] + [x.lower() for x in header_fields]
         header_out = at.Table(header_out, names=keys)
         header_out = np.array(header_out).tolist()
         
