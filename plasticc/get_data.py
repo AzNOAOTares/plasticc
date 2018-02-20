@@ -46,7 +46,7 @@ class GetData(object):
         phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
 
         phot_HDU = afits.open(phot_file)
-        phot_data = phot_HDU[1].data[ptrobs_min:ptrobs_max]
+        phot_data = phot_HDU[1].data[ptrobs_min-1:ptrobs_max]
 
         phot_dict = {}
         filters = list(set(phot_data['FLT']))  # e.g. ['i', 'r', 'Y', 'u', 'g', 'z']
