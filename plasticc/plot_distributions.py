@@ -8,30 +8,6 @@ import itertools
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 
 
-def plot_light_curves(data_release, fig_dir=None, field='%', sntype='%', snid='%'):
-    getdata = GetData(data_release)
-    result = getdata.get_transient_data(field=field, sntype=sntype, snid=snid)
-    n=0
-    for head, phot in result:
-        objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd, snid = head
-        n += 1
-        print(n)
-        for f in phot.columns:  # Filter names
-            flt, mag, magerr, mjd = phot[f]
-            g = np.where(mag != 128.0)[0] # good indexes (where magnitude isn't 128)
-            flt, mag, magerr, mjd = flt[g], mag[g], magerr[g], mjd[g]
-            print(flt, mjd, mag, magerr)
-
-            fsave = plt.figure(f)
-            plt.errorbar(mjd, mag, yerr=magerr, fmt='.')
-            plt.legend(objid)
-    try:
-        for f in phot.columns:
-            fsave.savefig("{0}/{1}_{2}_{3}_{4}.png".format(fig_dir, field, sntype, snid, f))
-    except Exception as e:
-        print("No results for {}_{}_{}.png".format(field, sntype, snid))
-
-
 def get_class_distributions(field, sntype, getdata):
     """ Get population stats for each field and sntype """
     print(field, sntype)
@@ -161,10 +137,8 @@ if __name__ == '__main__':
         os.makedirs(fig_dir)
 
     get_distributions_multiprocessing(data_release='20180112', fig_dir=fig_dir)
-    print("PLOTTING LIGHTCURVES")
-    plot_light_curves(data_release='20180112', fig_dir=fig_dir, field='WFD', sntype='1', snid='129712556')
-    print("PLOTTED LIGHTCURVES")
 
     plt.show()
+
 
 
