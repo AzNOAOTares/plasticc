@@ -40,9 +40,12 @@ class GetData(object):
         column_out: list
             A list containing all the entire column for a particular sntype class
         """
-        column_out = database.exec_sql_query("SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND sntype={3};".format(column_name, self.data_release, field, sntype))
-        column_out = np.array(column_out)[:, 0]
-
+        try:
+            column_out = database.exec_sql_query("SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND sntype={3};".format(column_name, self.data_release, field, sntype))
+            column_out = np.array(column_out)[:, 0]
+        except IndexError:
+            print("No data in the database satisfy the given arguments. field: {}, sntype: {}".format(field, sntype))
+            return []
         return column_out
 
 
