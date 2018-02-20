@@ -107,7 +107,7 @@ class GetData(object):
             yield num_lightcurves
             return
         try:
-            objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*header))
+            objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd, snid = list(zip(*header))
 
             for i in range(num_lightcurves):
                 phot_data = self.get_light_curve(objid[i], ptrobs_min[i], ptrobs_max[i])
