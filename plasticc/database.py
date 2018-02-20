@@ -5,7 +5,7 @@ import getpass
 _SQL_FLAVOR = 'mysql'
 _MYSQL_CONFIG = {'host':'dlgreenmysqlv.stsci.edu',
                 'port':43306,
-                'user':'antares',
+                'user':'gnarayan',
                 'db':'yse',
                 'password':None}
 
@@ -18,7 +18,7 @@ def get_sql_password():
     user = None
     try:
         user = getpass.getuser()
-        password = "H321BpxNb9Pd"  # getpass.getpass(prompt='Enter MySQL password: ', stream=sys.stderr)
+        password = getpass.getpass(prompt='Enter MySQL password: ', stream=sys.stderr)
         if user not in ['gnarayan', 'dmuthukrishna']:
             message = 'Unauthorized user {}'.format(user)
             raise RuntimeError(message)

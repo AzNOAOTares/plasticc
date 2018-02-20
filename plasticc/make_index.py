@@ -53,7 +53,7 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
     table_name = database.create_sql_index_table_for_release(data_release, redo=redo)
 
     # get a list of the header files in the data release
-    filepattern = '*/*HEAD.FITS'
+    filepattern = '*/*HEAD.FITS*'
     fullpattern = os.path.join(data_dir, data_release, filepattern)
     files = glob.glob(fullpattern)
 
@@ -77,7 +77,7 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
         dirname = os.path.split(os.path.dirname(header_file))[DIRNAMES]
         fieldname, modelname = dirname.replace('LSST_', '').split('_')
         modelname = modelname.replace('MODEL','')
-        basename = basename.replace('LSST_','').replace(fieldname+'_','').replace('_HEAD.FITS','')
+        basename = basename.replace('LSST_','').replace(fieldname+'_','').replace('_HEAD.FITS.gz','').replace('_HEAD.FITS','')
     
         # get the header data
         try:
