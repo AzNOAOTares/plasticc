@@ -75,7 +75,7 @@ def create_sql_index_table_for_release(data_release, redo=False):
         else:
             return table_name
 
-    query = 'CREATE TABLE {} (objid TINYTEXT, ptrobs_min BIGINT UNSIGNED, ptrobs_max BIGINT UNSIGNED, mwebv FLOAT, mwebv_err FLOAT, hostgal_photoz FLOAT, hostgal_photoz_err FLOAT, sntype SMALLINT UNSIGNED, peakmjd FLOAT)'.format(table_name) 
+    query = 'CREATE TABLE {} (objid VARCHAR(255), ptrobs_min BIGINT UNSIGNED, ptrobs_max BIGINT UNSIGNED, mwebv FLOAT, mwebv_err FLOAT, hostgal_photoz FLOAT, hostgal_photoz_err FLOAT, sntype SMALLINT UNSIGNED, peakmjd FLOAT, snid BIGINT UNSIGNED, PRIMARY KEY (objid))'.format(table_name) 
     result =  exec_sql_query(query)
     print("Created Table {}.".format(table_name))
     return table_name
@@ -87,7 +87,7 @@ def write_rows_to_index_table(index_entries, table_name):
     Returns number of rows written
     """
     con = get_mysql_connection()
-    query = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)'.format(table_name)
+    query = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'.format(table_name)
     cursor = con.cursor()
     number_of_rows = cursor.executemany(query, index_entries)
     con.commit()
