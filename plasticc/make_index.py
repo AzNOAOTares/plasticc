@@ -35,10 +35,11 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
     if data_dir is None:
         data_dir = os.path.join(ROOT_DIR, 'plasticc_data')
 
+    used_files = []
     # get the list of files we processed already so we can skip in case something dies mid-processing
     processed_table_file = os.path.join(data_dir, data_release, 'processed_{}.txt'.format(data_release))
     try:
-        processed_tables = at.Table.read(processed_table_file, names=('filename',),  format='ascii')
+        processed_tables = at.Table.read(processed_table_file, names=('filename',),  format='no_header')
         used_files = processed_tables['filename'].tolist()
         if redo:
             raise RuntimeError('Clobbering')
@@ -46,8 +47,10 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
         used_files = []
 
     # if we have no list or we are clobbering, open the same file for output
+    proc_flag = False
     if len(used_files) == 0:
         proc_table = open(processed_table_file, 'w')
+        proc_flag = True
 
     # make a mysql table for this data
     table_name = database.create_sql_index_table_for_release(data_release, redo=redo)
@@ -119,13 +122,15 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
         message = "Wrote {} from header file {} to MySQL table {}".format(nrows, header_file, table_name)
         print(message)
 
-        # make an entry in the processed file table for this file
-        proc_table.write(header_file+'\n')
+        if proc_flag:
+            # make an entry in the processed file table for this file
+            proc_table.write(header_file+'\n')
 
         # save that we've already processed this file
         used_files.append(header_file)
-
-    proc_table.close()
+    
+    if proc_flag:
+        proc_table.close()
     return used_files 
 
 
