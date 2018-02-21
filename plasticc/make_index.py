@@ -51,12 +51,17 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
     used_files = []
     # get the list of files we processed already so we can skip in case something dies mid-processing
     processed_table_file = os.path.join(data_dir, data_release, 'processed_{}.txt'.format(data_release))
+
     try:
-        processed_tables = at.Table.read(processed_table_file, names=('filename',),  format='no_header')
+        processed_tables = at.Table.read(processed_table_file, names=('filename',),  format='ascii.no_header')
         used_files = processed_tables['filename'].tolist()
         if redo:
             raise RuntimeError('Clobbering')
+        else:
+            print('Restored {} used_files'.format(len(used_files)))
     except Exception as e:
+        message = '{}\nSomething went wrong restoring processed file {}'.format(e, processed_table_file)
+        warnings.warn(message, RuntimeWarning)
         used_files = []
 
     # if we have no list or we are clobbering, open the same file for output
@@ -64,7 +69,6 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
     if len(used_files) == 0:
         proc_table = open(processed_table_file, 'w')
         proc_flag = True
-
 
     # get a list of the header files in the data release
     filepattern = '*/*HEAD.FITS*'
