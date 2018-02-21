@@ -157,4 +157,6 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
 def main():
     data_dir = os.path.join(ROOT_DIR, 'plasticc_data')
     for data_release in next(os.walk(data_dir))[DIRNAMES]:
+        if data_release == 'src':
+            continue 
         make_index_for_release(data_release, data_dir=data_dir, redo=False)
