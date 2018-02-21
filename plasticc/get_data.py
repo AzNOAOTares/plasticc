@@ -23,6 +23,32 @@ class GetData(object):
         obj_ids = database.exec_sql_query("SELECT objid FROM {0};".format(self.data_release))
         return obj_ids
 
+    def get_column_for_sntype(self, column_name, sntype, field='%'):
+        """ Get an sql column for a particular sntype class
+
+        Parameters
+        ----------
+        column_name : str
+            column name. E.g. column_name='peakmjd'
+        sntype : int
+            sntype number. E.g. sntype=4
+        field : str, optional
+            The field name. E.g. field='DDF' or field='WFD'. The default is '%' indicating that all fields will be included.
+
+        Return
+        -------
+        column_out: list
+            A list containing all the entire column for a particular sntype class
+        """
+        try:
+            column_out = database.exec_sql_query("SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND sntype={3};".format(column_name, self.data_release, field, sntype))
+            column_out = np.array(column_out)[:, 0]
+        except IndexError:
+            print("No data in the database satisfy the given arguments. field: {}, sntype: {}".format(field, sntype))
+            return []
+        return column_out
+
+
     def get_light_curve(self, objid, ptrobs_min, ptrobs_max):
         """ Get lightcurve from fits file
 
@@ -126,4 +152,5 @@ if __name__ == '__main__':
     # objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*head))
     # mjd, filt, mag, mag_err = phot
     print(head, phot)
+
 
