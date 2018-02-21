@@ -56,25 +56,17 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
         for i, f in enumerate(t_plot.keys()):
             ax = fig.add_subplot(3, 2, i + 1)
             fig.tight_layout()
-            fig.suptitle("{}".format(sntypes_map[sntype_in]))
+            fig.suptitle("{}".format(sntype_name))
             ax.set_title(f)
             ax.invert_yaxis()
             if f not in t_plot.keys():
                 continue
             for i in range(len(t_plot[f])):
                 ax.plot(t_plot[f][i], mag_plot[f][i], marker='.')
-            fig.savefig("{0}/{1}_{2}_{3}_{4}.png".format(fig_dir, field_in, sntype_in, snid_in, f))
+        fig.savefig("{0}/{1}_{2}.png".format(fig_dir, field_in, sntype_name))
         # except Exception as e:
         #     print("No results for {}_{}_{}.png".format(field_in, sntype_in, snid_in))
 
-
-    # plt.plot(t, mag, marker='.', label="{}".format(snid))
-    # # plt.errorbar(mjd, mag, yerr=magerr, fmt='.')
-    # plt.gca().invert_yaxis()
-    # plt.title("{}: {}".format(sntypes_map[sntype], f))
-    # plt.xlabel('Days since date of min(mag)')
-    # plt.ylabel('Mag')
-    # plt.legend()
 
 if __name__ == '__main__':
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures')
