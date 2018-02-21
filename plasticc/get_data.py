@@ -95,11 +95,15 @@ class GetData(object):
 
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
-    def get_transient_data(self, field='%', model='%', base='%', snid='%', sntype='%', get_num_lightcurves=False):
+    def get_transient_data(self, columns=['objid', 'ptrobs_min', 'ptrobs_max'], field='%', model='%', base='%', snid='%', sntype='%', get_num_lightcurves=False):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
         Parameters
         ----------
+        columns : list
+            A list of strings of the names of the columns you want to retrieve from the database.
+            You must at least include ['objid', 'ptrobs_min', 'ptrobs_max'] at the beginning of the input list.
+            E.g. columns=['objid', 'ptrobs_min', 'ptrobs_max', 'sntype', 'peakmjd'].
         field : str, optional
             The field name. E.g. field='DDF' or field='WFD'. The default is '%' indicating that all fields will be included.
         model : str, optional
@@ -125,18 +129,16 @@ class GetData(object):
 
         sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
         header = database.exec_sql_query(
-            "SELECT objid, ptrobs_min, ptrobs_max FROM {0} WHERE objid LIKE '{1}%' AND objid LIKE '%{2}%' AND objid LIKE '%{3}%' "
-            "AND objid LIKE '%{4}' {5};".format(self.data_release, field, model, base, snid, sntype_command))
-
+            "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' "
+            "AND objid LIKE '%{5}' {6};".format(', '.join(columns), self.data_release, field, model, base, snid, sntype_command))
         num_lightcurves = len(header)
         if get_num_lightcurves:
             yield num_lightcurves
             return
         try:
-            objid, ptrobs_min, ptrobs_max = list(zip(*header))
-
             for i in range(num_lightcurves):
-                phot_data = self.get_light_curve(objid[i], ptrobs_min[i], ptrobs_max[i])
+                objid, ptrobs_min, ptrobs_max = header[i][0:3]
+                phot_data = self.get_light_curve(objid, ptrobs_min, ptrobs_max)
                 yield header[i], phot_data
 
         except ValueError:
@@ -152,5 +154,6 @@ if __name__ == '__main__':
     # objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*head))
     # mjd, filt, mag, mag_err = phot
     print(head, phot)
+
 
 

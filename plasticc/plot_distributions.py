@@ -22,11 +22,11 @@ def get_class_distributions(field, sntype, getdata):
     n = 0
     mwebv_list, epoch_range_list = [], []
     cadence_list = {f: [] for f in ['i', 'r', 'Y', 'u', 'g', 'z']}
-    result = getdata.get_transient_data(field=field, sntype=sntype, get_num_lightcurves=False)
+    result = getdata.get_transient_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'mwebv', 'sntype'], field=field, sntype=sntype, get_num_lightcurves=False)
     print("GOT RESULTS", field, sntype)
     bad_mags = []
     for head, phot in result:
-        objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd, snid = head
+        objid, ptrobs_min, ptrobs_max, mwebv, sntype = head
 
         # Loop through the filter light curves in each spectrum
         for f in phot.columns:  # Filter names
@@ -139,6 +139,7 @@ if __name__ == '__main__':
     get_distributions_multiprocessing(data_release='20180112', fig_dir=fig_dir)
 
     plt.show()
+
 
 
 

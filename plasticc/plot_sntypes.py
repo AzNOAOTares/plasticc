@@ -8,20 +8,19 @@ ROOT_DIR = os.getenv('PLASTICC_DIR')
 
 def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', snid_in='%', cadences=None):
     getdata = GetData(data_release)
-    result = getdata.get_transient_data(field=field_in, sntype=sntype_in, snid=snid_in)
-    n = 0
+    result = getdata.get_transient_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'], field=field_in, sntype=sntype_in, snid=snid_in)
     t_plot, mag_plot, magerr_plot, peak_mjd_plot = {}, {}, {}, {}
     sntypes, sntypes_map = getdata.get_sntypes()
     sntype_name = sntypes_map[sntype_in]
     med_cad = cadences[sntype_name]
     peak_mjd_all = getdata.get_column_for_sntype(column_name='peakmjd', sntype=sntype_in, field=field_in)
+    non_transients = ['RRLyrae', 'Mdwarf', 'Mira']
+    n = {'Y': 0, 'g': 0, 'i': 0, 'r': 0, 'u': 0, 'z': 0}
 
     for head, phot in result:
-        objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd, snid = head
-        n += 1
-        print(n)
+        objid, ptrobs_min, ptrobs_max, peak_mjd = head
 
-        if n > 50:  # Plot first n light curves
+        if all(n_value >= 6 for n_value in n.values()):
             break
 
         for f in phot.columns:  # Filter names
@@ -31,47 +30,43 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
             # print(flt, mjd, mag, magerr)
 
             cad = np.median(np.diff(mjd))
-            if 0.3 * med_cad < cad < med_cad*1.2:
-                t = mjd - peak_mjd
-                if f in t_plot:
-                    t_plot[f].append(t)
-                    mag_plot[f].append(mag)
-                    magerr_plot[f].append(magerr)
-                    peak_mjd_plot[f].append(peak_mjd)
+            if sntype_name in non_transients or  min(peak_mjd_all) + 90 < peak_mjd < max(peak_mjd_all) - 90:
+                if 0.3 * med_cad < cad < med_cad*1.2:
+                    t = mjd - peak_mjd
+                    if f in t_plot:
+                        if n[f] < 6:
+                            n[f] += 1
+                            t_plot[f].append(t)
+                            mag_plot[f].append(mag)
+                            magerr_plot[f].append(magerr)
+                            peak_mjd_plot[f].append(peak_mjd)
+                            print("Plotted", n, f, cad)
+
+                    else:
+                        t_plot[f], mag_plot[f], magerr_plot[f], peak_mjd_plot[f] = [], [], [], []
                 else:
-                    t_plot[f], mag_plot[f], magerr_plot[f], peak_mjd_plot[f] = [], [], [], []
+                    print("CADENCE TOO HIGH/LOW: ", cad, f, sntype_name)
             else:
-                print("CADENCE TOO HIGH/LOW: ", cad, sntype_name)
+                print("OUT OF SEASON:", n, peak_mjd, sntype_name, min(peak_mjd_all) + 90, max(peak_mjd_all) - 90)
 
 
     # try:
     if peak_mjd_all != []:  # If there are nonzero light curves
         fig = plt.figure(figsize=(15, 10))
-        for i, f in enumerate(phot.columns):
+        for i, f in enumerate(t_plot.keys()):
             ax = fig.add_subplot(3, 2, i + 1)
             fig.tight_layout()
-            fig.suptitle("{}".format(sntypes_map[sntype_in]))
+            fig.suptitle("{}".format(sntype_name))
             ax.set_title(f)
+            ax.invert_yaxis()
             if f not in t_plot.keys():
                 continue
             for i in range(len(t_plot[f])):
-                if min(peak_mjd_all) + 90 < peak_mjd_plot[f][i] < max(peak_mjd_all) - 90:
-                    ax.plot(t_plot[f][i], mag_plot[f][i], marker='.')
-                    ax.invert_yaxis()
-                else:
-                    print("OUT OF SEASON:", peak_mjd_plot[f][i], sntypes_map[sntype_in])
-            fig.savefig("{0}/{1}_{2}_{3}_{4}.png".format(fig_dir, field_in, sntype_in, snid_in, f))
+                ax.plot(t_plot[f][i], mag_plot[f][i], marker='.')
+        fig.savefig("{0}/{1}_{2}.png".format(fig_dir, field_in, sntype_name))
         # except Exception as e:
         #     print("No results for {}_{}_{}.png".format(field_in, sntype_in, snid_in))
 
-
-    # plt.plot(t, mag, marker='.', label="{}".format(snid))
-    # # plt.errorbar(mjd, mag, yerr=magerr, fmt='.')
-    # plt.gca().invert_yaxis()
-    # plt.title("{}: {}".format(sntypes_map[sntype], f))
-    # plt.xlabel('Days since date of min(mag)')
-    # plt.ylabel('Mag')
-    # plt.legend()
 
 if __name__ == '__main__':
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures')
@@ -93,4 +88,5 @@ if __name__ == '__main__':
     print("PLOTTED LIGHTCURVES")
 
     plt.show()
+
 
