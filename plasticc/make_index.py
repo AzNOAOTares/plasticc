@@ -27,6 +27,19 @@ from . import database
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 DIRNAMES = 1
 
+def get_file_data(filename, extension=0):
+    """
+    Wrapped to handle getting the data that returns None if there there was an error
+    """
+    # get the header data
+    try:
+        data  = afits.getdata(filename, extension)
+    except Exception as e:
+        message = '{}\nSomething went wrong reading file {}. SKIPPING!'.format(e, filename)
+        warnings.warn(message, RuntimeWarning)
+        data = None
+    return data
+
 
 def make_index_for_release(data_release, data_dir=None, redo=False):
     """
@@ -52,16 +65,22 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
         proc_table = open(processed_table_file, 'w')
         proc_flag = True
 
-    # make a mysql table for this data
-    table_name = database.create_sql_index_table_for_release(data_release, redo=redo)
 
     # get a list of the header files in the data release
     filepattern = '*/*HEAD.FITS*'
     fullpattern = os.path.join(data_dir, data_release, filepattern)
     files = glob.glob(fullpattern)
 
-    # most of the header columns are junk - save only the relevant ones
-    header_fields = ['PTROBS_MIN', 'PTROBS_MAX', 'MWEBV', 'MWEBV_ERR','HOSTGAL_PHOTOZ', 'HOSTGAL_PHOTOZ_ERR', 'SNTYPE', 'PEAKMJD', 'SNID']
+    sample_file_for_schema = files[0]
+    sample_data = get_file_data(sample_file_for_schema, extension=1)
+    if sample_data is None:
+        message = 'Something went wrong with with loading sample data. Cannot make schema'
+        raise RuntimeError(message)
+
+    header_fields, mysql_fields, mysql_schema = database.make_mysql_schema_from_astropy_bintable_cols(sample_data.columns)
+
+    # make a mysql table for this data
+    table_name = database.create_sql_index_table_for_release(data_release, mysql_schema, redo=redo)
 
     for header_file in files:
         # skip processed files
@@ -82,13 +101,8 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
         modelname = modelname.replace('MODEL','')
         basename = basename.replace('LSST_','').replace(fieldname+'_','').replace('_HEAD.FITS.gz','').replace('_HEAD.FITS','')
     
-        # get the header data
-        try:
-            header_HDU = afits.open(header_file)
-            header_data = header_HDU[1].data
-        except Exception as e:
-            message = '{}\nSomething went wrong reading header file {}. SKIPPING!'.format(e, header_file)
-            warnings.warn(message, RuntimeWarning)
+        header_data = get_file_data(header_file, extension=1)
+        if header_data is None:
             continue
 
         # fix the object IDs to be useful
@@ -107,8 +121,7 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
             continue
 
         # fix the column names 
-        keys = ['objid',] + [x.lower() for x in header_fields]
-        header_out = at.Table(header_out, names=keys)
+        header_out = at.Table(header_out, names=mysql_fields)
         header_out = np.array(header_out).tolist()
         
         # and save to mysql 
@@ -119,7 +132,10 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
             warnings.warn(message, RuntimeWarning)
             continue
 
-        message = "Wrote {} from header file {} to MySQL table {}".format(nrows, header_file, table_name)
+        if nrows > 0:
+            message = "Wrote {} from header file {} to MySQL table {}".format(nrows, header_file, table_name)
+        else:
+            message = "No useful data from header file {}".format(header_file)
         print(message)
 
         if proc_flag:

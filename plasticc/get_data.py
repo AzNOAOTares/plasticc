@@ -99,7 +99,7 @@ class GetData(object):
 
         sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
         header = database.exec_sql_query(
-            "SELECT * FROM {0} WHERE objid LIKE '{1}%' AND objid LIKE '%{2}%' AND objid LIKE '%{3}%' "
+            "SELECT objid, ptrobs_min, ptrobs_max FROM {0} WHERE objid LIKE '{1}%' AND objid LIKE '%{2}%' AND objid LIKE '%{3}%' "
             "AND objid LIKE '%{4}' {5};".format(self.data_release, field, model, base, snid, sntype_command))
 
         num_lightcurves = len(header)
@@ -107,12 +107,12 @@ class GetData(object):
             yield num_lightcurves
             return
         try:
-            objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd, snid = list(zip(*header))
+            objid, ptrobs_min, ptrobs_max = list(zip(*header))
 
             for i in range(num_lightcurves):
                 phot_data = self.get_light_curve(objid[i], ptrobs_min[i], ptrobs_max[i])
-
                 yield header[i], phot_data
+
         except ValueError:
             print("No light curves in the database satisfy the given arguments. "
                   "field: {}, model: {}, base: {}, snid: {}, sntype: {}".format(field, model, base, snid, sntype))

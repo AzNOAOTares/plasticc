@@ -2,12 +2,63 @@ import sys
 import pymysql
 import getpass
 
-_SQL_FLAVOR = 'mysql'
+# we should probably get these from a file instead
 _MYSQL_CONFIG = {'host':'dlgreenmysqlv.stsci.edu',
                 'port':43306,
                 'user':'gnarayan',
                 'db':'yse',
                 'password':None}
+
+def make_mysql_schema_from_astropy_bintable_cols(astropy_columns):
+    """
+    Builds a schema for the data in the HEAD.fits file, converting from numpy
+    types to mysql datatypes
+    """
+    fields = astropy_columns.names
+
+    # the header files have some columns that are model dependent, so they
+    # aren't present for all models. This eliminates those columns from the
+    # mysql, so we are guaranteed to always have common columns for all files.
+    # The price is that we will have to get these model specific columns from
+    # the HEAD.fits, but it's less painful to do that for just a few objects
+    # than to store several NULLs for all objects in mysql.
+    use_fields = []
+    for field in fields:
+        if field.startswith('SIMSED') or field.startswith('LCLIB') or field.startswith('SIM_TEMPLATE') or field.startswith('SIM_SALT2'):
+            continue
+        else:
+            use_fields.append(field)
+
+    # upper case fieldnames are THE WORST.
+    mysql_fields = ['objid',] + [field.lower().replace(')','').replace('(','_') for field in use_fields]
+
+    # this is the FITS format codes
+    # FITS format code         Description                     8-bit bytes
+    # L                        logical (Boolean)               1
+    # X                        bit                             *
+    # B                        Unsigned byte                   1
+    # I                        16-bit integer                  2
+    # J                        32-bit integer                  4
+    # K                        64-bit integer                  4
+    # A                        character                       1
+    # E                        single precision floating point 4
+    # D                        double precision floating point 8
+    # C                        single precision complex        8
+    # M                        double precision complex        16
+    # P                        array descriptor                8
+    # Q                        array descriptor                16
+
+    # we don't need to support all the FITS codes - just the subset that we're going to see in the data
+    dtype_conversion = {'I':'INTEGER',
+                        'J':'BIGINT',
+                        'K':'BIGINT',
+                        'A':'TINYTEXT',
+                        'E':'FLOAT',
+                        'D':'DOUBLE'}
+
+    mysql_formats = ['VARCHAR(255)',] + [dtype_conversion.get(x[-1], 'TINYTEXT') for x in astropy_columns.formats]
+    mysql_schema = ', '.join(['{} {}'.format(x, y) for x, y in zip(mysql_fields, mysql_formats)])
+    return use_fields, mysql_fields, mysql_schema
 
 
 def get_sql_password():
@@ -59,10 +110,13 @@ def get_index_table_name_for_release(data_release):
     return table_name
 
 
-def create_sql_index_table_for_release(data_release, redo=False):
+def create_sql_index_table_for_release(data_release, schema, redo=False):
     """
     Creates a MySQL Table to hold useful data from HEAD.fits files from the
-    PLASTICC sim. Checks if the table exists already. Drop if redo.
+    PLASTICC sim. Checks if the table exists already. The schema for this
+    release must be supplied. This is not hardcoded since, other than SNID, we
+    do not expect the schema to be the same for all data releases.
+    Drops table if redo.
     Returns a table_name
     """
     table_name = get_index_table_name_for_release(data_release)
@@ -75,7 +129,7 @@ def create_sql_index_table_for_release(data_release, redo=False):
         else:
             return table_name
 
-    query = 'CREATE TABLE {} (objid VARCHAR(255), ptrobs_min BIGINT UNSIGNED, ptrobs_max BIGINT UNSIGNED, mwebv FLOAT, mwebv_err FLOAT, hostgal_photoz FLOAT, hostgal_photoz_err FLOAT, sntype SMALLINT UNSIGNED, peakmjd FLOAT, snid BIGINT UNSIGNED, PRIMARY KEY (objid))'.format(table_name) 
+    query = 'CREATE TABLE {} ({}, PRIMARY KEY (objid))'.format(table_name, schema) 
     result =  exec_sql_query(query)
     print("Created Table {}.".format(table_name))
     return table_name
@@ -86,8 +140,16 @@ def write_rows_to_index_table(index_entries, table_name):
     Write rows to an index table
     Returns number of rows written
     """
+    primitive = ['%s',]
+    nrows = len(index_entries)
+    if nrows == 0:
+        return nrows
+
+    ncols = len(index_entries[0])
+    format_string = ', '.join(primitive*ncols)
+
     con = get_mysql_connection()
-    query = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'.format(table_name)
+    query = f'INSERT INTO {table_name} VALUES ({format_string})'
     cursor = con.cursor()
     number_of_rows = cursor.executemany(query, index_entries)
     con.commit()
