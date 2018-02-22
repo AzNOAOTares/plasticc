@@ -52,17 +52,17 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
 
     # try:
     if peak_mjd_all != []:  # If there are nonzero light curves
-        fig = plt.figure(figsize=(15, 10))
+        fig, axs = plt.subplots(3, 2, figsize=(15, 10), sharex=True, sharey=True)
+        axs = axs.flatten()
         for i, f in enumerate(t_plot.keys()):
-            ax = fig.add_subplot(3, 2, i + 1)
             fig.tight_layout()
             fig.suptitle("{}".format(sntype_name))
-            ax.set_title(f)
-            ax.invert_yaxis()
+            axs[i].set_title(f)
+            axs[i].invert_yaxis()
             if f not in t_plot.keys():
                 continue
             for i in range(len(t_plot[f])):
-                ax.plot(t_plot[f][i], mag_plot[f][i], marker='.')
+                axs[i].plot(t_plot[f][i], mag_plot[f][i], marker='.')
         fig.savefig("{0}/{1}_{2}.png".format(fig_dir, field_in, sntype_name))
         # except Exception as e:
         #     print("No results for {}_{}_{}.png".format(field_in, sntype_in, snid_in))
@@ -88,5 +88,6 @@ if __name__ == '__main__':
     print("PLOTTED LIGHTCURVES")
 
     plt.show()
+
 
 
