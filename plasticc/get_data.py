@@ -6,7 +6,7 @@ import os
 import numpy as np
 import pandas as pd
 import astropy.io.fits as afits
-import database
+from . import database
 
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 DATA_DIR = os.path.join(ROOT_DIR, 'plasticc_data')
@@ -70,8 +70,15 @@ class GetData(object):
         field, model, base, snid = objid.split('_')
         filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
         phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
+        if not os.path.exists(phot_file):
+            phot_file +'.gz'
 
-        phot_HDU = afits.open(phot_file)
+        try:
+            phot_HDU = afits.open(phot_file)
+        except Exception as e:
+            message = f'Could not open photometry file {phot_file}'
+            raise RuntimeError(message)
+
         phot_data = phot_HDU[1].data[ptrobs_min-1:ptrobs_max]
 
         phot_dict = {}
@@ -86,16 +93,18 @@ class GetData(object):
         return phot_out
 
     def get_sntypes(self):
-        """ Returns a list of the different transient classes in the database. """
-        sntypes = database.exec_sql_query("SELECT DISTINCT sntype FROM {};".format(self.data_release))
-
         sntypes_map = {1: 'SN1a', 2: 'CC', 3: 'SNIbc', 4: 'IIn', 42: 'SNIa-91bg', 45: 'pointIa', 50: 'Kilonova',
                         60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira',
                         90:'BSR', 91: 'String'}
+        return sntypes_map
 
+    def get_avail_sntypes(self):
+        """ Returns a list of the different transient classes in the database. """
+        sntypes = database.exec_sql_query("SELECT DISTINCT sntype FROM {};".format(self.data_release))
+        sntypes_map = self.get_sntypes()
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
-    def get_transient_data(self, columns=['objid', 'ptrobs_min', 'ptrobs_max'], field='%', model='%', base='%', snid='%', sntype='%', get_num_lightcurves=False):
+    def get_transient_data(self, columns=None, field='%', model='%', base='%', snid='%', sntype='%', get_num_lightcurves=False):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
         Parameters
@@ -126,7 +135,8 @@ class GetData(object):
             A generator containing a DataFrame with the MJD, FLT, MAG, MAGERR as rows and the the filter names as columns.
             E.g. Access the magnitude in the z filter with phot_data['z']['MAG'].
         """
-
+        if columns is None:
+            columns=['objid', 'ptrobs_min', 'ptrobs_max']
         sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
         header = database.exec_sql_query(
             "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' "
