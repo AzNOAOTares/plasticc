@@ -16,7 +16,7 @@ class GetData(object):
 
     def __init__(self, data_release):
         self.data_release = "release_{}".format(data_release)
-        self.phot_fields = ['MJD', 'FLT', 'MAG', 'MAGERR']
+        self.phot_fields = ['MJD', 'FLT', 'FLUXCAL', 'FLUXCALERR', 'ZEROPT']
 
     def get_object_ids(self):
         """ Get list of all object ids """
@@ -64,14 +64,14 @@ class GetData(object):
         Return
         -------
         phot_out: pandas DataFrame
-            A DataFrame containing the MJD, FLT, MAG, MAGERR seperated by each filter.
+            A DataFrame containing the MJD, FLT, FLUXCAL, FLUXCALERR, ZEROPT seperated by each filter.
             E.g. Access the magnitude in the z filter with phot_out['z']['MAG'].
         """
         field, model, base, snid = objid.split('_')
         filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
         phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
         if not os.path.exists(phot_file):
-            phot_file +'.gz'
+            phot_file = phot_file +'.gz'
 
         try:
             phot_HDU = afits.open(phot_file)
