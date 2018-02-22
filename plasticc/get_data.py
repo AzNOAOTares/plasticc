@@ -102,7 +102,6 @@ class GetData(object):
                     phot_dict[f][pfield] = phot_data[pfield][fIndexes]
 
         phot_out = pd.DataFrame(phot_dict)
-
         return phot_out
 
     def get_sntypes(self):

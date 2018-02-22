@@ -157,7 +157,7 @@ def write_rows_to_index_table(index_entries, table_name):
     return number_of_rows
 
 
-def get_mysql_connection():
+def get_mysql_connection(attempts=0):
     """
     Get a  MySQL connection object. The config variable _MYSQL_CONFIG defines
     the context/parameters of the connection. If config does not include a
@@ -167,7 +167,16 @@ def get_mysql_connection():
     password = _MYSQL_CONFIG.get('password')
     if password is None:
         get_sql_password()
-    con = pymysql.connect(**_MYSQL_CONFIG)
+    try:
+        con = pymysql.connect(**_MYSQL_CONFIG)
+    except Exception as e:
+        attempts += 1
+        if attempts < 3:
+            _MYSQL_CONFIG.pop('password')
+            con = get_mysql_connection(attempts=attempts)
+        else:
+            message = 'Login attempts exceeded!'
+            raise RuntimeError(message)
     return con
 
 
