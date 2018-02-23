@@ -9,12 +9,14 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import plasticc
 from plasticc.get_data import GetData
+from astropy.stats import sigma_clip
+from collections import OrderedDict
 
 
-
-def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', snid_in='%', cadences=None):
+def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', snid_in='%', cadences=None, limit=100, shuffle=False):
     getdata = GetData(data_release)
-    result = getdata.get_transient_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'], field=field_in, sntype=sntype_in, snid=snid_in)
+    result = getdata.get_transient_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'],\
+            field=field_in, sntype=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle)
 
     t_plot, flux_plot, fluxerr_plot, peak_mjd_plot = {}, {}, {}, {}
     sntypes_map = getdata.get_sntypes()
@@ -24,19 +26,32 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
     peak_mjd_all = getdata.get_column_for_sntype(column_name='peakmjd', sntype=sntype_in, field=field_in)
     non_transients = ['RRLyrae', 'Mdwarf', 'Mira']
 
-    n = {'Y': 0, 'g': 0, 'i': 0, 'r': 0, 'u': 0, 'z': 0}
+    n = OrderedDict()
+    n['u'] = 0
+    n['g'] = 0
+    n['r'] = 0
+    n['i'] = 0
+    n['z'] = 0
+    n['Y'] = 0
+
 
     for head, phot in result:
         objid, ptrobs_min, ptrobs_max, peak_mjd = head
         if all(n_value >= 6 for n_value in n.values()):
             break
 
-        for f in phot.columns:  # Filter names
-            flt, flux, fluxerr, mjd, zeropt = phot[f]
+        for f in n:  # Filter names
+            data = phot.get(f)
+            if data is None:
+                continue
+            flt, flux, fluxerr, mjd, zeropt = data
             t = mjd - peak_mjd
 
-            sn = np.abs(flux/fluxerr)
-            ind = np.where(sn >= 1.)[0]
+            filtered_err = sigma_clip(fluxerr, sigma=3., iters=5, copy=True)
+            filtered_flux = sigma_clip(flux, sigma=7., iters=5, copy=True)
+            bad1 = filtered_err.mask
+            bad2 = filtered_flux.mask
+            ind = ~np.logical_or(bad1, bad2)
 
             t = t[ind]
             flux = flux[ind]
@@ -58,15 +73,15 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
                 pass
 
     fig = plt.figure(figsize=(15, 10))
-    for i, f in enumerate(t_plot.keys()):
+    for i, f in enumerate(n.keys()):
         ax = fig.add_subplot(3, 2, i + 1)
-        fig.tight_layout()
-        fig.suptitle("{}".format(sntype_name))
         ax.set_title(f)
         if f not in t_plot.keys():
             continue
         for j, _ in enumerate(t_plot[f]):
             ax.errorbar(t_plot[f][j], flux_plot[f][j], yerr=fluxerr_plot[f][j], marker='.', linestyle='None')
+    fig.suptitle("{}".format(sntype_name))
+    fig.tight_layout(rect=[0, 0.03, 1, 0.90])
     fig.savefig("{0}/{1}_{2}.pdf".format(fig_dir, field_in, sntype_name))
     return(fig)
 
@@ -77,6 +92,9 @@ if __name__ == '__main__':
         os.makedirs(fig_dir)
 
     data_release = '20180221'
+    field = 'DDF'
+    limit=30
+    shuffle=True
 
     print("PLOTTING LIGHTCURVES")
 
@@ -89,9 +107,9 @@ if __name__ == '__main__':
                     'RRLyrae': 18.37, 'Mdwarf': 21.79, 'Mira': 7., 'BSR': 7., 'String': 7}
 
 
-    with PdfPages(f'{fig_dir}/all_{data_release}.pdf') as pdf:
+    with PdfPages(f'{fig_dir}/all_{data_release}_{field}.pdf') as pdf:
         for s in [1, 2, 3, 4, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82]:
-            fig = plot_light_curves(data_release=data_release, fig_dir=fig_dir, field_in='DDF', sntype_in=s, snid_in='%', cadences=median_cadences)
+            fig = plot_light_curves(data_release=data_release, fig_dir=fig_dir, field_in=field, sntype_in=s, snid_in='%', cadences=median_cadences, limit=limit, shuffle=shuffle)
             pdf.savefig(fig)
             plt.close(fig)
     print("PLOTTED LIGHTCURVES")
