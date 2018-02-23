@@ -116,7 +116,7 @@ class GetData(object):
         sntypes_map = self.get_sntypes()
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
-    def get_transient_data(self, columns=None, field='%', model='%', base='%', snid='%', sntype='%', get_num_lightcurves=False):
+    def get_transient_data(self, columns=None, field='%', model='%', base='%', snid='%', sntype='%', get_num_lightcurves=False, limit=None, shuffle=False):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
         Parameters
@@ -149,10 +149,21 @@ class GetData(object):
         """
         if columns is None:
             columns=['objid', 'ptrobs_min', 'ptrobs_max']
+
+        try:
+            limit = int(limit)
+            if limit <= 0:
+                raise RuntimeError('prat')
+        except Exception as e:
+            limit = None
+
         sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
-        header = database.exec_sql_query(
-            "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' "
-            "AND objid LIKE '%{5}' {6};".format(', '.join(columns), self.data_release, field, model, base, snid, sntype_command))
+        limit_command = '' if limit is None else " LIMIT {:n}".format(limit)
+        shuffle_command = '' if shuffle is False else " ORDER BY RAND()"
+        extra_command = ''.join([sntype_command, shuffle_command, limit_command])
+
+        query = "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' AND objid LIKE '%{5}' {6};".format(', '.join(columns), self.data_release, field, model, base, snid, extra_command)
+        header = database.exec_sql_query(query)
         num_lightcurves = len(header)
         if get_num_lightcurves:
             yield num_lightcurves
