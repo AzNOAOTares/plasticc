@@ -15,8 +15,8 @@ from collections import OrderedDict
 
 def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', snid_in='%', cadences=None, limit=100, shuffle=False):
     getdata = GetData(data_release)
-    result = getdata.get_transient_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'],\
-            field=field_in, sntype=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle)
+    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'],\
+            field=field_in, sntype=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
 
     t_plot, flux_plot, fluxerr_plot, peak_mjd_plot = {}, {}, {}, {}
     sntypes_map = getdata.get_sntypes()
