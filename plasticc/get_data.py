@@ -4,6 +4,7 @@ Get PLASTICC data from SQL database
 """
 import os
 import numpy as np
+import warnings
 import pandas as pd
 import astropy.io.fits as afits
 from . import database
@@ -116,8 +117,10 @@ class GetData(object):
         sntypes_map = self.get_sntypes()
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
-    def get_transient_data(self, columns=None, field='%', model='%', base='%', snid='%', sntype='%', get_num_lightcurves=False, limit=None, shuffle=False):
-        """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
+
+    def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', sntype='%', 
+            get_num_lightcurves=False, limit=None, shuffle=False, sort=True, offset=0):
+        """ Gets the header data given specific conditions.
 
         Parameters
         ----------
@@ -138,14 +141,17 @@ class GetData(object):
         get_num_lightcurves : boolean, optional
             If this is True, then the return value is just a single iteration generator stating the number of
             light curves that satisfied the given conditions.
-
+        limit : int, optional 
+            Limit the results to this number (> 0)
+        shuffle : bool, optional
+            Randomize the order of the results - not allowed with `sort`
+        sort : bool, optional
+            Order the results by objid - overrides `shuffle` if both are set
+        offeet : int, optional
+            Start returning MySQL results from this row number offset
         Return
         -------
         result: tuple
-            A generator tuple containing (objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd)
-        phot_data : pandas DataFrame
-            A generator containing a DataFrame with the MJD, FLT, MAG, MAGERR as rows and the the filter names as columns.
-            E.g. Access the magnitude in the z filter with phot_data['z']['MAG'].
         """
         if columns is None:
             columns=['objid', 'ptrobs_min', 'ptrobs_max']
@@ -157,27 +163,94 @@ class GetData(object):
         except Exception as e:
             limit = None
 
+        try:
+            offset = int(offset)
+            if offset <= 0:
+                raise RuntimeError('prat')
+        except Exception as e:
+            offset = None
+
+        if limit is not None and shuffle is False and sort is False:
+            sort = True
+
         sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
         limit_command = '' if limit is None else " LIMIT {:n}".format(limit)
+        offset_command = '' if offset is None else " OFFSET {:n}".format(offset)
+
+        if sort is True and shuffle is True:
+            message = 'Cannot sort and shuffle at the same time! That makes no sense!'
+            shuffle = False
+            warnings.warn(message, RuntimeWarning)
+
+
         shuffle_command = '' if shuffle is False else " ORDER BY RAND()"
-        extra_command = ''.join([sntype_command, shuffle_command, limit_command])
+        sort_command  = '' if sort is False else ' ORDER BY objid'
+        extra_command = ''.join([sntype_command, sort_command, shuffle_command, limit_command, offset_command])
 
         query = "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' AND objid LIKE '%{5}' {6};".format(', '.join(columns), self.data_release, field, model, base, snid, extra_command)
         header = database.exec_sql_query(query)
+
         num_lightcurves = len(header)
         if get_num_lightcurves:
-            yield num_lightcurves
-            return
-        try:
-            for i in range(num_lightcurves):
-                objid, ptrobs_min, ptrobs_max = header[i][0:3]
-                phot_data = self.get_light_curve(objid, ptrobs_min, ptrobs_max)
-                yield header[i], phot_data
+            return num_lightcurves
 
-        except ValueError:
+        if num_lightcurves > 0:
+            return header
+        else:
             print("No light curves in the database satisfy the given arguments. "
                   "field: {}, model: {}, base: {}, snid: {}, sntype: {}".format(field, model, base, snid, sntype))
-            return
+            return []
+
+
+
+    def get_lcs_data(self, columns=None, field='%', model='%', base='%', snid='%', sntype='%',\
+            limit=None, shuffle=False, sort=True, offset=0):
+        """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
+
+        Parameters
+        ----------
+        columns : list
+            A list of strings of the names of the columns you want to retrieve from the database.
+            You must at least include ['objid', 'ptrobs_min', 'ptrobs_max'] at the beginning of the input list.
+            E.g. columns=['objid', 'ptrobs_min', 'ptrobs_max', 'sntype', 'peakmjd'].
+        field : str, optional
+            The field name. E.g. field='DDF' or field='WFD'. The default is '%' indicating that all fields will be included.
+        model : str, optional
+            The model number. E.g. model='04'. The default is '%' indicating that all model numbers will be included.
+        base : str, optional
+            The base name. E.g. base='NONIa'. The default is '%' indicating that all base names will be included.
+        snid : str, optional
+            The transient id. E.g. snid='87287'. The default is '%' indicating that all snids will be included.
+        sntype : str, optional
+            The transient type/class. E.g. sntype='3'. The default is '%' indicating that all sntypes will be included.
+        limit : int, optional 
+            Limit the results to this number (> 0)
+        shuffle : bool, optional
+            Randomize the order of the results - not allowed with `sort`
+        sort : bool, optional
+            Order the results by objid - overrides `shuffle` if both are set
+        offset : int, optional
+            Start returning MySQL results from this row number offset (> 0)
+
+        Return
+        -------
+        result: tuple
+            A generator tuple containing (objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd)
+        phot_data : pandas DataFrame
+            A generator containing a DataFrame with the MJD, FLT, MAG, MAGERR as rows and the the filter names as columns.
+            E.g. Access the magnitude in the z filter with phot_data['z']['MAG'].
+        """
+
+        header = self.get_lcs_headers(columns=columns, field=field,\
+                    model=model, base=base, snid=snid, sntype=sntype,\
+                    limit=limit, sort=sort, shuffle=shuffle, offset=offset)
+
+        num_lightcurves = len(header)
+        for i in range(num_lightcurves):
+            objid, ptrobs_min, ptrobs_max = header[i][0:3]
+            phot_data = self.get_light_curve(objid, ptrobs_min, ptrobs_max)
+            yield header[i], phot_data
+
 
 
 if __name__ == '__main__':
