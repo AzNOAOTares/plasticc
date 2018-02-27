@@ -20,17 +20,20 @@ class PeriodicMixin(object):
         on the array of periods sets model, periods, P_multi and best_period,
         overwriting if they already exist
         """
-        if len(self.time) == 0:
+        nobs = len(self.time)
+        if nobs == 0:
             return None, None, None
 
         if self.time.max() - self.time.min() < max_p:
             return None, None, None
 
-        if not self.per:
-            return None, None, None
 
+        optimizer_kwds = {'quiet':True}
         try:
-            model = periodic.LombScargleMultibandFast(fit_period=True)
+            if nobs <= 50:
+                model = periodic.LombScargleMultiband(fit_period=True, optimizer_kwds=optimizer_kwds)
+            else:
+                model = periodic.LombScargleMultibandFast(fit_period=True, optimizer_kwds=optimizer_kwds)
             model.optimizer.period_range = (min_p, max_p)
             model.fit(self.time, self.flux, self.fluxErr, self.passband)
 
