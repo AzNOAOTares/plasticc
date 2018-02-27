@@ -14,7 +14,7 @@ def get_class_distributions(field, sntype, getdata):
     stats = {}
 
     # Get the number of objects for each sntype
-    result = getdata.get_transient_data(field=field, sntype=sntype, get_num_lightcurves=True)
+    result = getdata.get_lcs_data(field=field, sntype=sntype, get_num_lightcurves=True)
     stats['nobjects'] = (next(result), 0)
     print("GOT COUNTS", field, sntype)
 
@@ -22,7 +22,7 @@ def get_class_distributions(field, sntype, getdata):
     n = 0
     mwebv_list, epoch_range_list = [], []
     cadence_list = {f: [] for f in ['i', 'r', 'Y', 'u', 'g', 'z']}
-    result = getdata.get_transient_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'mwebv', 'sntype'], field=field, sntype=sntype, get_num_lightcurves=False)
+    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'mwebv', 'sntype'], field=field, sntype=sntype, get_num_lightcurves=False)
     print("GOT RESULTS", field, sntype)
     bad_mags = []
     for head, phot in result:
