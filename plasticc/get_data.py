@@ -98,12 +98,52 @@ class GetData(object):
                     true_zpt = phot_data['ZEROPT'][fIndexes]
                     fluxcalerr = (10**(-0.4*(true_zpt - standard_zpt)))*phot_data[pfield][fIndexes]
                     phot_dict[f][pfield] = fluxcalerr
+                elif pfield=='MJD':
+                    # MJD
+                    phot_dict[f][pfield] = phot_data[pfield][fIndexes]
+                elif pfield=='FLT':
+                    true_zpt = phot_data['ZEROPT'][fIndexes]
+                    nobs = len(true_zpt)
+                    phot_dict[f][pfield] = np.repeat(f.strip(), nobs)
                 else:
-                    # MJD, FLT
                     phot_dict[f][pfield] = phot_data[pfield][fIndexes]
 
         phot_out = pd.DataFrame(phot_dict)
         return phot_out
+
+    @staticmethod
+    def convert_pandas_lc_to_recarray_lc(phot):
+        """
+        ANTARES_object not Pandas format broken up by passband
+        TODO: This is ugly - just have an option for get_lcs_data to return one or the other
+        """
+        pbs = ('u', 'g', 'r', 'i', 'z', 'Y')
+        mjd   = []
+        flux  = []
+        dflux = []
+        zpt   = []
+        pb    = []
+
+        for this_pb in phot:
+
+            # do we know what this passband is
+            if this_pb not in pbs:
+                continue 
+
+            this_pb_lc = phot.get(this_pb)
+            if this_pb_lc is None:
+                continue
+
+            mjd   += this_pb_lc['MJD'].tolist()
+            flux  += this_pb_lc['FLUXCAL'].tolist()
+            dflux += this_pb_lc['FLUXCALERR'].tolist()
+            pb    += this_pb_lc['FLT'].tolist()
+            zpt   += this_pb_lc['ZEROPT'].tolist()
+
+        out = np.rec.fromarrays([mjd, flux, dflux, pb, zpt], names=['mjd', 'flux', 'dflux', 'pb', 'zpt'])
+        return out
+
+
 
     def get_sntypes(self):
         sntypes_map = {1: 'SN1a', 2: 'CC', 3: 'SNIbc', 4: 'IIn', 42: 'SNIa-91bg', 45: 'pointIa', 50: 'Kilonova',
