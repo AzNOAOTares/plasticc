@@ -23,22 +23,39 @@ def parse_getdata_options(argv=None):
 
     def_sql_wildcard = '%'
     parser = argparse.ArgumentParser(description="Get options to the GetData structure")
+    group = parser.add_mutually_exclusive_group(required=True) 
     parser.register('type','bool',str2bool)
-    parser.add_argument('-d','--data_release', required=True, help='PLAsTiCC data release index table to process')
-    field_choices = ('WFD', 'DDF')
-    parser.add_argument('-f','--field', required=False, default=def_sql_wildcard, type=str.upper, choices=field_choices,\
+    parser.add_argument('--data_release', required=True, help='PLAsTiCC data release index table to process')
+    field_choices = ('WFD', 'DDF', '%')
+    parser.add_argument('--field', required=False, default='DDF', type=str.upper, choices=field_choices,\
                         help='PLAsTiCC field to process')
-    model_choices = list(GetData.get_sntypes().keys()).append('%')
-    parser.add_argument('-m', '--model', required=False, default=def_sql_wildcard, choices=model_choices,\
+
+    type_mapping = GetData.get_sntypes()
+    inverse_mapping = {v:k for k, v in type_mapping.items()}
+
+    model_choices = list(type_mapping.keys()).append('%')
+    model_name_choices = list(type_mapping.values()).append('%')
+
+    group.add_argument('--model', required=False, default=def_sql_wildcard, choices=model_choices,\
                         help='PLAsTiCC model to process')
-    parser.add_argument('-b', '--base', required=False, default=def_sql_wildcard, help='PLAsTiCC model base filename (probably not a good idea to touch this)')
-    parser.add_argument('-i', '--id', required=False, default=def_sql_wildcard, help='PLAsTiCC object ID number (useful for debugging/testing)')
-    parser.add_argument('-l', '--limit', required=False, type=int, default=None, help='Limit the number of returned results from the MySQL index')
+    group.add_argument('--model_name', required=False, default=def_sql_wildcard, choices=model_name_choices,\
+                        help='PLAsTiCC model name to process')
+    parser.add_argument('--base', required=False, default=def_sql_wildcard, help='PLAsTiCC model base filename (probably not a good idea to touch this)')
+    parser.add_argument('--snid', required=False, default=def_sql_wildcard, help='PLAsTiCC object ID number (useful for debugging/testing)')
+    parser.add_argument('--limit', required=False, type=int, default=None, help='Limit the number of returned results from the MySQL index')
     parser.add_argument('--shuffle', required=False, type="bool", default="False", help='Shuffle the returned results from the MySQL index')
     parser.add_argument('--sort', required=False, type="bool", default="True", help='Sort the returned results from the MySQL index')
-    parser.add_argument('-o', '--offset', required=False, default=None, type=int, help='Return the MySQL results AFTER offset rows')
+    parser.add_argument('--offset', required=False, default=None, type=int, help='Return the MySQL results AFTER offset rows')
     args = parser.parse_args(args=argv)
+
     out = vars(args)
+    if 'model_name' in out:
+        model_name = out.pop('model_name')
+        if model_name == '%':
+            out['model'] = '%'
+        else:
+            model = inverse_mapping.get(model_name)
+            out['model'] = model
     out['sntype'] = out['model']
     return out
 
