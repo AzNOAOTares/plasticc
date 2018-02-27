@@ -24,21 +24,24 @@ def main():
 
     colors = OrderedDict([('u','blueviolet'), ('g','green'), ('r','red'), ('i','orange'), ('z','black'), ('Y','gold')])
 
-    data_release = '20180221' # need to make this argparseable
-    model_name = 'RRLyrae'
-    #model_name = 'Mdwarf'
-    field = 'WFD'
+    kwargs = plasticc.get_data.parse_getdata_options()
+    print("This config ", kwargs)
+    data_release = kwargs.pop('data_release')
+    field = kwargs.get('field')
+    model_id = kwargs.get('model')
+    sntypes = plasticc.get_data.GetData.get_sntypes()
+    model_name = sntypes.get(model_id)
+    out_field = field
+    if out_field == '%':
+        out_field = 'all'
 
     getter = plasticc.get_data.GetData(data_release)
-    sntypes_map = getter.get_sntypes()
-    model_id = list(sntypes_map.keys())[list(sntypes_map.values()).index(model_name)]
 
-
-    lcdata = getter.get_lcs_data(model=model_id, sntype=model_id,  field=field)
+    lcdata = getter.get_lcs_data(**kwargs)
     if lcdata is None:
         raise RuntimeError('could not get light curves')
     else:
-        with PdfPages(f'{fig_dir}/{model_name}_{data_release}_{field}.pdf') as pdf:
+        with PdfPages(f'{fig_dir}/{model_name}_{data_release}_{out_field}.pdf') as pdf:
             for head, phot in lcdata:
                 objid, _, _ = head
                 lc = getter.convert_pandas_lc_to_recarray_lc(phot)
