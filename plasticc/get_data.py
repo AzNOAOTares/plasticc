@@ -105,6 +105,40 @@ class GetData(object):
         phot_out = pd.DataFrame(phot_dict)
         return phot_out
 
+    @staticmethod
+    def convert_pandas_lc_to_recarray_lc(phot):
+        """
+        ANTARES_object not Pandas format broken up by passband
+        TODO: This is ugly - just have an option for get_lcs_data to return one or the other
+        """
+        pbs = ('u', 'g', 'r', 'i', 'z', 'Y')
+        mjd   = []
+        flux  = []
+        dflux = []
+        zpt   = []
+        pb    = []
+
+        for this_pb in phot:
+
+            # do we know what this passband is
+            if this_pb not in pbs:
+                continue 
+
+            this_pb_lc = phot.get(this_pb)
+            if this_pb_lc is None:
+                continue
+
+            mjd   += this_pb_lc['MJD'].tolist()
+            flux  += this_pb_lc['FLUXCAL'].tolist()
+            dflux += this_pb_lc['FLUXCALERR'].tolist()
+            pb    += this_pb_lc['FLT'].tolist()
+            zpt   += this_pb_lc['ZEROPT'].tolist()
+
+        out = np.rec.fromarrays([mjd, flux, dflux, pb, zpt], names=['mjd', 'flux', 'dflux', 'pb', 'zpt'])
+        return out
+
+
+
     def get_sntypes(self):
         sntypes_map = {1: 'SN1a', 2: 'CC', 3: 'SNIbc', 4: 'IIn', 42: 'SNIa-91bg', 45: 'pointIa', 50: 'Kilonova',
                         60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira',
