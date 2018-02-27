@@ -1,4 +1,6 @@
 import sys
+import os
+import configparser
 import pymysql
 import getpass
 
@@ -6,8 +8,25 @@ import getpass
 _MYSQL_CONFIG = {'host':'dlgreenmysqlv.stsci.edu',
                 'port':43306,
                 'user':'gnarayan',
-                'db':'yse',
+                'database':'yse',
                 'password':None}
+
+def get_mysql_config():
+    mysql_setting_file = os.path.expanduser(os.path.join('~','.my.cnf'))
+    if os.path.exists(mysql_setting_file):
+        reader = configparser.RawConfigParser()
+        reader.read(mysql_setting_file)
+        if 'client' in reader.sections():
+            settings = dict(reader['client'].items())
+            for key, old_val in _MYSQL_CONFIG.items():
+                if old_val is None:
+                    new_val = settings.get(key)
+                    if new_val is not None:
+                        _MYSQL_CONFIG[key] = new_val
+    else:
+        print("Create a ~/.my.cnf if you don't want to keep being bugged about the password.")
+    return _MYSQL_CONFIG                
+
 
 def make_mysql_schema_from_astropy_bintable_cols(astropy_columns):
     """
@@ -164,6 +183,7 @@ def get_mysql_connection(attempts=0):
     MySQL password, the user is prompted for it.
     Returns a MySQL connection object.
     """
+    _MYSQL_CONFIG = get_mysql_config() 
     password = _MYSQL_CONFIG.get('password')
     if password is None:
         get_sql_password()
