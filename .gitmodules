@@ -1,0 +1,3 @@
+[submodule "snmachine"]
+	path = snmachine
+	url = git@github.com:AzNOAOTares/snmachine.git
