@@ -1,10 +1,12 @@
-# !/usr/bin/env python
+# -*- coding: UTF-8 -*-
 """
 Get PLASTICC data from SQL database
 """
+import sys
 import os
 import numpy as np
 import warnings
+import argparse
 import pandas as pd
 import astropy.io.fits as afits
 from . import database
@@ -12,9 +14,39 @@ from . import database
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 DATA_DIR = os.path.join(ROOT_DIR, 'plasticc_data')
 
+def parse_getdata_options(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+
+    def str2bool(v):
+        return v.lower() in ("yes", "true", "t", "1")
+
+    def_sql_wildcard = '%'
+    parser = argparse.ArgumentParser(description="Get options to the GetData structure")
+    parser.register('type','bool',str2bool)
+    parser.add_argument('-d','--data_release', required=True, help='PLAsTiCC data release index table to process')
+    field_choices = ('WFD', 'DDF')
+    parser.add_argument('-f','--field', required=False, default=def_sql_wildcard, type=str.upper, choices=field_choices,\
+                        help='PLAsTiCC field to process')
+    model_choices = list(GetData.get_sntypes().keys()).append('%')
+    parser.add_argument('-m', '--model', required=False, default=def_sql_wildcard, choices=model_choices,\
+                        help='PLAsTiCC model to process')
+    parser.add_argument('-b', '--base', required=False, default=def_sql_wildcard, help='PLAsTiCC model base filename (probably not a good idea to touch this)')
+    parser.add_argument('-i', '--id', required=False, default=def_sql_wildcard, help='PLAsTiCC object ID number (useful for debugging/testing)')
+    parser.add_argument('-l', '--limit', required=False, type=int, default=None, help='Limit the number of returned results from the MySQL index')
+    parser.add_argument('--shuffle', required=False, type="bool", default="False", help='Shuffle the returned results from the MySQL index')
+    parser.add_argument('--sort', required=False, type="bool", default="True", help='Sort the returned results from the MySQL index')
+    parser.add_argument('-o', '--offset', required=False, default=None, type=int, help='Return the MySQL results AFTER offset rows')
+    args = parser.parse_args(args=argv)
+    out = vars(args)
+    out['sntype'] = out['model']
+    return out
+
 
 class GetData(object):
-
+    """
+    Class to access the ANTARES parsed PLaSTiCC index and light curve data
+    """
     def __init__(self, data_release):
         self.data_release = "release_{}".format(data_release)
         self.phot_fields = ['MJD', 'FLT', 'FLUXCAL', 'FLUXCALERR', 'ZEROPT']
@@ -144,8 +176,8 @@ class GetData(object):
         return out
 
 
-
-    def get_sntypes(self):
+    @staticmethod
+    def get_sntypes():
         sntypes_map = {1: 'SN1a', 2: 'CC', 3: 'SNIbc', 4: 'IIn', 42: 'SNIa-91bg', 45: 'pointIa', 50: 'Kilonova',
                         60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira',
                         90:'BSR', 91: 'String'}
@@ -187,7 +219,7 @@ class GetData(object):
             Randomize the order of the results - not allowed with `sort`
         sort : bool, optional
             Order the results by objid - overrides `shuffle` if both are set
-        offeet : int, optional
+        offset : int, optional
             Start returning MySQL results from this row number offset
         Return
         -------
@@ -290,16 +322,3 @@ class GetData(object):
             objid, ptrobs_min, ptrobs_max = header[i][0:3]
             phot_data = self.get_light_curve(objid, ptrobs_min, ptrobs_max)
             yield header[i], phot_data
-
-
-
-if __name__ == '__main__':
-    getdata = GetData('20180112')
-    result = getdata.get_transient_data(field='DDF', base='NONIa')
-    head, phot = next(result)
-    # objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd = list(zip(*head))
-    # mjd, filt, mag, mag_err = phot
-    print(head, phot)
-
-
-
