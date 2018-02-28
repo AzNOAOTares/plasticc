@@ -305,7 +305,8 @@ class GetData(object):
         sort_command  = '' if sort is False else ' ORDER BY objid'
         extra_command = ''.join([sntype_command, sort_command, shuffle_command, limit_command, offset_command])
 
-        query = "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' AND objid LIKE '%{5}' {6};".format(', '.join(columns), self.data_release, field, model, base, snid, extra_command)
+        #query = "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' AND objid LIKE '%{5}' {6};".format(', '.join(columns), self.data_release, field, model, base, snid, extra_command)
+        query = "SELECT {} FROM {} WHERE objid LIKE '{}_{:02n}_{}_{}' {};".format(', '.join(columns), self.data_release, field, int(model), base, snid, extra_command)
         header = database.exec_sql_query(query)
 
         num_lightcurves = len(header)
