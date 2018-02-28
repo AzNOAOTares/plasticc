@@ -58,7 +58,6 @@ def parse_getdata_options(argv=None):
             out['model'] = model
     else:
         this_model = inverse_mapping.get(model_name)
-        model      = out.pop('model')
         if model == '%':
             out['model'] = this_model 
         else:
