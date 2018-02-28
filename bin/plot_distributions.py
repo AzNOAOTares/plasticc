@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from get_data import GetData
+from plasticc.get_data import GetData
 import multiprocessing as mp
 import itertools
 
@@ -14,15 +14,15 @@ def get_class_distributions(field, sntype, getdata):
     stats = {}
 
     # Get the number of objects for each sntype
-    result = getdata.get_lcs_data(field=field, sntype=sntype, get_num_lightcurves=True)
-    stats['nobjects'] = (next(result), 0)
+    result = getdata.get_lcs_headers(field=field, sntype=sntype, get_num_lightcurves=True)
+    stats['nobjects'] = result
     print("GOT COUNTS", field, sntype)
 
     # Get other stats for each sntype
     n = 0
     mwebv_list, epoch_range_list = [], []
     cadence_list = {f: [] for f in ['i', 'r', 'Y', 'u', 'g', 'z']}
-    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'mwebv', 'sntype'], field=field, sntype=sntype, get_num_lightcurves=False)
+    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'mwebv', 'sntype'], field=field, sntype=sntype)
     print("GOT RESULTS", field, sntype)
     bad_mags = []
     for head, phot in result:
@@ -30,49 +30,50 @@ def get_class_distributions(field, sntype, getdata):
 
         # Loop through the filter light curves in each spectrum
         for f in phot.columns:  # Filter names
-            flt, mag, magerr, mjd = phot[f]
+            flt, flux, fluxerr, mjd, zeropt = phot[f]
             # remove fluxes with mag = 128
-            g = np.where(mag != 128.0)[0]  # good indexes (where magnitude isn't 128)
-            b = np.where(mag == 128.0)[0]  # bad indexes (where magnitude isn't 128)
+            g = np.where(flux > 0)[0]  # good indexes (where magnitude isn't 128)
+            b = np.where(flux <= 0)[0]  # bad indexes (where magnitude isn't 128)
             if g.size == 0:
                 bad_mags.append([objid, f, mjd[b], 'ALL'])
                 continue
-            elif len(g) != len(mag):
+            elif len(g) != len(flux):
                 bad_mags.append([objid, f, mjd[b]])
 
-            flt, mag, magerr, mjd = flt[g], mag[g], magerr[g], mjd[g]
+            flt, flux, fluxerr, mjd, zeropt = flt[g], flux[g], fluxerr[g], mjd[g], zeropt[g]
             
             mwebv_list.append(mwebv)
             epoch_range_list.append(np.max(mjd) - np.min(mjd))
             cadence_list[f].append(np.median(np.diff(mjd)))
 
             n += 1
-            if n % 100 == 0:
+            if n % 1000 == 0:
                 print(n)
 
     if n == 0:
-        stats['mwebv'] = (0, 0)
-        stats['epoch_range'] = (0, 0)
-        stats['cadence'] = (0, 0)
+        stats['mean_mwebv'] = (0, 0)
+        stats['mean_epoch_range'] = (0, 0)
+        stats['mean_cadence'] = (0, 0)
     else:
-        stats['mwebv'] = (np.mean(mwebv_list), np.std(mwebv_list))
-        stats['epoch_range'] = (np.mean(epoch_range_list), np.std(epoch_range_list))
+        stats['mean_mwebv'] = (np.mean(mwebv_list), np.std(mwebv_list))
+        stats['mean_epoch_range'] = (np.mean(epoch_range_list), np.std(epoch_range_list))
         cadence_list_all = list(itertools.chain.from_iterable(list(cadence_list.values())))  # Combine lists
-        stats['cadence'] = (np.nanmean(cadence_list_all), np.nanstd(cadence_list_all))
+        stats['mean_cadence'] = (np.nanmean(cadence_list_all), np.nanstd(cadence_list_all))
 
     return stats, field, sntype, bad_mags
 
 
 def get_distributions_multiprocessing(data_release, fig_dir):
     getdata = GetData(data_release)
-    fields = ['DDF']#, 'WFD']
-    sntypes, sntypes_map = getdata.get_sntypes()
+    fields = ['DDF', 'WFD']
+    sntypes_map = getdata.get_sntypes()
+    sntypes = sntypes_map.keys()
     sntype_names = [sntypes_map[i] for i in sntypes]
     sntypes_and_fields = list(itertools.product(fields, sntypes))
-    # sntype_stats = {'nobjects': {'DDF': {}, 'WFD': {}}, 'mean_mwebv': {'DDF': {}, 'WFD': {}},
-    #                 'mean_epoch_range': {'DDF': {}, 'WFD': {}}, 'mean_cadence': {'DDF': {}, 'WFD': {}}}
-    sntype_stats = {'nobjects': {'DDF': {}}, 'mwebv': {'DDF': {}},
-                    'epoch_range': {'DDF': {}}, 'cadence': {'DDF': {}}}
+    sntype_stats = {'nobjects': {'DDF': {}, 'WFD': {}}, 'mean_mwebv': {'DDF': {}, 'WFD': {}},
+                    'mean_epoch_range': {'DDF': {}, 'WFD': {}}, 'mean_cadence': {'DDF': {}, 'WFD': {}}}
+    # sntype_stats = {'nobjects': {'DDF': {}}, 'mwebv': {'DDF': {}},
+    #                 'epoch_range': {'DDF': {}}, 'cadence': {'DDF': {}}}
 
     pool = mp.Pool()
     results = [pool.apply_async(get_class_distributions, args=(field, sntype, getdata)) for field, sntype in sntypes_and_fields]
@@ -139,6 +140,7 @@ if __name__ == '__main__':
     get_distributions_multiprocessing(data_release='20180112', fig_dir=fig_dir)
 
     plt.show()
+
 
 
 

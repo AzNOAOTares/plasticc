@@ -296,6 +296,8 @@ class GetData(object):
         sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
         limit_command = '' if limit is None else " LIMIT {:n}".format(limit)
         offset_command = '' if offset is None else " OFFSET {:n}".format(offset)
+        if model != '%':
+            model = "{:02n}".format(int(model))
 
         if sort is True and shuffle is True:
             message = 'Cannot sort and shuffle at the same time! That makes no sense!'
@@ -308,7 +310,7 @@ class GetData(object):
         extra_command = ''.join([sntype_command, sort_command, shuffle_command, limit_command, offset_command])
 
         #query = "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' AND objid LIKE '%{5}' {6};".format(', '.join(columns), self.data_release, field, model, base, snid, extra_command)
-        query = "SELECT {} FROM {} WHERE objid LIKE '{}_{:02n}_{}_{}' {};".format(', '.join(columns), self.data_release, field, int(model), base, snid, extra_command)
+        query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns), self.data_release, field, model, base, snid, extra_command)
         header = database.exec_sql_query(query)
 
         num_lightcurves = len(header)
@@ -371,3 +373,4 @@ class GetData(object):
             objid, ptrobs_min, ptrobs_max = header[i][0:3]
             phot_data = self.get_light_curve(objid, ptrobs_min, ptrobs_max)
             yield header[i], phot_data
+
