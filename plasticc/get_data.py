@@ -156,7 +156,7 @@ class GetData(object):
             phot_file = phot_file +'.gz'
 
         try:
-            phot_HDU = afits.open(phot_file)
+            phot_HDU = afits.open(phot_file, memmap=True)
         except Exception as e:
             message = f'Could not open photometry file {phot_file}'
             raise RuntimeError(message)
@@ -183,6 +183,8 @@ class GetData(object):
                     dtypes[pfield] = np.float64
 
         phot_out = pd.DataFrame(phot_dict)
+        phot_HDU.close()
+        del phot_HDU[1].data
         return phot_out
 
     @staticmethod
