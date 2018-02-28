@@ -132,7 +132,7 @@ class GetData(object):
         return column_out
 
 
-    def get_light_curve(self, objid, ptrobs_min, ptrobs_max, standard_zpt=30.):
+    def get_light_curve(self, objid, ptrobs_min, ptrobs_max, standard_zpt=27.5):
         """ Get lightcurve from fits file
 
         Parameters
@@ -173,17 +173,6 @@ class GetData(object):
             for pfield in self.phot_fields:
                 if pfield=='ZEROPT':
                     phot_dict[f][pfield] = np.repeat(standard_zpt, len(fIndexes))
-                elif pfield=='FLUXCAL':
-                    true_zpt = phot_data['ZEROPT'][fIndexes]
-                    fluxcal  = (10**(-0.4*(true_zpt - standard_zpt)))*phot_data[pfield][fIndexes]
-                    phot_dict[f][pfield] = fluxcal
-                elif pfield=='FLUXCALERR':
-                    true_zpt = phot_data['ZEROPT'][fIndexes]
-                    fluxcalerr = (10**(-0.4*(true_zpt - standard_zpt)))*phot_data[pfield][fIndexes]
-                    phot_dict[f][pfield] = fluxcalerr
-                elif pfield=='MJD':
-                    # MJD
-                    phot_dict[f][pfield] = phot_data[pfield][fIndexes]
                 elif pfield=='FLT':
                     true_zpt = phot_data['ZEROPT'][fIndexes]
                     nobs = len(true_zpt)
