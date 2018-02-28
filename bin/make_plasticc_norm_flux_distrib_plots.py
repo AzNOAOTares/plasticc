@@ -6,11 +6,13 @@ import sys
 import os
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 WORK_DIR = os.path.join(ROOT_DIR, 'plasticc')
+DATA_DIR = os.path.join(ROOT_DIR, 'plasticc_data')
 sys.path.append(WORK_DIR)
 import numpy as np
 import ANTARES_object
 import plasticc
 import plasticc.database
+import plasticc.make_index
 import plasticc.get_data
 import matplotlib.colors as mcl
 import matplotlib.pyplot as plt
@@ -18,6 +20,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from collections import OrderedDict
 import scipy.stats
 from scipy.stats import gaussian_kde, describe
+import astropy.io.fits as afits
+import pickle
 
 def main():
     fig_dir = os.path.join(WORK_DIR, 'Figures')
@@ -53,7 +57,8 @@ def main():
     fig3 = plt.figure(figsize=(15, 10))
     ax3 = fig3.add_subplot(1,1,1)
 
-    out_values = np.arange(-8, 8.1, 0.1)
+    #out_values = np.arange(-8, 8.1, 0.1)
+    out_values = np.arange(-30, 30.1, 0.11)
     out_snr = np.arange(0, 200.1, 0.1)
 
     cmap = plt.cm.tab20
@@ -79,11 +84,34 @@ def main():
             for head, phot in lcdata:
                 nobj += 1
 
+                obsid, _, _ = head
                 lc = getter.convert_pandas_lc_to_recarray_lc(phot)
-                sim = 10**(0.4*(27.5 - lc['sim_magobs']))
-                obs = lc['flux']
+
+                sim = 10**(0.4*(27.5 - lc['sim_magobs'])) 
+                obs = lc['flux'] 
                 flux_err = lc['dflux']
 
+                if (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR', 'String')):
+                    tfield, tmodel, tbase, tid  = obsid.split('_')
+                    header_dir = 'LSST_{}_MODEL{}'.format(tfield, tmodel)
+                    header_file = 'LSST_{}_{}_HEAD.FITS.gz'.format(tfield, tbase)
+                    header_file = os.path.join(DATA_DIR, data_release, header_dir, header_file)
+                    header_data = plasticc.make_index.get_file_data(header_file, extension=1)
+                    snid = np.array([x.strip() for x in header_data['SNID']])
+                    ind = (snid == tid)
+                    tu = header_data['LCLIB(TEMPLATE_MAG_u)'][ind][0]
+                    tg = header_data['LCLIB(TEMPLATE_MAG_g)'][ind][0]
+                    tr = header_data['LCLIB(TEMPLATE_MAG_r)'][ind][0]
+                    ti = header_data['LCLIB(TEMPLATE_MAG_i)'][ind][0]
+                    tz = header_data['LCLIB(TEMPLATE_MAG_z)'][ind][0]
+                    tY = header_data['LCLIB(TEMPLATE_MAG_Y)'][ind][0]
+                    template_mag_lookup = {'u':tu, 'g':tg, 'r':tr, 'i':ti, 'z':tz, 'Y':tY}
+                    temp_mag = np.array([template_mag_lookup.get(x) for x in lc['pb']])
+                    temp_flux = 10**(0.4*(27.5 - temp_mag))
+                else:
+                    temp_flux = 0. 
+
+                obs += temp_flux
                 sn = np.abs(obs)/flux_err
 
                 if obs_flux is None:
@@ -110,6 +138,9 @@ def main():
            
             norm_flux = (obs_flux - sim_flux)/sig_flux
 
+            if not (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR', 'String')):
+                continue 
+
             c = next(color)
             print(sntypes.get(model), nobj, describe(norm_flux))
 
@@ -122,10 +153,10 @@ def main():
 
             label = '{} ({:n}; {:n}) '.format(sntypes.get(model), nobj, nobs)
 
-            if not (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR')):
-                ax1.plot(out_values, lpdf+i/10., color=c, label=label, lw=3)
-                ax2.plot(out_values, lcdf+i/10, color=c, label=label, lw=3)
+            ax1.plot(out_values, lpdf+i/10., color=c, label=label, lw=3)
+            ax2.plot(out_values, lcdf+i/10, color=c, label=label, lw=3)
 
+            if not (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR', 'String')):
                 fig4 = plt.figure(figsize=(15, 10))
                 ax4 = fig4.add_subplot(1,1,1)
                 ax4.plot(sim_flux, sig_flux, marker='o', color=c,  markersize=2, alpha=0.35, linestyle='None')
@@ -137,8 +168,8 @@ def main():
                 plt.close(fig4)
             ax3.plot(out_snr, lsn+i/10, color=c, label=label, lw=3)
 
-        ax1.set_xlim(-10, 10)
-        ax2.set_xlim(-10, 10)
+        #ax1.set_xlim(-10, 10)
+        #ax2.set_xlim(-10, 10)
         ax3.set_xscale('log')
 
         ax1.axvline(0., color='grey', linestyle='--', lw=2)
