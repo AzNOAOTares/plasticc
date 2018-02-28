@@ -36,6 +36,9 @@ def main():
         out_field = 'all'
 
     getter = plasticc.get_data.GetData(data_release)
+    fields, dtypes  = getter.get_phot_fields()
+    fields.append('SIM_MAGOBS')
+    getter.set_phot_fields(fields, dtypes)
 
     lcdata = getter.get_lcs_data(**kwargs)
     if lcdata is None:
@@ -51,18 +54,10 @@ def main():
 
                 phase = laobj.get_phase(per=True)
                 period = laobj.best_period
-                fig = plt.figure(figsize=(10, 8))
-                ax = fig.add_subplot(1,1,1)
-                for i, pb in enumerate(colors):
-                    m = laobj.passband == pb
-                    ax.errorbar(phase[m], laobj.flux[m], yerr=laobj.fluxErr[m], marker='o', color=colors.get(pb, 'black'), linestyle='None', label=pb)
-                    ax.set_ylabel('Flux')
-                    ax.set_xlabel('phase', fontsize='large')
-                ax.legend(frameon=False, fontsize='small')
-                fig.suptitle('{} ({:.7f} days)'.format(objid, period), fontsize='x-large')
-                fig.tight_layout(rect=[0, 0.03, 1, 0.9])
-                pdf.savefig(fig)
-                plt.close(fig)
+                # things we should save
+                # (nobs_ugrizY, nobs) features in paper_ugrizY + period1-5 + power1-5
+            
+
 
 
 
