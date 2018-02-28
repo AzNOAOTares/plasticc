@@ -1,0 +1,175 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+from __future__ import absolute_import
+from __future__ import unicode_literals
+import sys
+import os
+ROOT_DIR = os.getenv('PLASTICC_DIR')
+WORK_DIR = os.path.join(ROOT_DIR, 'plasticc')
+sys.path.append(WORK_DIR)
+import numpy as np
+import ANTARES_object
+import plasticc
+import plasticc.database
+import plasticc.get_data
+import matplotlib.colors as mcl
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+from collections import OrderedDict
+import scipy.stats
+from scipy.stats import gaussian_kde, describe
+
+def main():
+    fig_dir = os.path.join(WORK_DIR, 'Figures')
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
+
+    colors = OrderedDict([('u','blueviolet'), ('g','green'), ('r','red'), ('i','orange'), ('z','black'), ('Y','gold')])
+
+    kwargs = plasticc.get_data.parse_getdata_options()
+    print("This config ", kwargs)
+    data_release = kwargs.pop('data_release')
+
+    _ = kwargs.pop('model')
+    field = kwargs.get('field')
+    
+    out_field = field
+    if out_field == '%':
+        out_field = 'all'
+
+    sntypes = plasticc.get_data.GetData.get_sntypes()
+
+    getter = plasticc.get_data.GetData(data_release)
+    fields, dtypes  = getter.get_phot_fields()
+    fields.append('SIM_MAGOBS')
+    getter.set_phot_fields(fields, dtypes)
+
+    fig1 = plt.figure(figsize=(15, 10))
+    ax1 = fig1.add_subplot(1,1,1)
+
+    fig2 = plt.figure(figsize=(15, 10))
+    ax2 = fig2.add_subplot(1,1,1)
+
+    fig3 = plt.figure(figsize=(15, 10))
+    ax3 = fig3.add_subplot(1,1,1)
+
+    out_values = np.arange(-8, 8.1, 0.1)
+    out_snr = np.arange(0, 200.1, 0.1)
+
+    cmap = plt.cm.tab20
+    nlines = len(sntypes.keys())
+    color = iter(cmap(np.linspace(0,1,nlines)))
+
+    with PdfPages(f'{fig_dir}/Flux_distrib_{data_release}_{out_field}.pdf') as pdf:
+        for i,  model in enumerate(sntypes.keys()):
+
+
+            kwargs['model'] = model
+            kwargs['sntype'] = model
+            lcdata = getter.get_lcs_data(**kwargs)
+            if lcdata is None:
+                continue
+
+            sim_flux  = None 
+            obs_flux  = None
+            sig_flux = None 
+            snr      = None
+
+            nobj = 0
+            for head, phot in lcdata:
+                nobj += 1
+
+                lc = getter.convert_pandas_lc_to_recarray_lc(phot)
+                sim = 10**(0.4*(27.5 - lc['sim_magobs']))
+                obs = lc['flux']
+                flux_err = lc['dflux']
+
+                sn = np.abs(obs)/flux_err
+
+                if obs_flux is None:
+                    obs_flux = obs 
+                    sim_flux = sim
+                    sig_flux = flux_err 
+                    snr = sn
+                else:
+                    obs_flux = np.concatenate((obs_flux, obs))
+                    sim_flux = np.concatenate((sim_flux, sim))
+                    sig_flux = np.concatenate((sig_flux, flux_err))
+                    snr = np.concatenate((snr, sn))
+            
+            if nobj == 0:
+                continue
+
+            if obs_flux is None:
+                continue 
+
+            nobs = len(obs_flux)
+
+            if nobs == 0:
+                continue 
+           
+            norm_flux = (obs_flux - sim_flux)/sig_flux
+
+            c = next(color)
+            print(sntypes.get(model), nobj, describe(norm_flux))
+
+            kernel = gaussian_kde(norm_flux)
+            lpdf = kernel.pdf(out_values)
+            lcdf = np.cumsum(lpdf)/np.sum(lpdf)
+
+            k2 = gaussian_kde(snr)
+            lsn = k2.pdf(out_snr)
+
+            label = '{} ({:n}; {:n}) '.format(sntypes.get(model), nobj, nobs)
+
+            if not (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR')):
+                ax1.plot(out_values, lpdf+i/10., color=c, label=label, lw=3)
+                ax2.plot(out_values, lcdf+i/10, color=c, label=label, lw=3)
+
+                fig4 = plt.figure(figsize=(15, 10))
+                ax4 = fig4.add_subplot(1,1,1)
+                ax4.plot(sim_flux, sig_flux, marker='o', color=c,  markersize=2, alpha=0.35, linestyle='None')
+                ax4.set_xlabel('sim_fluxobs')
+                ax4.set_ylabel('fluxcalerr')
+                fig4.suptitle(label)
+                fig4.tight_layout(rect=[0, 0.03, 1, 0.92])
+                fig4.savefig('{}/{}_{}_{}_noise_vs_flux.png'.format(fig_dir, sntypes.get(model), data_release, field))
+                plt.close(fig4)
+            ax3.plot(out_snr, lsn+i/10, color=c, label=label, lw=3)
+
+        ax1.set_xlim(-10, 10)
+        ax2.set_xlim(-10, 10)
+        ax3.set_xscale('log')
+
+        ax1.axvline(0., color='grey', linestyle='--', lw=2)
+        ax1.set_xlabel(r'Normalized Flux Difference $\frac{F_{O} - F_{S}}{\sigma}$')
+        ax1.set_ylabel('PDF')
+        ax1.legend(frameon=False, fontsize='small')
+
+        ax2.axvline(0., color='grey', linestyle='--', lw=2)
+        ax2.set_xlabel(r'Normalized Flux Difference $\frac{F_{O} - F_{S}}{\sigma}$')
+        ax2.set_ylabel('CDF')
+        ax2.legend(frameon=False, fontsize='small')
+
+        ax3.set_xlabel('SNR')
+        ax3.set_ylabel('PDF')
+        ax3.legend(frameon=False, fontsize='small')
+
+        pdf.savefig(fig1)
+        pdf.savefig(fig2)
+        pdf.savefig(fig3)
+        plt.close(fig1)
+        plt.close(fig2)
+        plt.close(fig3)
+
+
+
+
+
+            
+
+
+
+
+if __name__=='__main__':
+    sys.exit(main())
