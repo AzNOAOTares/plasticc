@@ -9,6 +9,7 @@ import warnings
 import argparse
 import pandas as pd
 import astropy.io.fits as afits
+from collections import OrderedDict
 from . import database
 
 ROOT_DIR = os.getenv('PLASTICC_DIR')
@@ -67,6 +68,29 @@ class GetData(object):
     def __init__(self, data_release):
         self.data_release = "release_{}".format(data_release)
         self.phot_fields = ['MJD', 'FLT', 'FLUXCAL', 'FLUXCALERR', 'ZEROPT']
+        self.phot_fields_dtypes = {'FLT':np.str_}
+
+    def get_phot_fields(self):
+        """
+        list of the photometry column names and a dictionary of NON-FLOAT
+        columns
+
+        For the default columns, this is only FLT
+        """
+        return list(self.phot_fields), dict(self.phot_fields_dtypes)
+
+    def set_phot_fields(self, fields, dtypes):
+        """
+        set the list of photometry column fields to retrieve and a dictionary
+        of data types for NON-FLOAT columns hashed by column name in the PHOT.FITS
+
+        i.e. if your column is a float, don't even bother listing it
+
+        Can be used to retrieve custom columns from the PHOT.FITS
+        Kinda kludgey - se with caution
+        """
+        self.phot_fields = list(fields)
+        self.phot_fields_dtypes = dict(dtypes)
 
     def get_object_ids(self):
         """ Get list of all object ids """
@@ -131,11 +155,12 @@ class GetData(object):
 
         phot_data = phot_HDU[1].data[ptrobs_min-1:ptrobs_max]
 
-        phot_dict = {}
+        phot_dict = OrderedDict()
         filters = list(set(phot_data['FLT']))  # e.g. ['i', 'r', 'Y', 'u', 'g', 'z']
+        dtypes = dict(self.phot_fields_dtypes)
         for f in filters:
             fIndexes = np.where(phot_data['FLT'] == f)[0]
-            phot_dict[f] = {}
+            phot_dict[f] = OrderedDict()
             for pfield in self.phot_fields:
                 if pfield=='ZEROPT':
                     phot_dict[f][pfield] = np.repeat(standard_zpt, len(fIndexes))
@@ -157,6 +182,9 @@ class GetData(object):
                 else:
                     phot_dict[f][pfield] = phot_data[pfield][fIndexes]
 
+                if not pfield in dtypes:
+                    dtypes[pfield] = np.float64
+
         phot_out = pd.DataFrame(phot_dict)
         return phot_out
 
@@ -167,29 +195,33 @@ class GetData(object):
         TODO: This is ugly - just have an option for get_lcs_data to return one or the other
         """
         pbs = ('u', 'g', 'r', 'i', 'z', 'Y')
-        mjd   = []
-        flux  = []
-        dflux = []
-        zpt   = []
-        pb    = []
+        # name mapping for the defaults in phot_fields
+        # any other column is going to become just lowercase it's current name
+        name_map = {'FLUXCAL':'flux', 'FLUXCALERR':'dflux','ZEROPT':'zpt', 'FLT':'pb', 'MJD':'mjd'}
+
+        out = None
+        out_names = None
 
         for this_pb in phot:
-
             # do we know what this passband is
+            # this is just a sanity test in case we accidentally retrieve dummy entries with passband = -9
             if this_pb not in pbs:
                 continue 
 
             this_pb_lc = phot.get(this_pb)
             if this_pb_lc is None:
                 continue
+            
+            if out is None:
+                out = np.rec.fromarrays(list(this_pb_lc))
+                if out_names is None:
+                    out_names = list(this_pb_lc.axes[0])
+                    out_names = [name_map.get(x, x.lower()) for x in out_names]
+            else:
+                temp  = np.rec.fromarrays(list(this_pb_lc))
+                out = np.concatenate((out, temp), axis=-1)
 
-            mjd   += this_pb_lc['MJD'].tolist()
-            flux  += this_pb_lc['FLUXCAL'].tolist()
-            dflux += this_pb_lc['FLUXCALERR'].tolist()
-            pb    += this_pb_lc['FLT'].tolist()
-            zpt   += this_pb_lc['ZEROPT'].tolist()
-
-        out = np.rec.fromarrays([mjd, flux, dflux, pb, zpt], names=['mjd', 'flux', 'dflux', 'pb', 'zpt'])
+        out.dtype.names = out_names
         return out
 
 
