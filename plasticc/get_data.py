@@ -24,7 +24,7 @@ def parse_getdata_options(argv=None):
 
     def_sql_wildcard = '%'
     parser = argparse.ArgumentParser(description="Get options to the GetData structure")
-    group = parser.add_mutually_exclusive_group(required=True) 
+    group = parser.add_mutually_exclusive_group(required=False) 
     parser.register('type','bool',str2bool)
     parser.add_argument('--data_release', required=True, help='PLAsTiCC data release index table to process')
     field_choices = ('WFD', 'DDF', '%')
@@ -36,10 +36,9 @@ def parse_getdata_options(argv=None):
 
     model_choices = list(type_mapping.keys()).append('%')
     model_name_choices = list(type_mapping.values()).append('%')
-
-    group.add_argument('--model', required=False, default=def_sql_wildcard, choices=model_choices,\
+    group.add_argument('--model', required=False, action="store", default=def_sql_wildcard, choices=model_choices,\
                         help='PLAsTiCC model to process')
-    group.add_argument('--model_name', required=False, default=def_sql_wildcard, choices=model_name_choices,\
+    group.add_argument('--model_name', required=False, action="store", default=def_sql_wildcard, choices=model_name_choices,\
                         help='PLAsTiCC model name to process')
     parser.add_argument('--base', required=False, default=def_sql_wildcard, help='PLAsTiCC model base filename (probably not a good idea to touch this)')
     parser.add_argument('--snid', required=False, default=def_sql_wildcard, help='PLAsTiCC object ID number (useful for debugging/testing)')
@@ -50,13 +49,23 @@ def parse_getdata_options(argv=None):
     args = parser.parse_args(args=argv)
 
     out = vars(args)
-    if 'model_name' in out:
-        model_name = out.pop('model_name')
-        if model_name == '%':
+    model_name = out.pop('model_name')
+    model      = out.pop('model')
+    if model_name == '%':
+        if model == '%':
             out['model'] = '%'
         else:
-            model = inverse_mapping.get(model_name)
             out['model'] = model
+    else:
+        this_model = inverse_mapping.get(model_name)
+        model      = out.pop('model')
+        if model == '%':
+            out['model'] = this_model 
+        else:
+            if this_model == model:
+                out['model'] = this_model 
+            else:
+                out['model'] = model 
     out['sntype'] = out['model']
     return out
 
