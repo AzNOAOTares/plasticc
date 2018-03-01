@@ -72,7 +72,7 @@ class SplineMixin(object):
             if per > 0:
                 kv = np.arange(0-degree,count+degree+degree-1,dtype='int')
             else:
-                kv = np.array([0]*degree + range(count-degree+1) + [count-degree]*degree,dtype='int')
+                kv = np.array([0]*degree + list(range(count-degree+1)) + [count-degree]*degree,dtype='int')
 
             # Calculate query range
             periodic = int(bool(per))
@@ -82,3 +82,4 @@ class SplineMixin(object):
             outtck[pb] = tck, u
         self.outtck = outtck
         return outtck
+
