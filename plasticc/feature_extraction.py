@@ -10,8 +10,8 @@ from ANTARES_object.LAobject import LAobject
 
 def get_light_curves(data_release, field_in='%', sntype_in='%', snid_in='%', limit=100, shuffle=False):
     getdata = GetData(data_release)
-    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'],\
-            field=field_in, model=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
+    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'], field=field_in, 
+                                  sntype=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
 
     sntypes_map = getdata.get_sntypes()
     sntype_name = sntypes_map[sntype_in]
@@ -55,13 +55,15 @@ def get_antares_features():
     sntype = 1
     features = {}
 
-    lc_result = get_light_curves(data_release=data_release, field_in=field, sntype_in=sntype, snid_in='%', limit=10, shuffle=False)
+    lc_result = get_light_curves(data_release=data_release, field_in=field, sntype_in=sntype, snid_in='%', limit=10, 
+                                 shuffle=False)
 
     for lcinfo in lc_result:
         t, flux, fluxerr, zeropt, mjd, flt, objid = lcinfo
         p = flt[0]
         features[objid] = {}
-        laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr, obsId=mjd, passband=flt, zeropoint=zeropt, per=False)
+        laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr, obsId=mjd, passband=flt, 
+                            zeropoint=zeropt, per=False)
 
         # Get Features
         features[objid]['amplitude'] = laobject.get_amplitude()
@@ -89,7 +91,6 @@ def get_antares_features():
 
     print(features)
     return features
-
 
 
 if __name__ == '__main__':
