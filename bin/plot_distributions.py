@@ -15,7 +15,7 @@ def get_class_distributions(field, sntype, getdata):
 
     # Get the number of objects for each sntype
     result = getdata.get_lcs_headers(field=field, sntype=sntype, get_num_lightcurves=True)
-    stats['nobjects'] = result
+    stats['nobjects'] = (result, 0)
     print("GOT COUNTS", field, sntype)
 
     # Get other stats for each sntype
@@ -72,8 +72,8 @@ def get_distributions_multiprocessing(data_release, fig_dir):
     sntypes_and_fields = list(itertools.product(fields, sntypes))
     sntype_stats = {'nobjects': {'DDF': {}, 'WFD': {}}, 'mean_mwebv': {'DDF': {}, 'WFD': {}},
                     'mean_epoch_range': {'DDF': {}, 'WFD': {}}, 'mean_cadence': {'DDF': {}, 'WFD': {}}}
-    # sntype_stats = {'nobjects': {'DDF': {}}, 'mwebv': {'DDF': {}},
-    #                 'epoch_range': {'DDF': {}}, 'cadence': {'DDF': {}}}
+    # sntype_stats = {'nobjects': {'DDF': {}}, 'mean_mwebv': {'DDF': {}},
+    #                 'mean_epoch_range': {'DDF': {}}, 'mean_cadence': {'DDF': {}}}
 
     pool = mp.Pool()
     results = [pool.apply_async(get_class_distributions, args=(field, sntype, getdata)) for field, sntype in sntypes_and_fields]
@@ -99,7 +99,6 @@ def get_distributions_multiprocessing(data_release, fig_dir):
         for stat in sntype_stats:
             fig, ax = plt.subplots(figsize=(20, 10))
             y, yerr = list(zip(*sntype_stats[stat][field].values()))
-            print(stat, y, yerr, len(sntypes))
             rects = ax.bar(range(len(sntypes)), y, yerr=yerr, align='center')
             ax.set_xticks(range(len(sntypes)))
             ax.set_xticklabels(sntype_names)
@@ -140,6 +139,7 @@ if __name__ == '__main__':
     get_distributions_multiprocessing(data_release='20180112', fig_dir=fig_dir)
 
     plt.show()
+
 
 
 
