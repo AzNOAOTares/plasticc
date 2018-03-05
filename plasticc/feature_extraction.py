@@ -4,13 +4,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
+import astropy.table as at
+import pymysql
+from collections import OrderedDict
 from plasticc.get_data import GetData
 from ANTARES_object.LAobject import LAobject
+from . import database
 
 
-def get_light_curves(data_release, field_in='%', sntype_in='%', snid_in='%', limit=100, shuffle=False):
+def get_light_curves(data_release, field_in='%', sntype_in='%', snid_in='%', limit=None, shuffle=False):
     getdata = GetData(data_release)
-    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'], field=field_in, 
+    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'], field=field_in,
                                   sntype=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
 
     sntypes_map = getdata.get_sntypes()
@@ -41,51 +45,91 @@ def get_light_curves(data_release, field_in='%', sntype_in='%', snid_in='%', lim
             mjd = mjd[ind]
             flt = flt[ind]
 
-            yield t, flux, fluxerr, zeropt[0], mjd, flt, objid
+            yield t, flux, fluxerr, zeropt[0], mjd, flt, objid, sntype_in
 
 
-def get_antares_features():
+def save_antares_features():
     """
     Get antares object features.
     Return as a DataFrame with columns being the features, and rows being the objid&passband
     """
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures')
-    data_release = '20180112'
+    data_release = '20180221'
     field = 'DDF'
     sntype = 1
     features = {}
+    redo = True
+    table_exists = False
+    nrows = 0
+    features_out = []
 
-    lc_result = get_light_curves(data_release=data_release, field_in=field, sntype_in=sntype, snid_in='%', limit=10, 
-                                 shuffle=False)
+    lc_result = get_light_curves(data_release=data_release, field_in=field, sntype_in=sntype, snid_in='%', limit=None,
+                                 shuffle=True)
 
     for lcinfo in lc_result:
-        t, flux, fluxerr, zeropt, mjd, flt, objid = lcinfo
+        t, flux, fluxerr, zeropt, mjd, flt, objid, sntype = lcinfo
         p = flt[0]
-        features[objid] = {}
-        laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr, obsId=mjd, passband=flt, 
-                            zeropoint=zeropt, per=False)
+        features[objid] = OrderedDict()
+
+        try:
+            laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr, obsId=mjd, passband=flt,
+                                zeropoint=zeropt, per=False)
+        except ValueError as e:
+            print(e)  # No good observations
+            continue
 
         # Get Features
-        features[objid]['amplitude'] = laobject.get_amplitude()
-        features[objid]['stats'] = laobject.get_stats()
-        features[objid]['skew'] = laobject.get_skew()
-        features[objid]['somean'] = laobject.get_StdOverMean()
-        features[objid]['shapiro'] = laobject.get_ShapiroWilk()
-        features[objid]['q31'] = laobject.get_Q31()
-        features[objid]['rms'] = laobject.get_RMS()
-        features[objid]['mad'] = laobject.get_MAD()
-        features[objid]['stetsonj'] = laobject.get_StetsonJ()
-        features[objid]['stetsonk'] = laobject.get_StetsonK()
-        features[objid]['acorr'] = laobject.get_AcorrIntegral()
-        features[objid]['hlratio'] = laobject.get_hlratio()
+        features[objid]['objid'] = objid + '_' + p
+        features[objid]['sntype'] = sntype
+        stats = laobject.get_stats()[p]
+        features[objid]['nobs'] = stats.nobs
+        if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
+            continue
+        features[objid]['variance'] = stats.variance
+        features[objid]['skewness'] = stats.skewness
+        features[objid]['kurtosis'] = stats.kurtosis
+        features[objid]['min'] = stats.minmax[0]
+        features[objid]['max'] = stats.minmax[1]
+        features[objid]['amplitude'] = laobject.get_amplitude()[p]
+        features[objid]['skew'] = laobject.get_skew()[p]
+        features[objid]['somean'] = laobject.get_StdOverMean()[p]
+        features[objid]['shapiro'] = laobject.get_ShapiroWilk()[p]
+        features[objid]['q31'] = laobject.get_Q31()[p]
+        features[objid]['rms'] = laobject.get_RMS()[p]
+        features[objid]['mad'] = laobject.get_MAD()[p]
+        features[objid]['stetsonj'] = laobject.get_StetsonJ()[p]
+        features[objid]['stetsonk'] = laobject.get_StetsonK()[p]
+        features[objid]['acorr'] = laobject.get_AcorrIntegral()[p]
+        features[objid]['hlratio'] = laobject.get_hlratio()[p]
 
-        # spline = laobject.spline_smooth(per=False)[flt[0]][0][1].transpose()
-        # lc = laobject.get_lc(smoothed=True)[flt[0]]
-        # plt.plot(t, flux, label='data')
-        # plt.plot(lc[0], lc[1], label='antares lc')
-        # plt.plot(spline[0], spline[1], label='spline')
-        # plt.legend()
-        # break
+        if not table_exists:
+            # if redo:
+            #     database.exec_sql_query("TRUNCATE TABLE features;")  # Delete everything in the features table
+            mysql_fields = list(features[objid].keys())
+            mysql_formats = ['VARCHAR(255)', ] + ['FLOAT' for x in mysql_fields[1:]]
+            mysql_schema = ', '.join(['{} {}'.format(x, y) for x, y in zip(mysql_fields, mysql_formats)])
+            table_name = database.create_sql_index_table_for_release(data_release, mysql_schema, redo=redo, table_name='features')
+            table_exists = True
+
+        features_out += [list(features[objid].values())]
+        nrows += 1
+
+        # Save to mysql in batches of 1000
+        if nrows >= 1000:
+            features_out = np.array(features_out)
+            features_out = at.Table(features_out, names=list(features[objid].keys()))
+            features_out = np.array(features_out).tolist()
+            nsavedrows = database.write_rows_to_index_table(features_out, table_name)
+            print("Saved ", nsavedrows, "rows")
+            nrows = 0
+            features_out = []
+
+    if features_out:
+        features_out = np.array(features_out)
+        features_out = at.Table(features_out, names=list(features[objid].keys()))
+        features_out = np.array(features_out).tolist()
+        nsavedrows = database.write_rows_to_index_table(features_out, table_name)
+        print("Saved ", nsavedrows, "rows")
 
     features = pd.DataFrame(features)
 
@@ -94,5 +138,6 @@ def get_antares_features():
 
 
 if __name__ == '__main__':
-    get_antares_features()
+    save_antares_features()
     plt.show()
+
