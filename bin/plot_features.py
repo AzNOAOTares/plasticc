@@ -100,7 +100,7 @@ def plot_features(table_name='features', feature_names=['redshift',], field='%',
     for i, f in enumerate(feature_names):
         features_dict[f] = features[:, i]
 
-    fig, ax = plt.subplots(len(feature_names)-1, sharex=True)
+    fig, ax = plt.subplots(len(feature_names)-1, sharex=True, figsize=(8, 15))
     for i, f in enumerate(feature_names[1:]):
         if f != 'redshift':
             ax[i].scatter(features_dict['redshift'], features_dict[f], marker='.', alpha=0.2)
@@ -108,7 +108,7 @@ def plot_features(table_name='features', feature_names=['redshift',], field='%',
     ax[i].set_xlabel('redshift')
     fig.subplots_adjust(hspace=0)
     plt.setp([a.get_xticklabels() for a in fig.axes[:-1]], visible=False)
-    fig.savefig("{0}/features_{1}.png".format(fig_dir, sntype))
+    fig.savefig("{0}/features_{1}.png".format(fig_dir, sntype), bbox_inches='tight')
     plt.show()
 
 
