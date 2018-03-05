@@ -14,7 +14,7 @@ from . import database
 
 def get_light_curves(data_release, field_in='%', sntype_in='%', snid_in='%', limit=None, shuffle=False):
     getdata = GetData(data_release)
-    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'], field=field_in,
+    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host'], field=field_in,
                                   sntype=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
 
     sntypes_map = getdata.get_sntypes()
@@ -24,7 +24,7 @@ def get_light_curves(data_release, field_in='%', sntype_in='%', snid_in='%', lim
     periodic = True if sntype_name in non_transients else False
 
     for head, phot in result:
-        objid, ptrobs_min, ptrobs_max, peak_mjd = head
+        objid, ptrobs_min, ptrobs_max, peak_mjd, redshift = head
 
         for f in phot.columns:  # Filter names
             data = phot.get(f)
@@ -45,7 +45,7 @@ def get_light_curves(data_release, field_in='%', sntype_in='%', snid_in='%', lim
             mjd = mjd[ind]
             flt = flt[ind]
 
-            yield t, flux, fluxerr, zeropt[0], mjd, flt, objid, sntype_in
+            yield t, flux, fluxerr, zeropt[0], mjd, flt, objid, sntype_in, redshift
 
 
 def save_antares_features():
@@ -67,11 +67,11 @@ def save_antares_features():
                                  shuffle=True)
 
     for lcinfo in lc_result:
-        t, flux, fluxerr, zeropt, mjd, flt, objid, sntype = lcinfo
+        t, flux, fluxerr, zeropt, mjd, flt, objid, sntype, redshift = lcinfo
         p = flt[0]
         objid = objid + '_' + p
         features[objid] = OrderedDict()
-        
+
         try:
             laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr, obsId=mjd, passband=flt,
                                 zeropoint=zeropt, per=False)
@@ -82,6 +82,7 @@ def save_antares_features():
         # Get Features
         features[objid]['objid'] = objid
         features[objid]['sntype'] = sntype
+        features[objid]['redshift'] = redshift
         stats = laobject.get_stats()[p]
         features[objid]['nobs'] = stats.nobs
         if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
@@ -104,8 +105,8 @@ def save_antares_features():
         features[objid]['hlratio'] = laobject.get_hlratio()[p]
 
         if not table_exists:
-            # if redo:
-            #     database.exec_sql_query("TRUNCATE TABLE features;")  # Delete everything in the features table
+            if redo:
+                database.exec_sql_query("TRUNCATE TABLE features;")  # Delete everything in the features table
             mysql_fields = list(features[objid].keys())
             mysql_formats = ['VARCHAR(255)', ] + ['FLOAT' for x in mysql_fields[1:]]
             mysql_schema = ', '.join(['{} {}'.format(x, y) for x, y in zip(mysql_fields, mysql_formats)])
@@ -141,4 +142,5 @@ def save_antares_features():
 if __name__ == '__main__':
     save_antares_features()
     plt.show()
+
 
