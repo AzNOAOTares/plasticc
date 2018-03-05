@@ -69,8 +69,9 @@ def save_antares_features():
     for lcinfo in lc_result:
         t, flux, fluxerr, zeropt, mjd, flt, objid, sntype = lcinfo
         p = flt[0]
+        objid = objid + '_' + p
         features[objid] = OrderedDict()
-
+        
         try:
             laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr, obsId=mjd, passband=flt,
                                 zeropoint=zeropt, per=False)
@@ -79,7 +80,7 @@ def save_antares_features():
             continue
 
         # Get Features
-        features[objid]['objid'] = objid + '_' + p
+        features[objid]['objid'] = objid
         features[objid]['sntype'] = sntype
         stats = laobject.get_stats()[p]
         features[objid]['nobs'] = stats.nobs
