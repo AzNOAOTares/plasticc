@@ -4,6 +4,7 @@ import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 from plasticc import database
+from plasticc.get_data import GetData
 
 
 def get_features(table_name='features', columns=None, field='%', model='%', base='%', snid='%', sntype='%',
@@ -63,8 +64,8 @@ def get_features(table_name='features', columns=None, field='%', model='%', base
         sort = True
 
     sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
-    limit_command = '' if limit is None else " LIMIT {:n}".format(limit)
-    offset_command = '' if offset is None else " OFFSET {:n}".format(offset)
+    limit_command = '' if limit is None else " LIMIT {:d}".format(limit)
+    offset_command = '' if offset is None else " OFFSET {:d}".format(offset)
     if model != '%':
         model = "{:02n}".format(int(model))
 
@@ -74,10 +75,9 @@ def get_features(table_name='features', columns=None, field='%', model='%', base
         warnings.warn(message, RuntimeWarning)
 
     shuffle_command = '' if shuffle is False else " ORDER BY RAND()"
-    sort_command  = '' if sort is False else ' ORDER BY objid'
+    sort_command = '' if sort is False else ' ORDER BY objid'
     extra_command = ''.join([sntype_command, sort_command, shuffle_command, limit_command, offset_command])
 
-    #query = "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' AND objid LIKE '%{5}' {6};".format(', '.join(columns), self.data_release, field, model, base, snid, extra_command)
     query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}_{}' {};".format(', '.join(columns), table_name, field, model, base, snid, passband, extra_command)
     feature_columns = database.exec_sql_query(query)
 
@@ -87,15 +87,16 @@ def get_features(table_name='features', columns=None, field='%', model='%', base
         return np.array(feature_columns)
     else:
         print("No light curves in the database satisfy the given arguments. "
-              "field: {}, model: {}, base: {}, snid: {}, sntype: {}".format(field, model, base, snid, sntype))
+              "field: {}, model: {}, base: {}, snid: {}, sntype: {}, passband: {}".format(field, model, base, snid, sntype, passband))
         return []
 
 
-def plot_features(table_name='features', feature_names=['redshift',], field='%', model='%', base='%', snid='%', sntype='%',
-                  limit=None, shuffle=False, sort=True, offset=0, fig_dir='.'):
+def plot_features(table_name='features_20180221', feature_names=['redshift'], field='%', model='%', base='%', snid='%',
+                  sntype='%', passband='%', limit=None, shuffle=False, sort=True, offset=0, fig_dir='.', sntypes_map=None):
     features = get_features(table_name=table_name, columns=feature_names, field=field, model=model, base=base,
-                            snid=snid, sntype=sntype, limit=limit, shuffle=shuffle, sort=sort, offset=offset)
+                            snid=snid, sntype=sntype, passband=passband, limit=limit, shuffle=shuffle, sort=sort, offset=offset)
 
+    sntype_name = sntypes_map[sntype]
     features_dict = {}
     for i, f in enumerate(feature_names):
         features_dict[f] = features[:, i]
@@ -103,18 +104,33 @@ def plot_features(table_name='features', feature_names=['redshift',], field='%',
     fig, ax = plt.subplots(len(feature_names)-1, sharex=True, figsize=(8, 15))
     for i, f in enumerate(feature_names[1:]):
         if f != 'redshift':
-            ax[i].scatter(features_dict['redshift'], features_dict[f], marker='.', alpha=0.2)
+            ax[i].scatter(features_dict['redshift'], features_dict[f], marker='.', alpha=0.1)
             ax[i].set_ylabel(f, rotation=0, labelpad=30)
-    ax[i].set_xlabel('redshift')
+    ax[-1].set_xlabel('redshift')
+    ax[0].set_title("{} {}".format(sntype_name, passband))
     fig.subplots_adjust(hspace=0)
     plt.setp([a.get_xticklabels() for a in fig.axes[:-1]], visible=False)
-    fig.savefig("{0}/features_{1}.png".format(fig_dir, sntype), bbox_inches='tight')
+    fig.savefig("{0}/features_{1}_{2}.png".format(fig_dir, sntype_name, passband), bbox_inches='tight')
+
+
+def main():
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures')
+    feature_names = ['redshift', 'variance', 'skewness', 'kurtosis', 'amplitude', 'skew', 'somean', 'shapiro', 'q31',
+                  'rms', 'mad', 'stetsonj', 'stetsonk', 'acorr', 'hlratio']
+    data_release = '20180221'
+    table_name = 'features_{}'.format(data_release)
+
+    getdata = GetData(data_release)
+    sntypes_map = getdata.get_sntypes()
+
+    for sntype in [1]:
+        for pb in ['i', 'r', 'Y', 'u', 'g', 'z']:
+            plot_features(table_name=table_name, feature_names=feature_names, field='DDF', sntype=sntype, passband=pb,
+                          limit=None, fig_dir=fig_dir, sntypes_map=sntypes_map)
+
     plt.show()
 
 
 if __name__ == '__main__':
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures')
-    feat_names = ['redshift', 'variance', 'skewness', 'kurtosis', 'amplitude', 'skew', 'somean', 'shapiro', 'q31',
-                  'rms', 'mad', 'stetsonj', 'stetsonk', 'acorr', 'hlratio']
-    plot_features(table_name='features', feature_names=feat_names, field='DDF', sntype=1, limit=100000,
-                  fig_dir=fig_dir)
+    main()
+
