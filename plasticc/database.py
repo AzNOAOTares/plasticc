@@ -129,7 +129,7 @@ def get_index_table_name_for_release(data_release):
     return table_name
 
 
-def create_sql_index_table_for_release(data_release, schema, redo=False):
+def create_sql_index_table_for_release(data_release, schema, redo=False, table_name=None):
     """
     Creates a MySQL Table to hold useful data from HEAD.fits files from the
     PLASTICC sim. Checks if the table exists already. The schema for this
@@ -138,7 +138,8 @@ def create_sql_index_table_for_release(data_release, schema, redo=False):
     Drops table if redo.
     Returns a table_name
     """
-    table_name = get_index_table_name_for_release(data_release)
+    if not table_name:
+        table_name = get_index_table_name_for_release(data_release)
     result = check_sql_db_for_table(table_name)
     if result:
         print("Table {} exists.".format(table_name))
@@ -148,7 +149,7 @@ def create_sql_index_table_for_release(data_release, schema, redo=False):
         else:
             return table_name
 
-    query = 'CREATE TABLE {} ({}, PRIMARY KEY (objid))'.format(table_name, schema) 
+    query = 'CREATE TABLE {} ({}, PRIMARY KEY (objid))'.format(table_name, schema)
     result =  exec_sql_query(query)
     print("Created Table {}.".format(table_name))
     return table_name
@@ -218,3 +219,4 @@ def exec_sql_query(query):
     finally:
         con.close()
     return result
+
