@@ -215,6 +215,7 @@ class LAobject(PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         self.filters    = list(set(self.passband))
         self.nobs = len(self.time)
         if self.nobs == 0:
-            message = 'Object {} with locus ID {} has no good observations.'.format(objectId, locusId)
+            message = 'Object {} with locus ID {} has no good observations.'.format(self.objectId, self.locusId)
             raise ValueError(message)
+
 
