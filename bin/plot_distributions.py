@@ -1,11 +1,15 @@
+#!/usr/bin/env python
+import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+ROOT_DIR = os.getenv('PLASTICC_DIR')
+MOD_DIR  = os.path.join(ROOT_DIR, 'plasticc')
+sys.path.append(MOD_DIR)
 from plasticc.get_data import GetData
 import multiprocessing as mp
 import itertools
 
-ROOT_DIR = os.getenv('PLASTICC_DIR')
 
 
 def get_class_distributions(field, sntype, getdata):
@@ -14,7 +18,7 @@ def get_class_distributions(field, sntype, getdata):
     stats = {}
 
     # Get the number of objects for each sntype
-    result = getdata.get_lcs_headers(field=field, sntype=sntype, get_num_lightcurves=True)
+    result = getdata.get_lcs_headers(field=field, model=sntype, get_num_lightcurves=True)
     stats['nobjects'] = (result, 0)
     print("GOT COUNTS", field, sntype)
 
@@ -22,7 +26,7 @@ def get_class_distributions(field, sntype, getdata):
     n = 0
     mwebv_list, epoch_range_list = [], []
     cadence_list = {f: [] for f in ['i', 'r', 'Y', 'u', 'g', 'z']}
-    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'mwebv', 'sntype'], field=field, sntype=sntype)
+    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'mwebv', 'sntype'], field=field, model=sntype, limit=1000)
     print("GOT RESULTS", field, sntype)
     bad_mags = []
     for head, phot in result:
@@ -72,8 +76,6 @@ def get_distributions_multiprocessing(data_release, fig_dir):
     sntypes_and_fields = list(itertools.product(fields, sntypes))
     sntype_stats = {'nobjects': {'DDF': {}, 'WFD': {}}, 'mean_mwebv': {'DDF': {}, 'WFD': {}},
                     'mean_epoch_range': {'DDF': {}, 'WFD': {}}, 'mean_cadence': {'DDF': {}, 'WFD': {}}}
-    # sntype_stats = {'nobjects': {'DDF': {}}, 'mean_mwebv': {'DDF': {}},
-    #                 'mean_epoch_range': {'DDF': {}}, 'mean_cadence': {'DDF': {}}}
 
     pool = mp.Pool()
     results = [pool.apply_async(get_class_distributions, args=(field, sntype, getdata)) for field, sntype in sntypes_and_fields]
@@ -106,7 +108,7 @@ def get_distributions_multiprocessing(data_release, fig_dir):
             ax.set_ylabel(stat)
             ax.set_ylim(bottom=0)
             autolabel(rects, ax)
-            fig.savefig("{0}/{1}_{2}.png".format(fig_dir, field, stat))
+            fig.savefig("{0}/distributions/{1}_{2}_{3}.pdf".format(fig_dir, field, stat, data_release))
     return sntype_stats
 
 
@@ -136,7 +138,7 @@ if __name__ == '__main__':
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
 
-    get_distributions_multiprocessing(data_release='20180112', fig_dir=fig_dir)
+    get_distributions_multiprocessing(data_release='20180221', fig_dir=fig_dir)
 
     plt.show()
 
