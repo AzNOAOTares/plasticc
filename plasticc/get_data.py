@@ -274,6 +274,9 @@ class GetData(object):
         if columns is None:
             columns=['objid', 'ptrobs_min', 'ptrobs_max']
 
+        if get_num_lightcurves:
+            columns=['COUNT(objid)',]
+
         try:
             limit = int(limit)
             if limit <= 0:
@@ -312,7 +315,10 @@ class GetData(object):
 
         num_lightcurves = len(header)
         if get_num_lightcurves:
+            num_lightcurves = int(header[0][0])
             return num_lightcurves
+        else:
+            num_lightcurves = len(header)
 
         if num_lightcurves > 0:
             return header
