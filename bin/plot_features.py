@@ -78,7 +78,7 @@ def get_features(table_name='features', columns=None, field='%', model='%', base
     sort_command = '' if sort is False else ' ORDER BY objid'
     extra_command = ''.join([sntype_command, sort_command, shuffle_command, limit_command, offset_command])
 
-    query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}_{}' {};".format(', '.join(columns), table_name, field, model, base, snid, passband, extra_command)
+    query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns), table_name, field, model, base, snid, extra_command)
     feature_columns = database.exec_sql_query(query)
 
     num_lightcurves = len(feature_columns)
@@ -87,7 +87,7 @@ def get_features(table_name='features', columns=None, field='%', model='%', base
         return np.array(feature_columns)
     else:
         print("No light curves in the database satisfy the given arguments. "
-              "field: {}, model: {}, base: {}, snid: {}, sntype: {}, passband: {}".format(field, model, base, snid, sntype, passband))
+              "field: {}, model: {}, base: {}, snid: {}, sntype: {}".format(field, model, base, snid, sntype))
         return []
 
 
@@ -133,4 +133,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
