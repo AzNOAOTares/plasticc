@@ -238,7 +238,7 @@ class GetData(object):
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
 
-    def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', sntype='%', 
+    def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', 
             get_num_lightcurves=False, limit=None, shuffle=False, sort=True, offset=0):
         """ Gets the header data given specific conditions.
 
@@ -256,8 +256,6 @@ class GetData(object):
             The base name. E.g. base='NONIa'. The default is '%' indicating that all base names will be included.
         snid : str, optional
             The transient id. E.g. snid='87287'. The default is '%' indicating that all snids will be included.
-        sntype : str, optional
-            The transient type/class. E.g. sntype='3'. The default is '%' indicating that all sntypes will be included.
         get_num_lightcurves : boolean, optional
             If this is True, then the return value is just a single iteration generator stating the number of
             light curves that satisfied the given conditions.
@@ -276,6 +274,9 @@ class GetData(object):
         if columns is None:
             columns=['objid', 'ptrobs_min', 'ptrobs_max']
 
+        if get_num_lightcurves:
+            columns=['COUNT(objid)',]
+
         try:
             limit = int(limit)
             if limit <= 0:
@@ -293,7 +294,6 @@ class GetData(object):
         if limit is not None and shuffle is False and sort is False:
             sort = True
 
-        sntype_command = '' if sntype == '%' else " AND sntype={}".format(sntype)
         limit_command = '' if limit is None else " LIMIT {:n}".format(limit)
         offset_command = '' if offset is None else " OFFSET {:n}".format(offset)
         if model != '%':
@@ -307,26 +307,29 @@ class GetData(object):
 
         shuffle_command = '' if shuffle is False else " ORDER BY RAND()"
         sort_command  = '' if sort is False else ' ORDER BY objid'
-        extra_command = ''.join([sntype_command, sort_command, shuffle_command, limit_command, offset_command])
+        extra_command = ''.join([sort_command, shuffle_command, limit_command, offset_command])
 
-        #query = "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND objid LIKE '%{3}%' AND objid LIKE '%{4}%' AND objid LIKE '%{5}' {6};".format(', '.join(columns), self.data_release, field, model, base, snid, extra_command)
-        query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns), self.data_release, field, model, base, snid, extra_command)
+        query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns),\
+                self.data_release, field, model, base, snid, extra_command)
         header = database.exec_sql_query(query)
 
         num_lightcurves = len(header)
         if get_num_lightcurves:
+            num_lightcurves = int(header[0][0])
             return num_lightcurves
+        else:
+            num_lightcurves = len(header)
 
         if num_lightcurves > 0:
             return header
         else:
             print("No light curves in the database satisfy the given arguments. "
-                  "field: {}, model: {}, base: {}, snid: {}, sntype: {}".format(field, model, base, snid, sntype))
+                  "field: {}, model: {}, base: {}, snid: {}".format(field, model, base, snid))
             return []
 
 
 
-    def get_lcs_data(self, columns=None, field='%', model='%', base='%', snid='%', sntype='%',\
+    def get_lcs_data(self, columns=None, field='%', model='%', base='%', snid='%',\
             limit=None, shuffle=False, sort=True, offset=0):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
@@ -335,7 +338,7 @@ class GetData(object):
         columns : list
             A list of strings of the names of the columns you want to retrieve from the database.
             You must at least include ['objid', 'ptrobs_min', 'ptrobs_max'] at the beginning of the input list.
-            E.g. columns=['objid', 'ptrobs_min', 'ptrobs_max', 'sntype', 'peakmjd'].
+            E.g. columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'].
         field : str, optional
             The field name. E.g. field='DDF' or field='WFD'. The default is '%' indicating that all fields will be included.
         model : str, optional
@@ -344,8 +347,6 @@ class GetData(object):
             The base name. E.g. base='NONIa'. The default is '%' indicating that all base names will be included.
         snid : str, optional
             The transient id. E.g. snid='87287'. The default is '%' indicating that all snids will be included.
-        sntype : str, optional
-            The transient type/class. E.g. sntype='3'. The default is '%' indicating that all sntypes will be included.
         limit : int, optional 
             Limit the results to this number (> 0)
         shuffle : bool, optional
@@ -358,14 +359,14 @@ class GetData(object):
         Return
         -------
         result: tuple
-            A generator tuple containing (objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, sntype, peak_mjd)
+            A generator tuple containing (objid, ptrobs_min, ptrobs_max, mwebv, mwebv_err, z, zerr, peak_mjd)
         phot_data : pandas DataFrame
             A generator containing a DataFrame with the MJD, FLT, MAG, MAGERR as rows and the the filter names as columns.
             E.g. Access the magnitude in the z filter with phot_data['z']['MAG'].
         """
 
         header = self.get_lcs_headers(columns=columns, field=field,\
-                    model=model, base=base, snid=snid, sntype=sntype,\
+                    model=model, base=base, snid=snid,\
                     limit=limit, sort=sort, shuffle=shuffle, offset=offset)
 
         num_lightcurves = len(header)

@@ -16,7 +16,7 @@ from collections import OrderedDict
 def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', snid_in='%', cadences=None, limit=100, shuffle=False):
     getdata = GetData(data_release)
     result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'],\
-            field=field_in, sntype=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
+            field=field_in, model=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
 
     t_plot, flux_plot, fluxerr_plot, peak_mjd_plot = {}, {}, {}, {}
     sntypes_map = getdata.get_sntypes()
@@ -82,7 +82,7 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
             ax.errorbar(t_plot[f][j], flux_plot[f][j], yerr=fluxerr_plot[f][j], marker='.', linestyle='None')
     fig.suptitle("{}".format(sntype_name))
     fig.tight_layout(rect=[0, 0.03, 1, 0.90])
-    fig.savefig("{0}/{1}_{2}.pdf".format(fig_dir, field_in, sntype_name))
+    fig.savefig("{0}/model_lc_plots/{1}_{2}.pdf".format(fig_dir, field_in, sntype_name))
     return(fig)
 
 
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         os.makedirs(fig_dir)
 
     data_release = '20180221'
-    field = 'DDF'
+    field = 'WFD'
     limit=30
     shuffle=True
 
