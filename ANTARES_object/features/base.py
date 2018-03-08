@@ -137,7 +137,7 @@ class BaseMixin(object):
                 amp = np.abs(np.percentile(thisFlux, 99) - np.percentile(thisFlux, 1))
 
                 outamp[pb] = amp
-
+        self.setattr_from_dict_default('amplitude', outamp, np.nan)
         self.amplitude = outamp
         return outamp
 
