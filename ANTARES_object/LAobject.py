@@ -218,10 +218,10 @@ class LAobject(PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         self._good_filters = set(['u','g','r','i','z','Y'])
         avail_filters      = set(self.passband)
         use_filters        = self._good_filters & avail_filters
-        self.filters       = list(use_filters)
-        if len(self.filters) != avail_filters:
-            message = 'Number of useful filters ({}) does not equal number available filters. Some filters will not be used'.format(''.join(self.filters))
+        if not avail_filters.issubset(use_filters):
+            message = 'Number of useful filters ({}) does not equal number available filters ({}) - some filters will not be used'.format(''.join(use_filters), ''.join(avail_filters))
             warnings.warn(message, RuntimeWarning)
+        self.filters       = list(use_filters)
 
         self.nobs = len(self.time)
         if self.nobs == 0:
