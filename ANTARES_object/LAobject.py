@@ -207,15 +207,40 @@ class LAobject(PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
             self.fluxErr = df
             self.passband = pbs
             self.zeropoint = zpt
-            self.obsId = oid 
+            self.obsId = oid
             return self.finalize()
 
 
     def finalize(self):
-        self.filters    = list(set(self.passband))
+        # this forces only some filters will be used for feature computation
+        # this is not ideal, but a necessary stop-gap while we revise
+        # the PropertyTable SQL
+        self._good_filters = set(['u','g','r','i','z','Y'])
+        avail_filters      = set(self.passband)
+        use_filters        = self._good_filters & avail_filters
+        self.filters       = list(use_filters)
+        if len(self.filters) != avail_filters:
+            message = 'Number of useful filters ({}) does not equal number available filters. Some filters will not be used'.format(''.join(self.filters))
+            warnings.warn(message, RuntimeWarning)
+
         self.nobs = len(self.time)
         if self.nobs == 0:
             message = 'Object {} with locus ID {} has no good observations.'.format(self.objectId, self.locusId)
             raise ValueError(message)
 
+
+    def setattr_from_dict_default(self, rootname, values_dict, default_value):
+        """
+        Set attributes for the LAobject from a values dictionary indexed by passband
+        The set attribute names are rootname_passband
+
+        Attributes are only set for passbands listed in _good_filters i.e. if
+        the light curve has passbands that were non-standard, then no features
+        are set.
+
+        If a passband listed in _good_filters is not present in the
+        values_dict, the default_value is set
+        """
+        for pb in self._good_filters:
+            setattr(self, '{}_{}'.format(rootname, pb),  values_dict.get(pb, default_value))
 
