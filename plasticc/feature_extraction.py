@@ -4,49 +4,51 @@ import numpy as np
 import pandas as pd
 from astropy.stats import sigma_clip
 import astropy.table as at
-import pymysql
 from collections import OrderedDict
 from plasticc.get_data import GetData
 from ANTARES_object.LAobject import LAobject
+import h5py
 from . import database
 
 DIRNAMES = 1
 
 
-def get_light_curves(data_release, field_in='%', sntype_in='%', snid_in='%', limit=None, shuffle=False):
+def get_light_curves(data_release, field_in='%', model_in='%', snid_in='%', limit=None, shuffle=False):
     getdata = GetData(data_release)
     result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host'], field=field_in,
-                                  sntype=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
+                                  model=model_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
 
     # sntypes_map = getdata.get_sntypes()
     # sntype_name = sntypes_map[sntype_in]
     #
     # non_transients = ['RRLyrae', 'Mdwarf', 'Mira']
     # periodic = True if sntype_name in non_transients else False
+    t, flux, fluxerr, zeropt, mjd, flt = {}, {}, {}, {}, {}, {}
 
     for head, phot in result:
         objid, ptrobs_min, ptrobs_max, peak_mjd, redshift = head
 
-        for f in phot.columns:  # Filter names
-            data = phot.get(f)
+        for pb in phot.columns:  # Filter names
+            data = phot.get(pb)
             if data is None:
                 continue
-            flt, flux, fluxerr, mjd, zeropt = data
-            t = mjd - peak_mjd
+            flt[pb], flux[pb], fluxerr[pb], mjd[pb], zeropt[pb] = data
+            zeropt[pb] = zeropt[pb][0]
+            t[pb] = mjd[pb] - peak_mjd
 
-            filtered_err = sigma_clip(fluxerr, sigma=3., iters=5, copy=True)
-            filtered_flux = sigma_clip(flux, sigma=7., iters=5, copy=True)
+            filtered_err = sigma_clip(fluxerr[pb], sigma=3., iters=5, copy=True)
+            filtered_flux = sigma_clip(flux[pb], sigma=7., iters=5, copy=True)
             bad1 = filtered_err.mask
             bad2 = filtered_flux.mask
             ind = ~np.logical_or(bad1, bad2)
 
-            t = t[ind]
-            flux = flux[ind]
-            fluxerr = fluxerr[ind]
-            mjd = mjd[ind]
-            flt = flt[ind]
+            t[pb] = t[pb][ind]
+            flux[pb] = flux[pb][ind]
+            fluxerr[pb] = fluxerr[pb][ind]
+            mjd[pb] = mjd[pb][ind]
+            flt[pb] = flt[pb][ind]
 
-            yield t, flux, fluxerr, zeropt[0], mjd, flt, objid, sntype_in, redshift
+        yield t, flux, fluxerr, zeropt, mjd, flt, objid, model_in, redshift
 
 
 def save_antares_features(data_release, redo=False):
@@ -54,88 +56,69 @@ def save_antares_features(data_release, redo=False):
     Get antares object features.
     Return as a DataFrame with columns being the features, and rows being the objid&passband
     """
-
+    passbands = ['i', 'r', 'Y', 'u', 'g', 'z']
     field = 'DDF'
-    sntype = '1'
-    features = {}
-    table_exists = False
+    model = '1'
+    fname = 'features_{}.hdf5'.format(model)
     nrows = 0
     features_out = []
+    feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'amplitude_%s' % p, 'skew_%s' % p, 'somean_%s' % p,
+                           'shapiro_%s' % p, 'q31_%s' % p, 'rms_%s' % p, 'mad_%s' % p, 'stetsonj_%s' % p,
+                           'stetsonk_%s' % p, 'acorr_%s' % p, 'hlratio_%s' % p] for p in passbands], [])
 
-    lc_result = get_light_curves(data_release=data_release, field_in=field, sntype_in=sntype, snid_in='%', limit=None,
+    mysql_fields = ['objid', 'redshift'] + feature_fields
+
+    lc_result = get_light_curves(data_release=data_release, field_in=field, model_in=model, snid_in='%', limit=None,
                                  shuffle=True)
 
     for lcinfo in lc_result:
-        t, flux, fluxerr, zeropt, mjd, flt, objid, sntype, redshift = lcinfo
-        p = flt[0]
-        objid = objid + '_' + p
+        t, flux, fluxerr, zeropt, mjd, flt, objid, model, redshift = lcinfo
         features = OrderedDict()
-
-        try:
-            laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr, obsId=mjd, passband=flt,
-                                zeropoint=zeropt, per=False)
-        except ValueError as e:
-            print(e)  # No good observations
-            continue
-
-        # Get Features
-        features['objid'] = objid
-        features['sntype'] = sntype
+        features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
-        stats = laobject.get_stats()[p]
-        features['nobs'] = stats.nobs
-        if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
-            continue
-        features['variance'] = stats.variance
-        features['skewness'] = stats.skewness
-        features['kurtosis'] = stats.kurtosis
-        features['min'] = stats.minmax[0]
-        features['max'] = stats.minmax[1]
-        features['amplitude'] = laobject.get_amplitude()[p]
-        features['skew'] = laobject.get_skew()[p]
-        features['somean'] = laobject.get_StdOverMean()[p]
-        features['shapiro'] = laobject.get_ShapiroWilk()[p]
-        features['q31'] = laobject.get_Q31()[p]
-        features['rms'] = laobject.get_RMS()[p]
-        features['mad'] = laobject.get_MAD()[p]
-        features['stetsonj'] = laobject.get_StetsonJ()[p]
-        features['stetsonk'] = laobject.get_StetsonK()[p]
-        features['acorr'] = laobject.get_AcorrIntegral()[p]
-        features['hlratio'] = laobject.get_hlratio()[p]
-
-        if not table_exists:
-            if redo:
-                database.exec_sql_query("TRUNCATE TABLE features;")  # Delete everything in the features table
-            mysql_fields = list(features.keys())
-            mysql_formats = ['VARCHAR(255)', ] + ['FLOAT' for x in mysql_fields[1:]]
-            mysql_schema = ', '.join(['{} {}'.format(x, y) for x, y in zip(mysql_fields, mysql_formats)])
-            table_name = database.create_sql_index_table_for_release(data_release, mysql_schema, redo=redo, table_name='features_{}'.format(data_release))
-            table_exists = True
-
+        for p in passbands:
+            try:
+                laobject = LAobject(locusId=objid, objectId=objid, time=t[p], flux=flux[p], fluxErr=fluxerr[p], obsId=mjd[p], passband=flt[p],
+                                    zeropoint=zeropt[p], per=False)
+            except (ValueError, KeyError) as e:
+                print(e)  # No good observations
+                for key in feature_fields:
+                    if '_%s' % p in key:
+                        features[key] = np.nan
+                continue
+            # Get Features
+            stats = laobject.get_stats()[p]
+            if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
+                for key in feature_fields:
+                    if '_%s' % p in key:
+                        features[key] = np.nan
+                continue
+            features['variance_%s' % p] = stats.variance
+            features['kurtosis_%s' % p] = stats.kurtosis
+            features['amplitude_%s' % p] = laobject.get_amplitude()[p]
+            features['skew_%s' % p] = laobject.get_skew()[p]
+            features['somean_%s' % p] = laobject.get_StdOverMean()[p]
+            features['shapiro_%s' % p] = laobject.get_ShapiroWilk()[p]
+            features['q31_%s' % p] = laobject.get_Q31()[p]
+            features['rms_%s' % p] = laobject.get_RMS()[p]
+            features['mad_%s' % p] = laobject.get_MAD()[p]
+            features['stetsonj_%s' % p] = laobject.get_StetsonJ()[p]
+            features['stetsonk_%s' % p] = laobject.get_StetsonK()[p]
+            features['acorr_%s' % p] = laobject.get_AcorrIntegral()[p]
+            features['hlratio_%s' % p] = laobject.get_hlratio()[p]
         features_out += [list(features.values())]
         nrows += 1
 
-        # Save to mysql in batches of 1000
-        if nrows >= 1000:
+        # Save to hdf5 in batches of 1000
+        if nrows >= 100:
+            print(len(features_out[0]), len(mysql_fields))
             features_out = np.array(features_out)
-            features_out = at.Table(features_out, names=list(features.keys()))
-            features_out = np.array(features_out).tolist()
-            nsavedrows = database.write_rows_to_index_table(features_out, table_name)
-            print("Saved ", nsavedrows, "rows")
+            features_out = at.Table(features_out, names=mysql_fields)
+            features_out.write(fname, path=data_release, append=True)
+            print("saved")
             nrows = 0
             features_out = []
 
-    if features_out:
-        features_out = np.array(features_out)
-        features_out = at.Table(features_out, names=list(features.keys()))
-        features_out = np.array(features_out).tolist()
-        nsavedrows = database.write_rows_to_index_table(features_out, table_name)
-        print("Saved ", nsavedrows, "rows")
-
-    # features = pd.DataFrame(features)
-
-    # print(features)
-    return features
 
 
 if __name__ == '__main__':
