@@ -59,7 +59,8 @@ def save_antares_features(data_release, redo=False):
     passbands = ['i', 'r', 'Y', 'u', 'g', 'z']
     field = 'DDF'
     model = '1'
-    fname = 'features_{}.hdf5'.format(model)
+    # fname = 'features_{}.hdf5'.format(model)
+    fname = os.path.join(ROOT_DIR, 'plasticc', 'features.hdf5')
     nrows = 0
     features_out = []
     feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'amplitude_%s' % p, 'skew_%s' % p, 'somean_%s' % p,
@@ -114,7 +115,7 @@ def save_antares_features(data_release, redo=False):
             print(len(features_out[0]), len(mysql_fields))
             features_out = np.array(features_out)
             features_out = at.Table(features_out, names=mysql_fields)
-            features_out.write(fname, path=data_release, append=True)
+            features_out.write(fname, path=data_release + '/' + model, append=True)
             print("saved")
             nrows = 0
             features_out = []
