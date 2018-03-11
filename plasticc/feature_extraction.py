@@ -143,7 +143,7 @@ def main():
     nobjects = getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True)
     print("{} objects for model {} in field {}".format(nobjects, model, field))
 
-    batch_size = 10
+    batch_size = 10000
     sort = True
     redo = True
 
@@ -157,7 +157,7 @@ def main():
     #     i += 1
 
     # Multiprocessing
-    i_list = np.arange(0, int(55/batch_size) + 1)
+    i_list = np.arange(0, int(nobjects/batch_size) + 1)
     pool = mp.Pool()
     results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
     pool.close()
