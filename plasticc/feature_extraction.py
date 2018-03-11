@@ -56,6 +56,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                 if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
                     features = set_keys_to_nan(feature_fields, p, features)
                     continue
+                features['nobs_%s' % p] = stats.nobs
                 features['variance_%s' % p] = stats.variance
                 features['kurtosis_%s' % p] = stats.kurtosis
 

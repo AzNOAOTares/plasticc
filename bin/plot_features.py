@@ -14,6 +14,9 @@ def get_features(fpath, data_release, field='%', model='%', base='%'):
     data = np.array(hdffile[data_release])
     hdffile.close()
 
+    # Ignore points that have redshift == 0
+    data = data[np.where(data['redshift'] != 0)[0]]
+
     return data
 
 
@@ -32,8 +35,8 @@ def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF',
             features_dict[pb][f] = features[feat_name]
 
     with PdfPages(f'{fig_dir}/{model_name}_{data_release}_{field}.pdf') as pdf:
-        fig, ax = plt.subplots(len(feature_names) - 1, sharex=True, figsize=(8, 15))
         for pb in features_dict.keys():
+            fig, ax = plt.subplots(len(feature_names) - 1, sharex=True, figsize=(8, 15))
             for i, f in enumerate(feature_names[1:]):
                 if f != 'redshift':
                     ax[i].scatter(features_dict[pb]['redshift'], features_dict[pb][f], marker='.', alpha=0.1)
@@ -42,9 +45,9 @@ def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF',
             ax[0].set_title("{} {}".format(model_name, pb))
             fig.subplots_adjust(hspace=0)
             plt.setp([a.get_xticklabels() for a in fig.axes[:-1]], visible=False)
-            # fig.savefig("{0}/features_{1}_{2}_{3}.png".format(fig_dir, field, model_name, passband), bbox_inches='tight')
-        pdf.savefig(fig, bbox_inches='tight')
-        plt.close(fig)
+            fig.savefig("{0}/features_{1}_{2}_{3}.png".format(fig_dir, field, model_name, pb), bbox_inches='tight')
+            pdf.savefig(fig, bbox_inches='tight')
+            plt.close(fig)
 
 
 def main():
