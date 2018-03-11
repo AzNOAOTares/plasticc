@@ -1,4 +1,5 @@
 import os
+import sys
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 import numpy as np
 import pandas as pd
@@ -13,55 +14,12 @@ from . import database
 DIRNAMES = 1
 
 
-def get_light_curves(data_release, field_in='%', model_in='%', snid_in='%', limit=None, shuffle=False):
-    getdata = GetData(data_release)
-    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host'], field=field_in,
-                                  model=model_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
-
-    # sntypes_map = getdata.get_sntypes()
-    # sntype_name = sntypes_map[sntype_in]
-    #
-    # non_transients = ['RRLyrae', 'Mdwarf', 'Mira']
-    # periodic = True if sntype_name in non_transients else False
-    t, flux, fluxerr, zeropt, mjd, flt = {}, {}, {}, {}, {}, {}
-
-    for head, phot in result:
-        objid, ptrobs_min, ptrobs_max, peak_mjd, redshift = head
-
-        for pb in phot.columns:  # Filter names
-            data = phot.get(pb)
-            if data is None:
-                continue
-            flt[pb], flux[pb], fluxerr[pb], mjd[pb], zeropt[pb] = data
-            zeropt[pb] = zeropt[pb][0]
-            t[pb] = mjd[pb] - peak_mjd
-
-            filtered_err = sigma_clip(fluxerr[pb], sigma=3., iters=5, copy=True)
-            filtered_flux = sigma_clip(flux[pb], sigma=7., iters=5, copy=True)
-            bad1 = filtered_err.mask
-            bad2 = filtered_flux.mask
-            ind = ~np.logical_or(bad1, bad2)
-
-            t[pb] = t[pb][ind]
-            flux[pb] = flux[pb][ind]
-            fluxerr[pb] = fluxerr[pb][ind]
-            mjd[pb] = mjd[pb][ind]
-            flt[pb] = flt[pb][ind]
-
-        yield t, flux, fluxerr, zeropt, mjd, flt, objid, model_in, redshift
-
-
-def save_antares_features(data_release, redo=False):
+def save_antares_features(fname, data_release, field_in='%', model_in='%', batch_size=100, offset=0, sort=True, redo=False):
     """
     Get antares object features.
     Return as a DataFrame with columns being the features, and rows being the objid&passband
     """
     passbands = ['i', 'r', 'Y', 'u', 'g', 'z']
-    field = 'DDF'
-    model = '1'
-    # fname = 'features_{}.hdf5'.format(model)
-    fname = os.path.join(ROOT_DIR, 'plasticc', 'features.hdf5')
-    nrows = 0
     features_out = []
     feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'amplitude_%s' % p, 'skew_%s' % p, 'somean_%s' % p,
                            'shapiro_%s' % p, 'q31_%s' % p, 'rms_%s' % p, 'mad_%s' % p, 'stetsonj_%s' % p,
@@ -69,64 +27,122 @@ def save_antares_features(data_release, redo=False):
 
     mysql_fields = ['objid', 'redshift'] + feature_fields
 
-    lc_result = get_light_curves(data_release=data_release, field_in=field, model_in=model, snid_in='%', limit=None,
-                                 shuffle=True)
+    getter = GetData(data_release)
+    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host'], field=field_in,
+                                  model=model_in, snid='%', limit=batch_size, offset=offset, shuffle=False, sort=sort)
+    for head, phot in result:
+        objid, ptrobs_min, ptrobs_max, peak_mjd, redshift = head
+        lc = getter.convert_pandas_lc_to_recarray_lc(phot)
+        obsid = np.arange(len(lc))
+        t = lc['mjd'] - peak_mjd  # subtract peakmjd from each mjd.
+        laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=lc['flux'], fluxErr=lc['dflux'],
+                         obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, clean=True)
 
-    for lcinfo in lc_result:
-        t, flux, fluxerr, zeropt, mjd, flt, objid, model, redshift = lcinfo
         features = OrderedDict()
         features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
+
         for p in passbands:
             try:
-                laobject = LAobject(locusId=objid, objectId=objid, time=t[p], flux=flux[p], fluxErr=fluxerr[p], obsId=mjd[p], passband=flt[p],
-                                    zeropoint=zeropt[p], per=False)
-            except (ValueError, KeyError) as e:
-                print(e)  # No good observations
+                stats = laobject.get_stats()[p]
+                # print(stats.nobs)
+                if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
+                    for key in feature_fields:
+                        if '_%s' % p in key:
+                            features[key] = np.nan
+                    continue
+                features['variance_%s' % p] = stats.variance
+                features['kurtosis_%s' % p] = stats.kurtosis
+                features['amplitude_%s' % p] = laobject.get_amplitude()[p]
+                features['skew_%s' % p] = laobject.get_skew()[p]
+                features['somean_%s' % p] = laobject.get_StdOverMean()[p]
+                features['shapiro_%s' % p] = laobject.get_ShapiroWilk()[p]
+                features['q31_%s' % p] = laobject.get_Q31()[p]
+                features['rms_%s' % p] = laobject.get_RMS()[p]
+                features['mad_%s' % p] = laobject.get_MAD()[p]
+                features['stetsonj_%s' % p] = laobject.get_StetsonJ()[p]
+                features['stetsonk_%s' % p] = laobject.get_StetsonK()[p]
+                features['acorr_%s' % p] = laobject.get_AcorrIntegral()[p]
+                features['hlratio_%s' % p] = laobject.get_hlratio()[p]
+            except KeyError as e:
                 for key in feature_fields:
                     if '_%s' % p in key:
                         features[key] = np.nan
                 continue
-            # Get Features
-            stats = laobject.get_stats()[p]
-            if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
-                for key in feature_fields:
-                    if '_%s' % p in key:
-                        features[key] = np.nan
-                continue
-            features['variance_%s' % p] = stats.variance
-            features['kurtosis_%s' % p] = stats.kurtosis
-            features['amplitude_%s' % p] = laobject.get_amplitude()[p]
-            features['skew_%s' % p] = laobject.get_skew()[p]
-            features['somean_%s' % p] = laobject.get_StdOverMean()[p]
-            features['shapiro_%s' % p] = laobject.get_ShapiroWilk()[p]
-            features['q31_%s' % p] = laobject.get_Q31()[p]
-            features['rms_%s' % p] = laobject.get_RMS()[p]
-            features['mad_%s' % p] = laobject.get_MAD()[p]
-            features['stetsonj_%s' % p] = laobject.get_StetsonJ()[p]
-            features['stetsonk_%s' % p] = laobject.get_StetsonK()[p]
-            features['acorr_%s' % p] = laobject.get_AcorrIntegral()[p]
-            features['hlratio_%s' % p] = laobject.get_hlratio()[p]
+
         features_out += [list(features.values())]
-        nrows += 1
 
-        # Save to hdf5 in batches of 1000
-        if nrows >= 100:
-            print(len(features_out[0]), len(mysql_fields))
-            features_out = np.array(features_out)
-            features_out = at.Table(features_out, names=mysql_fields)
-            features_out.write(fname, path=data_release + '/' + model, append=True)
-            print("saved")
-            nrows = 0
-            features_out = []
+    # Set all columns to floats except set first column to string (objid)
+    dtypes = ['S24'] + [np.float64] * (len(mysql_fields) - 1)
+
+    # Save to hdf5 in batches of 10000
+    features_out = np.array(features_out)
+    features_out = at.Table(features_out, names=mysql_fields, dtype=dtypes)
+    features_out.write(fname, path=data_release, append=False, overwrite=redo)
+    print("saved %s" % fname)
 
 
+def combine_hdf_files(save_dir, data_release):
+    fnames = os.listdir(save_dir)
+    fname_out = 'features_all.hdf5'  # os.path.join(ROOT_DIR, 'plasticc', 'features_all.hdf5')
+    output_file = h5py.File(fname_out, 'w')
 
-if __name__ == '__main__':
+    # keep track of the total number of rows
+    total_rows = 0
+
+    for n, f in enumerate(fnames):
+        f_hdf = h5py.File(os.path.join(save_dir, f), 'r')
+        data = f_hdf[data_release]
+        total_rows = total_rows + data.shape[0]
+
+        if n == 0:
+            # first file; fill the first section of the dataset; create with no max shape
+            create_dataset = output_file.create_dataset(data_release, data=data, chunks=True, maxshape=(None,))
+            where_to_start_appending = total_rows
+        else:
+            # resize the dataset to accomodate the new data
+            create_dataset.resize(total_rows, axis=0)
+            create_dataset[where_to_start_appending:total_rows] = data
+            where_to_start_appending = total_rows
+
+        f_hdf.close()
+
+    output_file.close()
+
+
+def main():
+    save_dir = 'hdf_features'  # os.path.join(ROOT_DIR, 'plasticc', 'hdf_features')
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
     # data_dir = os.path.join(ROOT_DIR, 'plasticc_data')
     # for data_release in next(os.walk(data_dir))[DIRNAMES]:
     #     if data_release == 'src':
     #         continue
+    #     save_antares_features(data_release, redo=True)
 
-    save_antares_features(data_release='20180221', redo=True)
+    data_release = '20180221'
+    field = 'DDF'
+    model = '1'
+    getter = GetData(data_release)
+    nobjects = getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True)
+    print("{} objects for model {} in field {}".format(nobjects, model, field))
+
+    batch_size = 10000
+    sort = True
+    offset = 0
+    i = 0
+    while offset < 55:
+        fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
+        save_antares_features(fname=fname, data_release=data_release, field_in=field, model_in=model,
+                              batch_size=batch_size, offset=offset, sort=sort, redo=True)
+        offset += batch_size
+        i += 1
+
+    combine_hdf_files(save_dir, data_release)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
+
 
