@@ -11,9 +11,11 @@ import pandas as pd
 import astropy.io.fits as afits
 from collections import OrderedDict
 from . import database
+from bin import helpers
 
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 DATA_DIR = os.path.join(ROOT_DIR, 'plasticc_data')
+
 
 def parse_getdata_options(argv=None):
     if argv is None:
@@ -130,7 +132,6 @@ class GetData(object):
             return []
         return column_out
 
-
     def get_light_curve(self, objid, ptrobs_min, ptrobs_max, standard_zpt=27.5):
         """ Get lightcurve from fits file
 
@@ -223,20 +224,15 @@ class GetData(object):
         out.dtype.names = out_names
         return out
 
-
     @staticmethod
     def get_sntypes():
-        sntypes_map = {1: 'SN1a', 2: 'CC', 3: 'SNIbc', 4: 'IIn', 42: 'SNIa-91bg', 45: 'pointIa', 50: 'Kilonova',
-                        60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira',
-                        90:'BSR', 91: 'String'}
-        return sntypes_map
+        return helpers.get_sntypes()
 
     def get_avail_sntypes(self):
         """ Returns a list of the different transient classes in the database. """
         sntypes = database.exec_sql_query("SELECT DISTINCT sntype FROM {};".format(self.data_release))
         sntypes_map = self.get_sntypes()
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
-
 
     def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', 
             get_num_lightcurves=False, limit=None, shuffle=False, sort=True, offset=0):
@@ -269,7 +265,7 @@ class GetData(object):
             Start returning MySQL results from this row number offset
         Return
         -------
-        result: tuple
+        result: tuple or int
         """
         if columns is None:
             columns=['objid', 'ptrobs_min', 'ptrobs_max']
