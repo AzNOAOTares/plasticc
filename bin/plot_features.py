@@ -45,7 +45,7 @@ def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF',
             ax[0].set_title("{} {}".format(model_name, pb))
             fig.subplots_adjust(hspace=0)
             plt.setp([a.get_xticklabels() for a in fig.axes[:-1]], visible=False)
-            fig.savefig("{0}/features_{1}_{2}_{3}.png".format(fig_dir, field, model_name, pb), bbox_inches='tight')
+            # fig.savefig("{0}/features_{1}_{2}_{3}.png".format(fig_dir, field, model_name, pb), bbox_inches='tight')
             pdf.savefig(fig, bbox_inches='tight')
             plt.close(fig)
 
@@ -62,7 +62,7 @@ def main():
 
     for data_release in ['20180221']:
         for field in ['DDF']:
-            for model in [1]:
+            for model in [1, 2, 3, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82]:
                 plot_features(fpath, data_release, feature_names, field, model, fig_dir, sntypes_map)
 
     plt.show()
