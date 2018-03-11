@@ -5,7 +5,7 @@ import h5py
 from matplotlib.backends.backend_pdf import PdfPages
 import helpers
 
-ROOT_DIR = '../..'  # os.getenv('PLASTICC_DIR')
+ROOT_DIR = os.getenv('PLASTICC_DIR')
 
 
 def get_features(fpath, data_release, field='%', model='%', base='%'):
