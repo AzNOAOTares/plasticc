@@ -58,7 +58,14 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                     continue
                 features['variance_%s' % p] = stats.variance
                 features['kurtosis_%s' % p] = stats.kurtosis
-                features['amplitude_%s' % p] = laobject.get_amplitude()[p]
+
+                try:
+                    features['amplitude_%s' % p] = laobject.get_amplitude()[p]
+                except AttributeError as err:
+                    # TODO: AttributeError is caused by not enough nobs in get_amplitude function in the ANTARES object. Look into why this differs from stats.nobs
+                    # print("Attribute error for {}, {}-band: {}".format(objid, p, err))
+                    features['amplitude_%s' % p] = np.nan
+
                 features['skew_%s' % p] = laobject.get_skew()[p]
                 features['somean_%s' % p] = laobject.get_StdOverMean()[p]
                 features['shapiro_%s' % p] = laobject.get_ShapiroWilk()[p]
@@ -70,11 +77,6 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                 features['acorr_%s' % p] = laobject.get_AcorrIntegral()[p]
                 features['hlratio_%s' % p] = laobject.get_hlratio()[p]
             except KeyError as err:
-                features = set_keys_to_nan(feature_fields, p, features)
-                continue
-            except AttributeError as err:
-                # TODO: AttributeError is caused by not enough nobs in get_amplitude function in the ANTARES object. Look into why this differs from stats.nobs
-                print(err)
                 features = set_keys_to_nan(feature_fields, p, features)
                 continue
 
@@ -92,7 +94,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
 
 def combine_hdf_files(save_dir, data_release):
     fnames = os.listdir(save_dir)
-    fname_out = 'features_all.hdf5'  # os.path.join(ROOT_DIR, 'plasticc', 'features_all.hdf5')
+    fname_out = os.path.join(ROOT_DIR, 'plasticc', 'features_all.hdf5')
     output_file = h5py.File(fname_out, 'w')
 
     # keep track of the total number of rows
