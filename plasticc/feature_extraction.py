@@ -9,12 +9,20 @@ from collections import OrderedDict
 from plasticc.get_data import GetData
 from ANTARES_object.LAobject import LAobject
 import h5py
+import multiprocessing as mp
 from . import database
 
 DIRNAMES = 1
 
 
-def save_antares_features(fname, data_release, field_in='%', model_in='%', batch_size=100, offset=0, sort=True, redo=False):
+def set_keys_to_nan(feature_fields, p, features):
+    for key in feature_fields:
+        if '_%s' % p in key:
+            features[key] = np.nan
+    return features
+
+
+def save_antares_features(data_release, fname, field_in='%', model_in='%', batch_size=100, offset=0, sort=True, redo=False):
     """
     Get antares object features.
     Return as a DataFrame with columns being the features, and rows being the objid&passband
@@ -45,11 +53,8 @@ def save_antares_features(fname, data_release, field_in='%', model_in='%', batch
         for p in passbands:
             try:
                 stats = laobject.get_stats()[p]
-                # print(stats.nobs)
                 if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
-                    for key in feature_fields:
-                        if '_%s' % p in key:
-                            features[key] = np.nan
+                    features = set_keys_to_nan(feature_fields, p, features)
                     continue
                 features['variance_%s' % p] = stats.variance
                 features['kurtosis_%s' % p] = stats.kurtosis
@@ -64,10 +69,13 @@ def save_antares_features(fname, data_release, field_in='%', model_in='%', batch
                 features['stetsonk_%s' % p] = laobject.get_StetsonK()[p]
                 features['acorr_%s' % p] = laobject.get_AcorrIntegral()[p]
                 features['hlratio_%s' % p] = laobject.get_hlratio()[p]
-            except KeyError as e:
-                for key in feature_fields:
-                    if '_%s' % p in key:
-                        features[key] = np.nan
+            except KeyError as err:
+                features = set_keys_to_nan(feature_fields, p, features)
+                continue
+            except AttributeError as err:
+                # TODO: AttributeError is caused by not enough nobs in get_amplitude function in the ANTARES object. Look into why this differs from stats.nobs
+                print(err)
+                features = set_keys_to_nan(feature_fields, p, features)
                 continue
 
         features_out += [list(features.values())]
@@ -110,8 +118,15 @@ def combine_hdf_files(save_dir, data_release):
     output_file.close()
 
 
+def create_all_hdf_files(data_release, i, save_dir, field_in, model_in, batch_size, sort, redo):
+    offset = batch_size * i
+    fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
+    save_antares_features(data_release=data_release, fname=fname, field_in=field_in, model_in=model_in,
+                          batch_size=batch_size, offset=offset, sort=sort, redo=redo)
+
+
 def main():
-    save_dir = 'hdf_features'  # os.path.join(ROOT_DIR, 'plasticc', 'hdf_features')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -122,22 +137,31 @@ def main():
     #     save_antares_features(data_release, redo=True)
 
     data_release = '20180221'
-    field = 'DDF'
-    model = '1'
+    field = '%'
+    model = '%'
     getter = GetData(data_release)
     nobjects = getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True)
     print("{} objects for model {} in field {}".format(nobjects, model, field))
 
-    batch_size = 10000
+    batch_size = 10
     sort = True
-    offset = 0
-    i = 0
-    while offset < 55:
-        fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
-        save_antares_features(fname=fname, data_release=data_release, field_in=field, model_in=model,
-                              batch_size=batch_size, offset=offset, sort=sort, redo=True)
-        offset += batch_size
-        i += 1
+    redo = True
+
+    # offset = 0
+    # i = 0
+    # while offset < 1000:
+    #     fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
+    #     save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
+    #                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)
+    #     offset += batch_size
+    #     i += 1
+
+    # Multiprocessing
+    i_list = np.arange(0, int(55/batch_size) + 1)
+    pool = mp.Pool()
+    results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
+    pool.close()
+    pool.join()
 
     combine_hdf_files(save_dir, data_release)
 
