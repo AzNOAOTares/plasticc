@@ -8,14 +8,19 @@ import helpers
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 
 
-def get_features(fpath, data_release, field='%', model='%', base='%'):
+def get_features(fpath, data_release, field_in='%', model_in='%'):
     """ Get features from hdf5 files. """
     hdffile = h5py.File(fpath, 'r')
     data = np.array(hdffile[data_release])
     hdffile.close()
 
-    # Ignore points that have redshift == 0
-    data = data[np.where(data['redshift'] != 0)[0]]
+    indexes = []
+    for i, objid in enumerate(data['objid']):
+        field, model, base, snid = objid.astype(str).split('_')
+        if (field == field_in or field_in == '%') and (model_in == '%' or int(model) == int(model_in)):
+            indexes.append(i)
+
+    data = data[indexes]
 
     return data
 
@@ -23,13 +28,13 @@ def get_features(fpath, data_release, field='%', model='%', base='%'):
 def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', fig_dir='.',
                   sntypes_map=None):
     model_name = sntypes_map[int(model)]
-    features = get_features(fpath, data_release)
+    features = get_features(fpath, data_release, field, model)
 
     features_dict = {'u': {}, 'g': {}, 'r': {}, 'i': {}, 'z': {}, 'Y': {}}
     for pb in features_dict.keys():
         for f in feature_names:
             if f in ['objid', 'redshift']:
-                feat_name = "%s" % (f)
+                feat_name = "%s" % f
             else:
                 feat_name = "%s_%s" % (f, pb)
             features_dict[pb][f] = features[feat_name]
