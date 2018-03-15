@@ -4,9 +4,9 @@ import numpy as np
 import h5py
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy import stats
-from . import helpers
+import helpers
 
-ROOT_DIR = os.getenv('PLASTICC_DIR')
+ROOT_DIR = '..' # os.getenv('PLASTICC_DIR')
 
 
 def get_features(fpath, data_release, field_in='%', model_in='%'):
@@ -51,6 +51,7 @@ def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF',
                     y = np.copy(features_dict[pb][f])
                     mask = ~np.isnan(y)  # Mask NaN points
                     x, y = x[mask], y[mask]
+                    objid_masked = np.copy(features_dict[pb]['objid'])[mask]
                     data = np.array([x, y])
                     xmin, xmax, ymin, ymax = x.min(), x.max(), y.min(), y.max()
                     X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
@@ -64,11 +65,11 @@ def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF',
                     ax[i].set_ylabel(f, rotation=0, labelpad=30)
 
                     # Find plotting range by removing points over 10 standard deviations from the median 3 times iteratively.
-                    for ii in range(3):
+                    for ii in range(1):
                         ystd = np.nanstd(y)
                         ymedian = np.nanmedian(y)
                         for jj in np.where(abs(y - ymedian) > 10*ystd)[0]:
-                            print("Extreme values for: ", features_dict[pb]['objid'][jj], pb, f, y[jj])
+                            print("Extreme values for: ", objid_masked[jj], pb, f, y[jj])
                         mask = np.where(abs(y - ymedian) < 10*ystd)[0]
                         y = y[mask]
                     ax[i].set_ylim([y.min(), y.max()])
@@ -83,7 +84,7 @@ def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF',
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features4')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_DDF.hdf5')

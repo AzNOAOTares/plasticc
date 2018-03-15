@@ -22,6 +22,17 @@ def set_keys_to_nan(feature_fields, p, features):
     return features
 
 
+def renorm_flux_lightcurve(flux, fluxerr, mu):
+    """ Normalise flux light curves with distance modulus."""
+    d = 10 ** (mu/5 + 1)
+    dsquared = d**2
+
+    fluxout = flux * dsquared
+    fluxerrout = fluxerr * dsquared
+
+    return fluxout, fluxerrout
+
+
 def save_antares_features(data_release, fname, field_in='%', model_in='%', batch_size=100, offset=0, sort=True, redo=False):
     """
     Get antares object features.
@@ -36,15 +47,17 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     mysql_fields = ['objid', 'redshift'] + feature_fields
 
     getter = GetData(data_release)
-    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host'], field=field_in,
+    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host', 'mwebv', 'sim_dlmu'], field=field_in,
                                   model=model_in, snid='%', limit=batch_size, offset=offset, shuffle=False, sort=sort)
     for head, phot in result:
-        objid, ptrobs_min, ptrobs_max, peak_mjd, redshift = head
+        objid, ptrobs_min, ptrobs_max, peak_mjd, redshift, mwebv, dlmu = head
         lc = getter.convert_pandas_lc_to_recarray_lc(phot)
         obsid = np.arange(len(lc))
         t = lc['mjd'] - peak_mjd  # subtract peakmjd from each mjd.
-        laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=lc['flux'], fluxErr=lc['dflux'],
-                         obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, clean=True)
+
+        flux, fluxerr = renorm_flux_lightcurve(flux=lc['flux'], fluxerr=lc['dflux'], mu=dlmu)
+        laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr,
+                            obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, clean=True)
 
         features = OrderedDict()
         features['objid'] = objid.encode('utf8')
