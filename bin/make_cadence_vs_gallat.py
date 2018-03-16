@@ -113,8 +113,8 @@ def main():
             nobs = len(ra) 
             if nobs == 0:
                 continue
-
-            alpha = 1./int(np.log10(nobs))
+            if nobs > 10:
+                alpha = 1./int(np.log10(nobs))
             if alpha <= 0.2:
                 alpha/=10
             ax1.scatter(ra, dec, marker='.', color=c, alpha=alpha)
@@ -126,25 +126,30 @@ def main():
                 thispbgallat = np.array(thispbgallat)
                 thispbcad    = np.array(thispbcad)
 
-                if len(thispbcad) == 0:
+                if len(thispbcad) < 3:
                     continue 
 
                 thispbgallat = np.abs(thispbgallat)
                 hcol = hcolors[pb]
 
-                ax2 = fig2.add_subplot(3, 2, i+1)
                 ax3 = fig3.add_subplot(3, 2, i+1)
-                kernel = gaussian_kde(thispbcad)
+                ntimebins = int(np.ceil((thispbcad.max() - thispbcad.min())/5.))
+                if ntimebins < 5:
+                    ntimebins = 5
+                h = ax3.hist2d(thispbgallat, thispbcad, bins=[18,ntimebins], cmap=hcol, norm=LogNorm())
+                fig3.colorbar(h[3], ax=ax3)
+                ax3.set_xlabel('Gal Latitude')
+                ax3.set_ylabel('{} Cadence'.format(pb))
+
+                try:
+                 kernel = gaussian_kde(thispbcad)
+                except Exception as e:
+                    continue
+                ax2 = fig2.add_subplot(3, 2, i+1)
                 this_y = current_y[pb]
                 new_y = kernel(time_array)
                 ax2.fill_between(time_array, new_y+this_y, this_y, color=c)
-                ntimebins = np.ceil(thispbcad.max() - thispbcad.min())/5. 
-                h = ax3.hist2d(thispbgallat, thispbcad, bins=[18,ntimebins], cmap=hcol, norm=LogNorm())
-                fig3.colorbar(h[3], ax=ax3)
                 current_y[pb] = this_y + new_y
-
-                ax3.set_xlabel('Gal Latitude')
-                ax3.set_ylabel('{} Cadence'.format(pb))
             #end loop over pb
             fig3.suptitle('{} {}'.format(model_name, field), fontsize='large')
             fig3.tight_layout(rect=[0,0,1,0.93])
