@@ -10,6 +10,7 @@ from plasticc.get_data import GetData
 from ANTARES_object.LAobject import LAobject
 import h5py
 import multiprocessing as mp
+import extinction
 from . import database
 
 DIRNAMES = 1
@@ -33,12 +34,31 @@ def renorm_flux_lightcurve(flux, fluxerr, mu):
     return fluxout, fluxerrout
 
 
+def remove_extinction(mwebv, lc):
+    passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
+    PB_WAVE = np.array([356.95, 476.65, 621.45, 754.45, 870.75, 1003.95])
+
+    extinctions = extinction.fitzpatrick99(wave=PB_WAVE, a_v=3.1*mwebv, r_v=3.1, unit='aa')
+
+    for i, pb in enumerate(passbands):
+        flux = lc['flux'][lc['pb'] == pb]
+        fluxerr = lc['dflux'][lc['pb'] == pb]
+
+        newflux = extinction.remove(extinctions[i], flux, inplace=False)
+        newfluxerr = extinction.remove(extinctions[i], fluxerr, inplace=False)
+
+        lc['flux'][lc['pb'] == pb] = newflux
+        lc['dflux'][lc['pb'] == pb] = newfluxerr
+
+    return lc
+
+
 def save_antares_features(data_release, fname, field_in='%', model_in='%', batch_size=100, offset=0, sort=True, redo=False):
     """
     Get antares object features.
     Return as a DataFrame with columns being the features, and rows being the objid&passband
     """
-    passbands = ['i', 'r', 'Y', 'u', 'g', 'z']
+    passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
     features_out = []
     feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'amplitude_%s' % p, 'skew_%s' % p, 'somean_%s' % p,
                            'shapiro_%s' % p, 'q31_%s' % p, 'rms_%s' % p, 'mad_%s' % p, 'stetsonj_%s' % p,
@@ -52,16 +72,19 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     for head, phot in result:
         objid, ptrobs_min, ptrobs_max, peak_mjd, redshift, mwebv, dlmu = head
         lc = getter.convert_pandas_lc_to_recarray_lc(phot)
+        lc = remove_extinction(mwebv, lc)
+
         obsid = np.arange(len(lc))
         t = lc['mjd'] - peak_mjd  # subtract peakmjd from each mjd.
 
         flux, fluxerr = renorm_flux_lightcurve(flux=lc['flux'], fluxerr=lc['dflux'], mu=dlmu)
         laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr,
-                            obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, clean=True)
+                            obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False)
 
         features = OrderedDict()
         features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
+        features['mwebv'] = mwebv
 
         for p in passbands:
             try:
