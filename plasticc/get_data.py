@@ -67,7 +67,6 @@ def parse_getdata_options(argv=None):
                 out['model'] = this_model 
             else:
                 out['model'] = model 
-    out['sntype'] = out['model']
     return out
 
 
@@ -307,6 +306,7 @@ class GetData(object):
 
         query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns),\
                 self.data_release, field, model, base, snid, extra_command)
+        print(query)
         header = database.exec_sql_query(query)
 
         num_lightcurves = len(header)
