@@ -79,7 +79,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
 
         flux, fluxerr = renorm_flux_lightcurve(flux=lc['flux'], fluxerr=lc['dflux'], mu=dlmu)
         laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr,
-                            obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, clean=True)
+                            obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False)
 
         features = OrderedDict()
         features['objid'] = objid.encode('utf8')
