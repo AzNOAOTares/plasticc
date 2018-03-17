@@ -311,7 +311,7 @@ class GetData(object):
         query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns),\
                 self.data_release, field, model, base, snid, extra_command)
         if big:
-            for result in database.exec_sql_query(query, big=big):
+            for result in database.exec_big_sql_query(query):
                 yield result
         else:
             header = database.exec_sql_query(query)
@@ -323,11 +323,12 @@ class GetData(object):
                 num_lightcurves = len(header)
             
             if num_lightcurves > 0:
-                return header
+                for result in header:
+                    yield result 
             else:
                 print("No light curves in the database satisfy the given arguments. "
                       "field: {}, model: {}, base: {}, snid: {}".format(field, model, base, snid))
-                return []
+                return
 
 
 
