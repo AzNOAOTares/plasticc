@@ -293,8 +293,8 @@ class GetData(object):
         if limit is not None and shuffle is False and sort is False:
             sort = True
 
-        limit_command = '' if limit is None else " LIMIT {:n}".format(limit)
-        offset_command = '' if offset is None else " OFFSET {:n}".format(offset)
+        limit_command = '' if limit is None else " LIMIT {}".format(limit)
+        offset_command = '' if offset is None else " OFFSET {}".format(offset)
         if model != '%':
             model = "{:02n}".format(int(model))
 
