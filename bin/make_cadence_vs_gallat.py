@@ -47,7 +47,13 @@ def main():
     fig2 = plt.figure(figsize=(15,10))
     ax1 = fig1.add_subplot(1,1,1, projection='aitoff')
 
-    time_array = np.arange(0., 101, 1.)
+    if field == 'DDF':
+        max_time = 20.01
+        time_step = 0.01
+    else:
+        max_time = 101
+        time_step = 1. 
+    time_array = np.arange(0., max_time, time_step)
     current_y = {pb:np.zeros(len(time_array)) for pb in colors}
 
     cmap = plt.cm.tab20
@@ -132,8 +138,11 @@ def main():
                 ntimebins = int(np.ceil((thispbcad.max() - thispbcad.min())/5.))
                 if ntimebins < 5:
                     ntimebins = 5
-                h = ax3.hist2d(thispbgallat, thispbcad, bins=[18,ntimebins], cmap=hcol, norm=LogNorm())
-                fig3.colorbar(h[3], ax=ax3)
+                if len(thispbcad) < 50000:
+                    h = ax3.scatter(thispbgallat, thispbcad, color=pbcolor, marker='.')
+                else:
+                    h = ax3.hist2d(thispbgallat, thispbcad, bins=[18,ntimebins], cmap=hcol, norm=LogNorm())
+                    fig3.colorbar(h[3], ax=ax3)
                 ax3.set_xlabel('Gal Latitude')
                 ax3.set_ylabel('{} Cadence'.format(pb))
 
