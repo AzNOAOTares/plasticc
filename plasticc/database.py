@@ -201,18 +201,28 @@ def get_mysql_connection(attempts=0):
     return con
 
 
-def exec_sql_query(query):
+def exec_sql_query(query, big=False):
     """
     Executes a supplied MySQL query. The context of the query is defined by
     _MYSQL_CONFIG and the connection object returned by get_mysql_connection() 
-    Returns the result of the query (if any)
+    Returns the result of the query (if any) or yields it as a generator if big=True
     """
     result = None
     con = get_mysql_connection()
     try:
         cursor = con.cursor()
-        cursor.execute(query)
-        result = cursor.fetchall()
+        if big:
+            cursor.execute(query)
+            loop_ok = True 
+            while loop_ok:
+                result = cursor.fetchone()
+                if result:
+                    yield result 
+                else:
+                    loop_ok = False
+        else:
+            cursor.execute(query)
+            result = cursor.fetchall()
     except Exception as e:
         message = '{}\nFailed to execute query\n{}'.format(e, query)
         raise RuntimeError(message)
