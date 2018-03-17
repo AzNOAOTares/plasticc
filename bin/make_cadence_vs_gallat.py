@@ -62,17 +62,13 @@ def main():
             model_name = sntypes[model]
             print(model_name)
             fig3 = plt.figure(figsize=(15,10))
-        
-            kwargs['model'] = model
-            lcdata = getter.get_lcs_data(**kwargs)
-            if lcdata is None:
-                continue
-        
             ra  = []
             dec = []
-
             cadence = {pb:[] for pb in colors}
         
+            kwargs['model'] = model
+            kwargs['big'] = True
+            lcdata = getter.get_lcs_data(**kwargs)
             nobj = 0
             for head, phot in lcdata:
                 nobj += 1
