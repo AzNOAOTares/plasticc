@@ -212,7 +212,7 @@ def exec_sql_query(query, big=False):
     try:
         cursor = con.cursor()
         if big:
-            cursor.execute(query)
+            success = cursor.execute(query)
             loop_ok = True 
             while loop_ok:
                 result = cursor.fetchone()
@@ -221,7 +221,7 @@ def exec_sql_query(query, big=False):
                 else:
                     loop_ok = False
         else:
-            cursor.execute(query)
+            success = cursor.execute(query)
             result = cursor.fetchall()
     except Exception as e:
         message = '{}\nFailed to execute query\n{}'.format(e, query)
