@@ -234,7 +234,7 @@ class GetData(object):
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
     def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', 
-            get_num_lightcurves=False, limit=None, shuffle=False, sort=True, offset=0):
+            get_num_lightcurves=False, limit=None, shuffle=False, sort=True, offset=0, big=False):
         """ Gets the header data given specific conditions.
 
         Parameters
@@ -262,6 +262,9 @@ class GetData(object):
             Order the results by objid - overrides `shuffle` if both are set
         offset : int, optional
             Start returning MySQL results from this row number offset
+        big : bool, optional
+            If True, use a generator to retrieve results - cannot be used with
+            get_num_lightcurves since generators have no length
         Return
         -------
         result: tuple or int
@@ -271,6 +274,7 @@ class GetData(object):
 
         if get_num_lightcurves:
             columns=['COUNT(objid)',]
+            big = False
 
         try:
             limit = int(limit)
@@ -306,27 +310,29 @@ class GetData(object):
 
         query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns),\
                 self.data_release, field, model, base, snid, extra_command)
-        print(query)
-        header = database.exec_sql_query(query)
-
-        num_lightcurves = len(header)
-        if get_num_lightcurves:
-            num_lightcurves = int(header[0][0])
-            return num_lightcurves
+        if big:
+            for result in database.exec_sql_query(query, big=big):
+                yield result
         else:
+            header = database.exec_sql_query(query)
             num_lightcurves = len(header)
-
-        if num_lightcurves > 0:
-            return header
-        else:
-            print("No light curves in the database satisfy the given arguments. "
-                  "field: {}, model: {}, base: {}, snid: {}".format(field, model, base, snid))
-            return []
+            if get_num_lightcurves:
+                num_lightcurves = int(header[0][0])
+                return num_lightcurves
+            else:
+                num_lightcurves = len(header)
+            
+            if num_lightcurves > 0:
+                return header
+            else:
+                print("No light curves in the database satisfy the given arguments. "
+                      "field: {}, model: {}, base: {}, snid: {}".format(field, model, base, snid))
+                return []
 
 
 
     def get_lcs_data(self, columns=None, field='%', model='%', base='%', snid='%',\
-            limit=None, shuffle=False, sort=True, offset=0):
+            limit=None, shuffle=False, sort=True, offset=0, big=False):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
         Parameters
@@ -351,6 +357,10 @@ class GetData(object):
             Order the results by objid - overrides `shuffle` if both are set
         offset : int, optional
             Start returning MySQL results from this row number offset (> 0)
+        big : bool, optional
+            If True, use a generator to retrieve results - cannot be used with
+            get_num_lightcurves since generators have no length
+            
 
         Return
         -------
@@ -363,11 +373,10 @@ class GetData(object):
 
         header = self.get_lcs_headers(columns=columns, field=field,\
                     model=model, base=base, snid=snid,\
-                    limit=limit, sort=sort, shuffle=shuffle, offset=offset)
+                    limit=limit, sort=sort, shuffle=shuffle, offset=offset, big=big)
 
-        num_lightcurves = len(header)
-        for i in range(num_lightcurves):
-            objid, ptrobs_min, ptrobs_max = header[i][0:3]
+        for h in header:
+            objid, ptrobs_min, ptrobs_max = h[0:3]
             phot_data = self.get_light_curve(objid, ptrobs_min, ptrobs_max)
-            yield header[i], phot_data
+            yield h, phot_data
 
