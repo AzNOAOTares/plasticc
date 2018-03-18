@@ -48,6 +48,7 @@ def parse_getdata_options(argv=None):
     parser.add_argument('--shuffle', required=False, type="bool", default="False", help='Shuffle the returned results from the MySQL index')
     parser.add_argument('--sort', required=False, type="bool", default="True", help='Sort the returned results from the MySQL index')
     parser.add_argument('--offset', required=False, default=None, type=int, help='Return the MySQL results AFTER offset rows')
+    parser.add_argument('--extrasql', required=False, default=None, help='Extra SQL for the selection function - enter as quoted string - used as is')
     args = parser.parse_args(args=argv)
 
     out = vars(args)
@@ -79,6 +80,7 @@ class GetData(object):
         self.phot_fields = ['MJD', 'FLT', 'FLUXCAL', 'FLUXCALERR', 'ZEROPT']
         self.phot_fields_dtypes = {'FLT':np.str_}
 
+
     def get_phot_fields(self):
         """
         list of the photometry column names and a dictionary of NON-FLOAT
@@ -87,6 +89,7 @@ class GetData(object):
         For the default columns, this is only FLT
         """
         return list(self.phot_fields), dict(self.phot_fields_dtypes)
+
 
     def set_phot_fields(self, fields, dtypes):
         """
@@ -101,10 +104,12 @@ class GetData(object):
         self.phot_fields = list(fields)
         self.phot_fields_dtypes = dict(dtypes)
 
+
     def get_object_ids(self):
         """ Get list of all object ids """
         obj_ids = database.exec_sql_query("SELECT objid FROM {0};".format(self.data_release))
         return obj_ids
+
 
     def get_column_for_sntype(self, column_name, sntype, field='%'):
         """ Get an sql column for a particular sntype class
@@ -130,6 +135,7 @@ class GetData(object):
             print("No data in the database satisfy the given arguments. field: {}, sntype: {}".format(field, sntype))
             return []
         return column_out
+
 
     def get_light_curve(self, objid, ptrobs_min, ptrobs_max, standard_zpt=27.5):
         """ Get lightcurve from fits file
@@ -187,6 +193,7 @@ class GetData(object):
         del phot_HDU[1].data
         return phot_out
 
+
     @staticmethod
     def convert_pandas_lc_to_recarray_lc(phot):
         """
@@ -223,9 +230,11 @@ class GetData(object):
         out.dtype.names = out_names
         return out
 
+
     @staticmethod
     def get_sntypes():
         return helpers.get_sntypes()
+
 
     def get_avail_sntypes(self):
         """ Returns a list of the different transient classes in the database. """
@@ -233,7 +242,8 @@ class GetData(object):
         sntypes_map = self.get_sntypes()
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
-    def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', 
+
+    def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', extrasql='', 
             get_num_lightcurves=False, limit=None, shuffle=False, sort=True, offset=0, big=False):
         """ Gets the header data given specific conditions.
 
@@ -293,6 +303,7 @@ class GetData(object):
         if limit is not None and shuffle is False and sort is False:
             sort = True
 
+        extrasql_command = '' if extrasql is None else extrasql 
         limit_command = '' if limit is None else " LIMIT {}".format(limit)
         offset_command = '' if offset is None else " OFFSET {}".format(offset)
         if model != '%':
@@ -306,7 +317,7 @@ class GetData(object):
 
         shuffle_command = '' if shuffle is False else " ORDER BY RAND()"
         sort_command  = '' if sort is False else ' ORDER BY objid'
-        extra_command = ''.join([sort_command, shuffle_command, limit_command, offset_command])
+        extra_command = ''.join([extrasql_command, sort_command, shuffle_command, limit_command, offset_command])
 
         query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns),\
                 self.data_release, field, model, base, snid, extra_command)
@@ -333,7 +344,7 @@ class GetData(object):
 
 
     def get_lcs_data(self, columns=None, field='%', model='%', base='%', snid='%',\
-            limit=None, shuffle=False, sort=True, offset=0, big=False):
+            limit=None, shuffle=False, sort=True, offset=0, big=False, extrasql=''):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
         Parameters
@@ -374,7 +385,8 @@ class GetData(object):
 
         header = self.get_lcs_headers(columns=columns, field=field,\
                     model=model, base=base, snid=snid,\
-                    limit=limit, sort=sort, shuffle=shuffle, offset=offset, big=big)
+                    limit=limit, sort=sort, shuffle=shuffle, offset=offset,\
+                    big=big, extrasql=extrasql)
 
         for h in header:
             objid, ptrobs_min, ptrobs_max = h[0:3]
