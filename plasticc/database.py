@@ -207,12 +207,13 @@ def exec_big_sql_query(query, big=False):
     _MYSQL_CONFIG and the connection object returned by get_mysql_connection() 
     Returns the result of the query (if any) or yields it as a generator if big=True
     """
+    print(query)
     result = None
     con = get_mysql_connection()
     try:
         cursor = con.cursor()
         success = cursor.execute(query)
-        print(success)
+        print('Query results:',success)
         loop_ok = True 
         while loop_ok:
             result = cursor.fetchone()
@@ -233,12 +234,13 @@ def exec_sql_query(query, big=False):
     _MYSQL_CONFIG and the connection object returned by get_mysql_connection() 
     Returns the result of the query (if any) or yields it as a generator if big=True
     """
+    print(query)
     result = None
     con = get_mysql_connection()
     try:
         cursor = con.cursor()
         success = cursor.execute(query)
-        print(success)
+        print('Query results:',success)
         result = cursor.fetchall()
     except Exception as e:
         message = '{}\nFailed to execute query\n{}'.format(e, query)
@@ -246,4 +248,3 @@ def exec_sql_query(query, big=False):
     finally:
         con.close()
     return result
-
