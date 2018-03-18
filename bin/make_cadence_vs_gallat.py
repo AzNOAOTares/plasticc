@@ -48,7 +48,7 @@ def main():
     ax1 = fig1.add_subplot(1,1,1, projection='aitoff')
 
     if field == 'DDF':
-        max_time = 20.01
+        max_time = 14.51
         time_step = 0.01
     else:
         max_time = 101
