@@ -17,14 +17,16 @@ and have that return the right LCs as an iterator
 
 import sys
 import os
+ROOT_DIR = os.getenv('PLASTICC_DIR')
+WORK_DIR = os.path.join(ROOT_DIR, 'plasticc')
+sys.path.append(WORK_DIR)
 import warnings
 import glob
 import numpy as np
 import astropy.io.fits as afits
 import astropy.table as at
-from . import database
+from plasticc import database
 
-ROOT_DIR = os.getenv('PLASTICC_DIR')
 DIRNAMES = 1
 
 def get_file_data(filename, extension=0):
@@ -160,3 +162,7 @@ def main():
         if data_release == 'src':
             continue 
         make_index_for_release(data_release, data_dir=data_dir, redo=False)
+
+
+if __name__=='__main__':
+    sys.exit(main())
