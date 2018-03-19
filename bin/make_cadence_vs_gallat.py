@@ -19,8 +19,13 @@ from matplotlib.backends.backend_pdf import PdfPages
 from collections import OrderedDict
 from scipy.stats import gaussian_kde, describe
 from astropy.coordinates import SkyCoord
+import astropy.table as at
 
 def main():
+    table_dir = os.path.join(WORK_DIR,'Tables')
+    if not os.path.exists(table_dir):
+        os.makedirs(table_dir)
+
     fig_dir = os.path.join(WORK_DIR, 'Figures')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
@@ -62,6 +67,7 @@ def main():
     legend = []
     labels = []
 
+    table_fn = f'{table_dir}/cadence_analysis_{data_release}_{out_field}.txt'
 
     with PdfPages(f'{fig_dir}/cadence_analysis/cadence_vs_gallat_{data_release}_{out_field}.pdf') as pdf:
         for i,  model in enumerate(sntypes.keys()):
@@ -99,8 +105,13 @@ def main():
                     if len(lc[ind]) > 1:
                         t = lc['mjd'][ind]
                         t = np.sort(t)
-                        cad = np.median(np.diff(t))
-                        cadence[pb].append((b, cad))
+                        d = np.diff(t)
+                        good_d = (d < 90)
+                        d = d[good_d]
+                        if len(d) <= 1:
+                            continue 
+                        cad = np.median(d)
+                        cadence[pb].append((obsid, l, b, cad))
                     else:
                         continue 
                 #end loop over pb
@@ -119,17 +130,37 @@ def main():
                 alpha = 1./int(np.log10(nobs))
             if alpha <= 0.2:
                 alpha/=10
-            ax1.scatter(ra, dec, marker='.', color=c, alpha=alpha)
+
+            ra_rad  = np.radians(ra)
+            dec_rad = np.radians(dec)
+            ra_rad[ra_rad > np.pi] -= 2. * np.pi
+            ax1.scatter(ra_rad, dec_rad, marker='.', color=c, alpha=alpha)
             for i, pb in enumerate(colors):
                 pbcolor = colors[pb]
                 thiscad = cadence[pb]
                 
-                thispbgallat, thispbcad = zip(*thiscad)
-                thispbgallat = np.array(thispbgallat)
-                thispbcad    = np.array(thispbcad)
+                thispbobsid, thispbgallong, thispbgallat, thispbcad = zip(*thiscad)
+        
+                thispbobsid   = np.array(thispbobsid)
+                thispbgallong = np.array(thispbgallong)
+                thispbgallat  = np.array(thispbgallat)
+                thispbcad     = np.array(thispbcad)
+                ncad = len(thispbcad)
 
-                if len(thispbcad) < 3:
+                if ncad < 3:
                     continue 
+
+                thispbmod    = np.repeat(model_name, ncad)
+                thispb       = np.repeat(pb, ncad)
+                table = at.Table([thispbobsid, thispbmod, thispb, thispbgallong, thispbgallat, thispbcad],\
+                                names=['objid', 'model','pb','l','b','cadence'])
+                if not os.path.exists(table_fn):
+                    table.write(table_fn, format='ascii.fixed_width', delimiter=' ')
+                else:
+                    with open(table_fn, mode='a') as f:
+                        f.seek(0, os.SEEK_END)
+                        table.write(f, format='ascii.fixed_width_no_header', delimiter=' ')
+
 
                 thispbgallat = np.abs(thispbgallat)
                 hcol = hcolors[pb]
