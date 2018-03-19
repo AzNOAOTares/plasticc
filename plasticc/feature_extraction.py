@@ -28,10 +28,23 @@ def renorm_flux_lightcurve(flux, fluxerr, mu):
     d = 10 ** (mu/5 + 1)
     dsquared = d**2
 
-    fluxout = flux * dsquared
-    fluxerrout = fluxerr * dsquared
+    norm = 1e19
+
+    fluxout = flux * dsquared / norm
+    fluxerrout = fluxerr * dsquared / norm
 
     return fluxout, fluxerrout
+
+
+def remove(extinction, flux, inplace=False):
+    """ extinction.remove doesn't work, so this is a direct copy of the function. """
+    trans = 10.**(0.4 * extinction)
+
+    if inplace:
+        flux *= trans
+        return flux
+    else:
+        return flux * trans
 
 
 def remove_extinction(mwebv, lc):
@@ -44,8 +57,9 @@ def remove_extinction(mwebv, lc):
         flux = lc['flux'][lc['pb'] == pb]
         fluxerr = lc['dflux'][lc['pb'] == pb]
 
-        newflux = extinction.remove(extinctions[i], flux, inplace=False)
-        newfluxerr = extinction.remove(extinctions[i], fluxerr, inplace=False)
+        # extinction.remove doesn't work for some reason... so writing remove function which is the same
+        newflux = remove(extinctions[i], flux, inplace=False)
+        newfluxerr = remove(extinctions[i], fluxerr, inplace=False)
 
         lc['flux'][lc['pb'] == pb] = newflux
         lc['dflux'][lc['pb'] == pb] = newfluxerr
@@ -76,15 +90,12 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
 
         obsid = np.arange(len(lc))
         t = lc['mjd'] - peak_mjd  # subtract peakmjd from each mjd.
-
         flux, fluxerr = renorm_flux_lightcurve(flux=lc['flux'], fluxerr=lc['dflux'], mu=dlmu)
         laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr,
                             obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False)
-
         features = OrderedDict()
         features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
-        features['mwebv'] = mwebv
 
         for p in passbands:
             try:
@@ -92,10 +103,8 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                 if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
                     features = set_keys_to_nan(feature_fields, p, features)
                     continue
-                features['nobs_%s' % p] = stats.nobs
                 features['variance_%s' % p] = stats.variance
                 features['kurtosis_%s' % p] = stats.kurtosis
-
                 try:
                     features['amplitude_%s' % p] = laobject.get_amplitude()[p]
                 except AttributeError as err:
@@ -116,7 +125,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             except KeyError as err:
                 features = set_keys_to_nan(feature_fields, p, features)
                 continue
-
+        print(offset)
         features_out += [list(features.values())]
 
     # Set all columns to floats except set first column to string (objid)
@@ -176,10 +185,10 @@ def main():
     #     save_antares_features(data_release, redo=True)
 
     data_release = '20180221'
-    field = '%'
+    field = 'DDF'
     model = '%'
     getter = GetData(data_release)
-    nobjects = getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True)
+    nobjects = next(getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True, big=False))
     print("{} objects for model {} in field {}".format(nobjects, model, field))
 
     batch_size = 10000
@@ -197,8 +206,10 @@ def main():
 
     # Multiprocessing
     i_list = np.arange(0, int(nobjects/batch_size) + 1)
+    print(i_list)
     pool = mp.Pool()
     results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
+    print(results)
     pool.close()
     pool.join()
 
@@ -207,5 +218,6 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
 
 

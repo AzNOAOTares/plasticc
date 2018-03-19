@@ -26,34 +26,42 @@ def parse_getdata_options(argv=None):
 
     def_sql_wildcard = '%'
     parser = argparse.ArgumentParser(description="Get options to the GetData structure")
-    group = parser.add_mutually_exclusive_group(required=False) 
-    parser.register('type','bool',str2bool)
+    group = parser.add_mutually_exclusive_group(required=False)
+    parser.register('type', 'bool', str2bool)
     parser.add_argument('--data_release', required=True, help='PLAsTiCC data release index table to process')
     field_choices = ('WFD', 'DDF', '%')
-    parser.add_argument('--field', required=False, default='DDF', type=str.upper, choices=field_choices,\
+    parser.add_argument('--field', required=False, default='DDF', type=str.upper, choices=field_choices, \
                         help='PLAsTiCC field to process')
 
     type_mapping = GetData.get_sntypes()
-    inverse_mapping = {v:k for k, v in type_mapping.items()}
+    inverse_mapping = {v: k for k, v in type_mapping.items()}
 
     model_choices = list(type_mapping.keys()).append('%')
     model_name_choices = list(type_mapping.values()).append('%')
-    group.add_argument('--model', required=False, action="store", default=def_sql_wildcard, choices=model_choices,\
-                        help='PLAsTiCC model to process')
-    group.add_argument('--model_name', required=False, action="store", default=def_sql_wildcard, choices=model_name_choices,\
-                        help='PLAsTiCC model name to process')
-    parser.add_argument('--base', required=False, default=def_sql_wildcard, help='PLAsTiCC model base filename (probably not a good idea to touch this)')
-    parser.add_argument('--snid', required=False, default=def_sql_wildcard, help='PLAsTiCC object ID number (useful for debugging/testing)')
-    parser.add_argument('--limit', required=False, type=int, default=None, help='Limit the number of returned results from the MySQL index')
-    parser.add_argument('--shuffle', required=False, type="bool", default="False", help='Shuffle the returned results from the MySQL index')
-    parser.add_argument('--sort', required=False, type="bool", default="True", help='Sort the returned results from the MySQL index')
-    parser.add_argument('--offset', required=False, default=None, type=int, help='Return the MySQL results AFTER offset rows')
-    parser.add_argument('--extrasql', required=False, default=None, help='Extra SQL for the selection function - enter as quoted string - used as is')
+    group.add_argument('--model', required=False, action="store", default=def_sql_wildcard, choices=model_choices, \
+                       help='PLAsTiCC model to process')
+    group.add_argument('--model_name', required=False, action="store", default=def_sql_wildcard,
+                       choices=model_name_choices, \
+                       help='PLAsTiCC model name to process')
+    parser.add_argument('--base', required=False, default=def_sql_wildcard,
+                        help='PLAsTiCC model base filename (probably not a good idea to touch this)')
+    parser.add_argument('--snid', required=False, default=def_sql_wildcard,
+                        help='PLAsTiCC object ID number (useful for debugging/testing)')
+    parser.add_argument('--limit', required=False, type=int, default=None,
+                        help='Limit the number of returned results from the MySQL index')
+    parser.add_argument('--shuffle', required=False, type="bool", default="False",
+                        help='Shuffle the returned results from the MySQL index')
+    parser.add_argument('--sort', required=False, type="bool", default="True",
+                        help='Sort the returned results from the MySQL index')
+    parser.add_argument('--offset', required=False, default=None, type=int,
+                        help='Return the MySQL results AFTER offset rows')
+    parser.add_argument('--extrasql', required=False, default=None,
+                        help='Extra SQL for the selection function - enter as quoted string - used as is')
     args = parser.parse_args(args=argv)
 
     out = vars(args)
     model_name = out.pop('model_name')
-    model      = out.pop('model')
+    model = out.pop('model')
     if model_name == '%':
         if model == '%':
             out['model'] = '%'
@@ -62,12 +70,12 @@ def parse_getdata_options(argv=None):
     else:
         this_model = inverse_mapping.get(model_name)
         if model == '%':
-            out['model'] = this_model 
+            out['model'] = this_model
         else:
             if this_model == model:
-                out['model'] = this_model 
+                out['model'] = this_model
             else:
-                out['model'] = model 
+                out['model'] = model
     return out
 
 
@@ -75,11 +83,11 @@ class GetData(object):
     """
     Class to access the ANTARES parsed PLaSTiCC index and light curve data
     """
+
     def __init__(self, data_release):
         self.data_release = "release_{}".format(data_release)
         self.phot_fields = ['MJD', 'FLT', 'FLUXCAL', 'FLUXCALERR', 'ZEROPT']
-        self.phot_fields_dtypes = {'FLT':np.str_}
-
+        self.phot_fields_dtypes = {'FLT': np.str_}
 
     def get_phot_fields(self):
         """
@@ -89,7 +97,6 @@ class GetData(object):
         For the default columns, this is only FLT
         """
         return list(self.phot_fields), dict(self.phot_fields_dtypes)
-
 
     def set_phot_fields(self, fields, dtypes):
         """
@@ -104,12 +111,10 @@ class GetData(object):
         self.phot_fields = list(fields)
         self.phot_fields_dtypes = dict(dtypes)
 
-
     def get_object_ids(self):
         """ Get list of all object ids """
         obj_ids = database.exec_sql_query("SELECT objid FROM {0};".format(self.data_release))
         return obj_ids
-
 
     def get_column_for_sntype(self, column_name, sntype, field='%'):
         """ Get an sql column for a particular sntype class
@@ -129,13 +134,14 @@ class GetData(object):
             A list containing all the entire column for a particular sntype class
         """
         try:
-            column_out = database.exec_sql_query("SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND sntype={3};".format(column_name, self.data_release, field, sntype))
+            column_out = database.exec_sql_query(
+                "SELECT {0} FROM {1} WHERE objid LIKE '{2}%' AND sntype={3};".format(column_name, self.data_release,
+                                                                                     field, sntype))
             column_out = np.array(column_out)[:, 0]
         except IndexError:
             print("No data in the database satisfy the given arguments. field: {}, sntype: {}".format(field, sntype))
             return []
         return column_out
-
 
     def get_light_curve(self, objid, ptrobs_min, ptrobs_max, standard_zpt=27.5):
         """ Get lightcurve from fits file
@@ -159,7 +165,7 @@ class GetData(object):
         filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
         phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
         if not os.path.exists(phot_file):
-            phot_file = phot_file +'.gz'
+            phot_file = phot_file + '.gz'
 
         try:
             phot_HDU = afits.open(phot_file, memmap=True)
@@ -167,7 +173,7 @@ class GetData(object):
             message = f'Could not open photometry file {phot_file}'
             raise RuntimeError(message)
 
-        phot_data = phot_HDU[1].data[ptrobs_min-1:ptrobs_max]
+        phot_data = phot_HDU[1].data[ptrobs_min - 1:ptrobs_max]
 
         phot_dict = OrderedDict()
         filters = list(set(phot_data['FLT']))  # e.g. ['i', 'r', 'Y', 'u', 'g', 'z']
@@ -176,9 +182,9 @@ class GetData(object):
             fIndexes = np.where(phot_data['FLT'] == f)[0]
             phot_dict[f] = OrderedDict()
             for pfield in self.phot_fields:
-                if pfield=='ZEROPT':
+                if pfield == 'ZEROPT':
                     phot_dict[f][pfield] = np.repeat(standard_zpt, len(fIndexes))
-                elif pfield=='FLT':
+                elif pfield == 'FLT':
                     true_zpt = phot_data['ZEROPT'][fIndexes]
                     nobs = len(true_zpt)
                     phot_dict[f][pfield] = np.repeat(f.strip(), nobs)
@@ -193,7 +199,6 @@ class GetData(object):
         del phot_HDU[1].data
         return phot_out
 
-
     @staticmethod
     def convert_pandas_lc_to_recarray_lc(phot):
         """
@@ -203,7 +208,7 @@ class GetData(object):
         pbs = ('u', 'g', 'r', 'i', 'z', 'Y')
         # name mapping for the defaults in phot_fields
         # any other column is going to become just lowercase it's current name
-        name_map = {'FLUXCAL':'flux', 'FLUXCALERR':'dflux','ZEROPT':'zpt', 'FLT':'pb', 'MJD':'mjd'}
+        name_map = {'FLUXCAL': 'flux', 'FLUXCALERR': 'dflux', 'ZEROPT': 'zpt', 'FLT': 'pb', 'MJD': 'mjd'}
 
         out = None
         out_names = None
@@ -212,29 +217,27 @@ class GetData(object):
             # do we know what this passband is
             # this is just a sanity test in case we accidentally retrieve dummy entries with passband = -9
             if this_pb not in pbs:
-                continue 
+                continue
 
             this_pb_lc = phot.get(this_pb)
             if this_pb_lc is None:
                 continue
-            
+
             if out is None:
                 out = np.rec.fromarrays(list(this_pb_lc))
                 if out_names is None:
                     out_names = list(this_pb_lc.axes[0])
                     out_names = [name_map.get(x, x.lower()) for x in out_names]
             else:
-                temp  = np.rec.fromarrays(list(this_pb_lc))
+                temp = np.rec.fromarrays(list(this_pb_lc))
                 out = np.concatenate((out, temp), axis=-1)
 
         out.dtype.names = out_names
         return out
 
-
     @staticmethod
     def get_sntypes():
         return helpers.get_sntypes()
-
 
     def get_avail_sntypes(self):
         """ Returns a list of the different transient classes in the database. """
@@ -242,9 +245,8 @@ class GetData(object):
         sntypes_map = self.get_sntypes()
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
-
-    def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', extrasql='', 
-            get_num_lightcurves=False, limit=None, shuffle=False, sort=True, offset=0, big=False):
+    def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', extrasql='',
+                        get_num_lightcurves=False, limit=None, shuffle=False, sort=True, offset=0, big=False):
         """ Gets the header data given specific conditions.
 
         Parameters
@@ -280,10 +282,10 @@ class GetData(object):
         result: tuple or int
         """
         if columns is None:
-            columns=['objid', 'ptrobs_min', 'ptrobs_max']
+            columns = ['objid', 'ptrobs_min', 'ptrobs_max']
 
         if get_num_lightcurves:
-            columns=['COUNT(objid)',]
+            columns = ['COUNT(objid)', ]
             big = False
 
         try:
@@ -303,7 +305,7 @@ class GetData(object):
         if limit is not None and shuffle is False and sort is False:
             sort = True
 
-        extrasql_command = '' if extrasql is None else extrasql 
+        extrasql_command = '' if extrasql is None else extrasql
         limit_command = '' if limit is None else " LIMIT {}".format(limit)
         offset_command = '' if offset is None else " OFFSET {}".format(offset)
         if model != '%':
@@ -314,37 +316,34 @@ class GetData(object):
             shuffle = False
             warnings.warn(message, RuntimeWarning)
 
-
         shuffle_command = '' if shuffle is False else " ORDER BY RAND()"
-        sort_command  = '' if sort is False else ' ORDER BY objid'
+        sort_command = '' if sort is False else ' ORDER BY objid'
         extra_command = ''.join([extrasql_command, sort_command, shuffle_command, limit_command, offset_command])
 
-        query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns),\
-                self.data_release, field, model, base, snid, extra_command)
+        query = "SELECT {} FROM {} WHERE objid LIKE '{}_{}_{}_{}' {};".format(', '.join(columns), \
+                                                                              self.data_release, field, model, base,
+                                                                              snid, extra_command)
         if big:
             for result in database.exec_big_sql_query(query):
                 yield result
         else:
             header = database.exec_sql_query(query)
-            num_lightcurves = len(header)
             if get_num_lightcurves:
                 num_lightcurves = int(header[0][0])
-                return num_lightcurves
+                yield num_lightcurves
             else:
                 num_lightcurves = len(header)
-            
+
             if num_lightcurves > 0:
                 for result in header:
-                    yield result 
+                    yield result
             else:
                 print("No light curves in the database satisfy the given arguments. "
                       "field: {}, model: {}, base: {}, snid: {}".format(field, model, base, snid))
                 return
 
-
-
-    def get_lcs_data(self, columns=None, field='%', model='%', base='%', snid='%',\
-            limit=None, shuffle=False, sort=True, offset=0, big=False, extrasql=''):
+    def get_lcs_data(self, columns=None, field='%', model='%', base='%', snid='%', \
+                     limit=None, shuffle=False, sort=True, offset=0, big=False, extrasql=''):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
         Parameters
@@ -383,10 +382,10 @@ class GetData(object):
             E.g. Access the magnitude in the z filter with phot_data['z']['MAG'].
         """
 
-        header = self.get_lcs_headers(columns=columns, field=field,\
-                    model=model, base=base, snid=snid,\
-                    limit=limit, sort=sort, shuffle=shuffle, offset=offset,\
-                    big=big, extrasql=extrasql)
+        header = self.get_lcs_headers(columns=columns, field=field, \
+                                      model=model, base=base, snid=snid, \
+                                      limit=limit, sort=sort, shuffle=shuffle, offset=offset, \
+                                      big=big, extrasql=extrasql)
 
         for h in header:
             objid, ptrobs_min, ptrobs_max = h[0:3]
