@@ -12,11 +12,12 @@ from .features.periodic import PeriodicMixin
 from .features.gp import GPMixin
 from .features.spline import SplineMixin
 from .features.base import BaseMixin
+from .features.plasticc import PlasticcMixin
 from astropy.stats import sigma_clip
 
 __all__=['LAobject']
 
-class LAobject(PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
+class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
     """
     ANTARES object - locus aggregated alert lightcurve and feature encapsulator
 
@@ -119,6 +120,9 @@ class LAobject(PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
             self.best_period   = None
             self.lcPeriodic    = None
             self.lcNonPeriodic = np.nan
+
+        if header is None:
+            header = {}
         self.header = header
 
         # pre-processing = remove invalid values
@@ -254,6 +258,13 @@ class LAobject(PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
 
 
     def finalize(self):
+        """
+        Finalizes the LAobject by setting the list of available
+        filters and the light curve length after filtering.
+
+        HACK : the filters are limited to the PLAsTiCC ugrizY set since the
+        PropertyTable SQL in ANTARES must have pre-defined keys
+        """
         # this forces only some filters will be used for feature computation
         # this is not ideal, but a necessary stop-gap while we revise
         # the PropertyTable SQL
@@ -285,9 +296,3 @@ class LAobject(PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         """
         for pb in self._good_filters:
             setattr(self, '{}_{}'.format(rootname, pb),  values_dict.get(pb, default_value))
-
-    
-    def finalize_plasticc(self):
-        pass
-
-
