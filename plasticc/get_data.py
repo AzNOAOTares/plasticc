@@ -86,8 +86,8 @@ class GetData(object):
 
     def __init__(self, data_release):
         self.data_release = "release_{}".format(data_release)
-        self.phot_fields = ['MJD', 'FLT', 'FLUXCAL', 'FLUXCALERR', 'ZEROPT']
-        self.phot_fields_dtypes = {'FLT': np.str_}
+        self.phot_fields = ['MJD', 'FLT', 'FLUXCAL', 'FLUXCALERR', 'ZEROPT', 'PHOTFLAG']
+        self.phot_fields_dtypes = {'FLT': np.str_, 'PHOTFLAG': np.int_}
 
     def get_phot_fields(self):
         """
@@ -208,7 +208,8 @@ class GetData(object):
         pbs = ('u', 'g', 'r', 'i', 'z', 'Y')
         # name mapping for the defaults in phot_fields
         # any other column is going to become just lowercase it's current name
-        name_map = {'FLUXCAL': 'flux', 'FLUXCALERR': 'dflux', 'ZEROPT': 'zpt', 'FLT': 'pb', 'MJD': 'mjd'}
+        name_map = {'FLUXCAL': 'flux', 'FLUXCALERR': 'dflux', 'ZEROPT': 'zpt',\
+                        'FLT': 'pb', 'MJD': 'mjd', 'PHOTFLAG': 'photflag'}
 
         out = None
         out_names = None
