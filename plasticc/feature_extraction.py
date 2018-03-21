@@ -36,30 +36,20 @@ def renorm_flux_lightcurve(flux, fluxerr, mu):
     return fluxout, fluxerrout
 
 
-def remove(extinction, flux, inplace=False):
-    """ extinction.remove doesn't work, so this is a direct copy of the function. """
-    trans = 10.**(0.4 * extinction)
-
-    if inplace:
-        flux *= trans
-        return flux
-    else:
-        return flux * trans
-
-
 def remove_extinction(mwebv, lc):
     passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
-    PB_WAVE = np.array([356.95, 476.65, 621.45, 754.45, 870.75, 1003.95])
+    PB_WAVE = np.array([3569.5, 4766.5, 6214.5, 7544.5, 8707.5, 10039.5])
 
-    extinctions = extinction.fitzpatrick99(wave=PB_WAVE, a_v=3.1*mwebv, r_v=3.1, unit='aa')
+    # Using negative a_v so that extinction.apply works in reverse and removes the extinction
+    extinctions = extinction.fitzpatrick99(wave=PB_WAVE, a_v=-3.1*mwebv, r_v=3.1, unit='aa')
 
     for i, pb in enumerate(passbands):
         flux = lc['flux'][lc['pb'] == pb]
         fluxerr = lc['dflux'][lc['pb'] == pb]
 
-        # extinction.remove doesn't work for some reason... so writing remove function which is the same
-        newflux = remove(extinctions[i], flux, inplace=False)
-        newfluxerr = remove(extinctions[i], fluxerr, inplace=False)
+        extinction.apply(extinctions[i], flux)
+        newflux = extinction.apply(extinctions[i], flux, inplace=False)
+        newfluxerr = extinction.apply(extinctions[i], fluxerr, inplace=False)
 
         lc['flux'][lc['pb'] == pb] = newflux
         lc['dflux'][lc['pb'] == pb] = newfluxerr
@@ -137,10 +127,12 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     features_out.write(fname, path=data_release, append=False, overwrite=redo)
     print("saved %s" % fname)
 
+    return fname
+
 
 def combine_hdf_files(save_dir, data_release):
     fnames = os.listdir(save_dir)
-    fname_out = os.path.join(ROOT_DIR, 'plasticc', 'features_all.hdf5')
+    fname_out = os.path.join(ROOT_DIR, 'plasticc', 'features_all_DDF.hdf5')
     output_file = h5py.File(fname_out, 'w')
 
     # keep track of the total number of rows
@@ -184,14 +176,14 @@ def main():
     #         continue
     #     save_antares_features(data_release, redo=True)
 
-    data_release = '20180221'
+    data_release = '20180316'
     field = 'DDF'
     model = '%'
     getter = GetData(data_release)
     nobjects = next(getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True, big=False))
     print("{} objects for model {} in field {}".format(nobjects, model, field))
 
-    batch_size = 10000
+    batch_size = 1000
     sort = True
     redo = True
 
@@ -218,6 +210,7 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
 
 
 
