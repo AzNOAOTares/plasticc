@@ -187,10 +187,10 @@ def main():
                 ax2.fill_between(time_array, new_y+this_y, this_y, color=c)
                 current_y[pb] = this_y + new_y
             #end loop over pb
-            fig3.suptitle('{} {}'.format(model_name, field), fontsize='large')
-            fig3.tight_layout(rect=[0,0,1,0.93])
-            #fig3.savefig('{}/cadence_analysis/{}_{}_cadence_vs_gallat.png'.format(fig_dir, model_name, field))
-            pdf.savefig(fig3)
+            if nobj > 0:
+                fig3.suptitle('{} {}'.format(model_name, field), fontsize='large')
+                fig3.tight_layout(rect=[0,0,1,0.93])
+                pdf.savefig(fig3)
             print(nobj)
         #end loop over models
         for i, pb in enumerate(colors):
