@@ -62,6 +62,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     Get antares object features.
     Return as a DataFrame with columns being the features, and rows being the objid&passband
     """
+    print(fname)
     passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
     features_out = []
     feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'amplitude_%s' % p, 'skew_%s' % p, 'somean_%s' % p,
@@ -73,6 +74,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     getter = GetData(data_release)
     result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host', 'mwebv', 'sim_dlmu'], field=field_in,
                                   model=model_in, snid='%', limit=batch_size, offset=offset, shuffle=False, sort=sort)
+    count = 0
     for head, phot in result:
         objid, ptrobs_min, ptrobs_max, peak_mjd, redshift, mwebv, dlmu = head
         lc = getter.convert_pandas_lc_to_recarray_lc(phot)
@@ -81,8 +83,12 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         obsid = np.arange(len(lc))
         t = lc['mjd'] - peak_mjd  # subtract peakmjd from each mjd.
         flux, fluxerr = renorm_flux_lightcurve(flux=lc['flux'], fluxerr=lc['dflux'], mu=dlmu)
-        laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr,
-                            obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False)
+        try:
+            laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr,
+                                obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False)
+        except ValueError as err:
+            print(err)
+            continue
         features = OrderedDict()
         features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
@@ -114,10 +120,14 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                 features['hlratio_%s' % p] = laobject.get_hlratio()[p]
             except KeyError as err:
                 features = set_keys_to_nan(feature_fields, p, features)
+                print('NO FEATURES FOR: ', objid, p)
                 continue
-        print(offset)
+        count += 1
+        # field, model, base, snid = objid.astype(str).split('_')
+        print(objid.encode('utf8'), offset, count, os.path.basename(fname))
         features_out += [list(features.values())]
 
+    # print('__B__', offset, count, len(features_out), os.path.basename(fname))
     # Set all columns to floats except set first column to string (objid)
     dtypes = ['S24'] + [np.float64] * (len(mysql_fields) - 1)
 
@@ -164,7 +174,6 @@ def create_all_hdf_files(data_release, i, save_dir, field_in, model_in, batch_si
     save_antares_features(data_release=data_release, fname=fname, field_in=field_in, model_in=model_in,
                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)
 
-
 def main():
     save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features')
     if not os.path.exists(save_dir):
@@ -205,11 +214,20 @@ def main():
     pool.close()
     pool.join()
 
+    # The last file with less than the batch_size number of objects isn't getting saved. If so, retry saving it here:
+    fname_last = os.path.join(save_dir, 'features_{}.hdf5'.format(i_list[-1]))
+    print(fname_last)
+    if not os.path.isfile(fname_last):
+        print("Last file not saved. Retrying...")
+        save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
+                              batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
+
     combine_hdf_files(save_dir, data_release)
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    main()
+
 
 
 
