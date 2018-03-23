@@ -66,8 +66,9 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
     features_out = []
     feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'amplitude_%s' % p, 'skew_%s' % p, 'somean_%s' % p,
-                           'shapiro_%s' % p, 'q31_%s' % p, 'rms_%s' % p, 'mad_%s' % p, 'stetsonj_%s' % p,
-                           'stetsonk_%s' % p, 'acorr_%s' % p, 'hlratio_%s' % p] for p in passbands], [])
+                           'shapiro_%s' % p, 'q31_%s' % p, 'rms_%s' % p, 'mad_%s' % p, 'entropy_%s' % p,
+                           'stetsonj_%s' % p, 'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p,
+                           'hlratio_%s' % p] for p in passbands], [])
 
     mysql_fields = ['objid', 'redshift'] + feature_fields
 
@@ -114,9 +115,11 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                 features['q31_%s' % p] = laobject.get_Q31()[p]
                 features['rms_%s' % p] = laobject.get_RMS()[p]
                 features['mad_%s' % p] = laobject.get_MAD()[p]
+                features['entropy_%s' % p] = laobject.get_ShannonEntropy()[p]
                 features['stetsonj_%s' % p] = laobject.get_StetsonJ()[p]
                 features['stetsonk_%s' % p] = laobject.get_StetsonK()[p]
                 features['acorr_%s' % p] = laobject.get_AcorrIntegral()[p]
+                features['von-neumann_%s' % p] = laobject.get_vonNeumannRatio()[p]
                 features['hlratio_%s' % p] = laobject.get_hlratio()[p]
             except KeyError as err:
                 features = set_keys_to_nan(feature_fields, p, features)
@@ -192,7 +195,7 @@ def main():
     nobjects = next(getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True, big=False))
     print("{} objects for model {} in field {}".format(nobjects, model, field))
 
-    batch_size = 1000
+    batch_size = 2000
     sort = True
     redo = True
 
