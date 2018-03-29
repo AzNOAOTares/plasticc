@@ -18,20 +18,20 @@ class BaseMixin(object):
     """
     Methods to derive baseline features for LAobjects
     """
-    def get_lc(self, smoothed=False, gpr=True, phase_offset=None, per=None, recompute=False):
+
+    def get_lc(self, smoothed=False, gpr=True, phase_offset=None, per=None, recompute=False, usephotflag=False):
         """
         Return a lightcurve suitable for computing features
         """
-
         outlc = getattr(self, '_outlc', None)
         if outlc is not None:
             # if we are asking for smoothed representation, always recompute
-            if (smoothed is False) and (~recompute):
+            if (smoothed is False) and not recompute:
                 return outlc
 
-        phase   = self.get_phase(phase_offset=phase_offset, per=per)
+        phase = self.get_phase(phase_offset=phase_offset, per=per)
         filters = self.filters
-        outlc   = {}
+        outlc = {}
 
         if smoothed:
             # compute the GP or the spline if we haven't already
@@ -48,10 +48,10 @@ class BaseMixin(object):
                 maxph = thispbphase.max()
 
                 # generate a phase array onto which we will interpolate the lightcurve
-                #if self.per:
+                # if self.per:
                 #    # if it is periodic, always generate a smooth curve from 0 to 2
                 #    outphase = np.linspace(0.,2.0,num=200,endpoint=True)
-                #else:
+                # else:
                 #
                 #    # if it is not periodic, either just return at the locations of the data
                 #    # or make a smooth curve if there were enough observations in this filter
@@ -76,10 +76,10 @@ class BaseMixin(object):
                     arange = np.arange(len(thisu))
                     points = np.zeros((len(thisu), cv.shape[1]))
                     for i in range(cv.shape[1]):
-                        points[arange, i] = scinterp.splev(thisu, (kv, cv[:,i], degree))
+                        points[arange, i] = scinterp.splev(thisu, (kv, cv[:, i], degree))
 
-                    outphase = points[:,0]
-                    interpy = points[:,1]
+                    outphase = points[:, 0]
+                    interpy = points[:, 1]
                     interpyerr = np.repeat(self.fluxErr[mask].mean(), len(outphase))
                 outlc[pb] = (outphase, interpy, interpyerr)
             # DO NOT SET OUTLC IF USING SMOOTHING
@@ -90,13 +90,17 @@ class BaseMixin(object):
                 m2 = phase[mask].argsort()
 
                 thispbphase = phase[mask][m2]
-                thisFlux    = self.flux[mask][m2]
+                thisFlux = self.flux[mask][m2]
                 thisFluxErr = self.fluxErr[mask][m2]
+
                 if len(thisFlux) > 0:
-                    outlc[pb] = (thispbphase, thisFlux, thisFluxErr)
+                    if usephotflag and self.photflag is not None:
+                        photflag = self.photflag[mask][m2]
+                    else:
+                        photflag = None
+                    outlc[pb] = (thispbphase, thisFlux, thisFluxErr, photflag)
             self._outlc = outlc
         return outlc
-
 
     def get_amplitude(self, smoothed=False, per=None, gpr=True, phase_offset=None, recompute=False):
         """
@@ -108,13 +112,14 @@ class BaseMixin(object):
             if not recompute:
                 return outamp
 
-        outamp  = {}
-        outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outamp = {}
+        outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset,
+                            usephotflag=True)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
 
-            thispbphase, thisFlux, thisFluxErr = thislc
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
             nobs = len(thispbphase)
 
             # if we have only one observation, assume that the survey had a
@@ -134,15 +139,20 @@ class BaseMixin(object):
 
                 # difference between the 99th percentile and 1st pecentile of the flux as amplitude
                 # this is more robust than ptp if there are outliers
-                amp = np.abs(np.percentile(thisFlux, 99) - np.percentile(thisFlux, 1))
+                if photflag is not None:
+                    photmask = photflag >= 4096
+                    thisFlux = thisFlux[photmask]
+                if len(thisFlux) == 0:  # if this Flux is empty
+                    amp = 0
+                else:
+                    amp = np.abs(np.percentile(thisFlux, 99) - np.percentile(thisFlux, 1))
 
                 outamp[pb] = amp
         self.setattr_from_dict_default('amplitude', outamp, np.nan)
         self.amplitude = outamp
         return outamp
 
-
-    def get_stats(self, smoothed=False, per=None, gpr=True, phase_offset=None, recompute=False):
+    def get_stats(self, smoothed=False, per=None, gpr=True, phase_offset=None, recompute=False, usephotflag=False):
         """
         Basic statistics for LAobject
         # min, max, mean, std, kurtosis, skewness
@@ -154,18 +164,28 @@ class BaseMixin(object):
                 return outstats
 
         outstats = {}
-        outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset,
+                            usephotflag=usephotflag)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
 
-            thispbphase, thisFlux, thisFluxErr = thislc
-            thisstat = scipy.stats.describe(thisFlux)
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
+
+            if usephotflag and photflag is not None:
+                photmask = photflag >= 4096
+                thisFlux = thisFlux[photmask]
+                if len(thisFlux) == 0:
+                    thisstat = scipy.stats.describe([0,0])
+                else:
+                    thisstat = scipy.stats.describe(thisFlux)
+            else:
+                thisstat = scipy.stats.describe(thisFlux)
+
             outstats[pb] = thisstat
 
         self.stats = outstats
         return outstats
-
 
     def get_skew(self, smoothed=False, per=None, gpr=True, phase_offset=None, recompute=False):
         """
@@ -178,38 +198,36 @@ class BaseMixin(object):
 
         outskew = {}
         outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
-        outstats  = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outstats = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
 
-            thispbphase, thisFlux, thisFluxErr = thislc
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
             npb = len(thisFlux)
 
             thisstats = outstats.get(pb)
             if thisstats is None:
                 continue
             thismean = thisstats[2]
-            thisvar  = thisstats[3]
-            thisstd = thisvar**0.5
+            thisvar = thisstats[3]
+            thisstd = thisvar ** 0.5
 
-            thisskew = (1./npb)*math.fsum(((thisFlux - thismean)**3.)/(thisstd**3.))
+            thisskew = (1. / npb) * math.fsum(((thisFlux - thismean) ** 3.) / (thisstd ** 3.))
             outskew[pb] = thisskew
 
         self.skew = outskew
         return outskew
 
-
     def get_StdOverMean(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
         Return the Standard Deviation over the Mean
         """
-        outstats  = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
-        outSOMean = {pb: (x[3]**0.5/x[2]) for pb, x in outstats.items()}
+        outstats = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset, usephotflag=True)
+        outSOMean = {pb: (x[3] ** 0.5 / x[2]) for pb, x in outstats.items()}
         return outSOMean
 
-
-    def get_ShapiroWilk(self,smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
+    def get_ShapiroWilk(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
         Get the Shapriro-Wilk W statistic
         """
@@ -222,14 +240,13 @@ class BaseMixin(object):
         outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
-            if len(thisFlux) <=3 :
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
+            if len(thisFlux) <= 3:
                 continue
-            thissw, _  = scipy.stats.shapiro(thisFlux)
+            thissw, _ = scipy.stats.shapiro(thisFlux)
             sw[pb] = thissw
         self.ShapiroWilk = sw
         return sw
-
 
     def get_Q31(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
@@ -245,12 +262,11 @@ class BaseMixin(object):
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
             thisq31 = np.percentile(thisFlux, 75) - np.percentile(thisFlux, 25)
             q31[pb] = thisq31
         self.Q31 = q31
         return q31
-
 
     def get_RMS(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
@@ -263,22 +279,29 @@ class BaseMixin(object):
 
         rms = {}
         outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
-        outstats  = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outstats = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset, usephotflag=True)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
+
+            if photflag is not None:
+                photmask = photflag >= 4096
+                thisFlux = thisFlux[photmask]
+            if len(thisFlux) == 0:  # if this Flux is empty
+                rms[pb] = 0
+                continue
+
             thisstats = outstats.get(pb)
             if thisstats is None:
                 continue
             thismean = thisstats[2]
-            thisrms  = math.fsum( ((thisFlux - thismean)/thisFluxErr)**2. )
-            thisrms/= math.fsum(1./thisFluxErr**2.)
-            thisrms = thisrms**0.5
+            thisrms = math.fsum(((thisFlux - thismean) / thisFluxErr) ** 2.)
+            thisrms /= math.fsum(1. / thisFluxErr ** 2.)
+            thisrms = thisrms ** 0.5
             rms[pb] = thisrms
         self.RMS = rms
         return rms
-
 
     def get_ShannonEntropy(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
@@ -294,12 +317,11 @@ class BaseMixin(object):
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
             thisEntropy = stats_computation.shannon_entropy(thisFlux, thisFluxErr)
             entropy[pb] = thisEntropy
         self.entropy = entropy
         return entropy
-
 
     def get_MAD(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
@@ -316,12 +338,18 @@ class BaseMixin(object):
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
-            thismad = median_absolute_deviation(thisFlux)
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
+
+            if photflag is not None:
+                photmask = photflag >= 4096
+                thisFlux = thisFlux[photmask]
+            if len(thisFlux) == 0:  # if this Flux is empty
+                thismad = 0
+            else:
+                thismad = median_absolute_deviation(thisFlux)
             mad[pb] = thismad
         self.MAD = mad
         return mad
-
 
     def get_vonNeumannRatio(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
@@ -345,21 +373,20 @@ class BaseMixin(object):
 
         vnr = {}
         outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
-        outstats  = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outstats = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
-            delta = math.fsum(((thisFlux[1:] - thisFlux[:-1])**2.)/(len(thisFlux) -1))
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
+            delta = math.fsum(((thisFlux[1:] - thisFlux[:-1]) ** 2.) / (len(thisFlux) - 1))
             thisstats = outstats.get(pb)
             if thisstats is None:
                 continue
             thisvar = thisstats[3]
-            thisvnr = delta/(thisvar)
+            thisvnr = delta / (thisvar)
             vnr[pb] = thisvnr
         self.VNR = vnr
         return vnr
-
 
     def get_StetsonJ(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
@@ -373,15 +400,19 @@ class BaseMixin(object):
 
         stetsonJ = {}
         outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
-        outstats  = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outstats = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset, usephotflag=True)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
 
             thisstats = outstats.get(pb)
             if thisstats is None:
                 continue
+
+            if photflag is not None:
+                photmask = photflag >= 4096
+                thisFlux = thisFlux[photmask]
 
             thismean = thisstats[2]
             npb = len(thisFlux)
@@ -389,14 +420,13 @@ class BaseMixin(object):
             if npb < 2:
                 continue
 
-            delta = (npb/(npb -1))*((thisFlux - thismean)/thisFluxErr)
-            val = np.nan_to_num(delta[0:-1]*delta[1:])
+            delta = (npb / (npb - 1)) * ((thisFlux - thismean) / thisFluxErr)
+            val = np.nan_to_num(delta[0:-1] * delta[1:])
             sign = np.sign(val)
-            thisJ = math.fsum(sign*(np.abs(val)**0.5))
+            thisJ = math.fsum(sign * (np.abs(val) ** 0.5))
             stetsonJ[pb] = thisJ
         self.stetsonJ = stetsonJ
         return stetsonJ
-
 
     def get_StetsonK(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
@@ -410,11 +440,11 @@ class BaseMixin(object):
 
         stetsonK = {}
         outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
-        outstats  = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outstats = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
 
             thisstats = outstats.get(pb)
             if thisstats is None:
@@ -423,13 +453,12 @@ class BaseMixin(object):
             thismean = thisstats[2]
             npb = len(thisFlux)
 
-            residual = (thisFlux - thismean)/thisFluxErr
-            thisK    = np.sum(np.fabs(residual)) / np.sqrt(np.sum(residual*residual)) / np.sqrt(npb)
+            residual = (thisFlux - thismean) / thisFluxErr
+            thisK = np.sum(np.fabs(residual)) / np.sqrt(np.sum(residual * residual)) / np.sqrt(npb)
             thisK = np.nan_to_num(thisK)
             stetsonK[pb] = thisK
         self.stetsonK = stetsonK
         return stetsonK
-
 
     def get_AcorrIntegral(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
@@ -442,12 +471,12 @@ class BaseMixin(object):
 
         AcorrInt = {}
         outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
-        outstats  = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
-        outrms  = self.get_RMS(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outstats = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outrms = self.get_RMS(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
 
         for j, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
 
             thisstats = outstats.get(pb)
             if thisstats is None:
@@ -463,13 +492,12 @@ class BaseMixin(object):
             sum_list = []
             val_list = []
             for i in t:
-                sum_list.append(math.fsum( (thisFlux[0:npb-i] - thismean)*(thisFlux[i:npb] - thismean)))
-                val_list.append(1./((npb - i)*thisrms**2.))
-            thisAcorr = np.abs(math.fsum([x*y for x, y in zip(sum_list, val_list)]))
+                sum_list.append(math.fsum((thisFlux[0:npb - i] - thismean) * (thisFlux[i:npb] - thismean)))
+                val_list.append(1. / ((npb - i) * thisrms ** 2.))
+            thisAcorr = np.abs(math.fsum([x * y for x, y in zip(sum_list, val_list)]))
             AcorrInt[pb] = thisAcorr
         self.AcorrInt = AcorrInt
         return AcorrInt
-
 
     def get_hlratio(self, smoothed=False, per=False, gpr=True, phase_offset=None, recompute=False):
         """
@@ -486,12 +514,12 @@ class BaseMixin(object):
 
         hlratio = {}
         outlc = self.get_lc(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
-        outstats  = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
+        outstats = self.get_stats(recompute=recompute, per=per, smoothed=smoothed, gpr=gpr, phase_offset=phase_offset)
 
         for j, pb in enumerate(outlc):
             thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr = thislc
-            thisWeight = 1./thisFluxErr
+            thispbphase, thisFlux, thisFluxErr, photflag = thislc
+            thisWeight = 1. / thisFluxErr
 
             thisstats = outstats.get(pb)
             if thisstats is None:
@@ -501,14 +529,14 @@ class BaseMixin(object):
             wl = thisWeight[il]
             wlsum = np.sum(wl)
             fl = thisFlux[il]
-            wl_weighted_std = np.sum(wl*(fl - thismean)**2)/wlsum
+            wl_weighted_std = np.sum(wl * (fl - thismean) ** 2) / wlsum
 
             ih = thisFlux <= thismean
             wh = thisWeight[ih]
             whsum = np.sum(wh)
             fh = thisFlux[ih]
-            wh_weighted_std = np.sum(wh*(fh - thismean)**2)/whsum
+            wh_weighted_std = np.sum(wh * (fh - thismean) ** 2) / whsum
 
-            hlratio[pb] = np.nan_to_num(np.sqrt(wl_weighted_std/wh_weighted_std))
+            hlratio[pb] = np.nan_to_num(np.sqrt(wl_weighted_std / wh_weighted_std))
         self.hlratio = hlratio
         return hlratio

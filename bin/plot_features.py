@@ -35,7 +35,7 @@ def get_features_dict(fpath, data_release, feature_names=('redshift',), field='D
 
     features = get_features(fpath, data_release, field, model)
 
-    features_dict = {'u': {}, 'g': {}, 'r': {}, 'i': {}, 'z': {}, 'Y': {}}
+    features_dict = {'r': {}}
     for pb in features_dict.keys():
         for f in feature_names:
             if f in ['objid', 'redshift']:
@@ -50,7 +50,7 @@ def get_features_dict(fpath, data_release, feature_names=('redshift',), field='D
 def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', fig_dir='.', sntypes_map=None):
 
     model_name = sntypes_map[int(model)]
-    passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
+    passbands = ('r')
     features_dict = get_features_dict(fpath, data_release, feature_names, field, model)
 
     xlabel = 'redshift'
@@ -109,18 +109,18 @@ def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF',
 
 def get_limits(y, feature=None):
     # Find plotting range by removing points over 10 standard deviations from the median 3 times iteratively.
-    for ii in range(1):
-        ymad = robust.mad(y)
-        ymedian = np.nanmedian(y)
-        mask = np.where(abs(y - ymedian) <= 10*ymad)[0]
-        y = y[mask]
-    ymin, ymax = min(y), max(y)
-
+    # for ii in range(1):
+    #     ymad = robust.mad(y)
+    #     ymedian = np.nanmedian(y)
+    #     mask = np.where(abs(y - ymedian) <= 10*ymad)[0]
+    #     y = y[mask]
+    # ymin, ymax = min(y), max(y)
+    #
     if feature is not None:
-        minmax = {'variance': (0, 250), 'kurtosis': (None, 14), 'amplitude': (0, 50), 'skew': (None, None),
-                  'somean': (-15, 15), 'shapiro': (None, None), 'q31': (0, 36), 'rms': (0, 30), 'mad': (0, 25),
-                  'stetsonj': (0, 50), 'stetsonk': (None, None), 'acorr': (None, 13), 'hlratio': (None, 5),
-                  'entropy': (-1, 1), 'von-neumann': (None, None)}
+        minmax = {'kurtosis': (None, 14), 'amplitude': (-2, 8), 'skew': (None, None), 'somean': (-1, 1.5),
+                  'shapiro': (None, None), 'q31': (-1, 8), 'rms': (-1, 4), 'mad': (-1, 4), 'stetsonj': (-3, 10),
+                  'stetsonk': (-0.25, 1.5), 'acorr': (-2, 13), 'hlratio': (None, 5), 'entropy': (-1, 1),
+                  'von-neumann': (None, None), 'variance': (-1, 25)}
 
         ymin, ymax = minmax[feature]
     # ymin, ymax = np.percentile(y, 0), np.percentile(y, 99)
@@ -133,7 +133,7 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
     passbands = ('r')
     model_names = []
     features_by_model = {}
-    for model in [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
+    for model in [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]:
         model_name = sntypes_map[int(model)]
         model_names.append(model_name)
         features_by_pb = get_features_dict(fpath, data_release, feature_names, field, model)
@@ -163,7 +163,8 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
                     joyplot_data['g'] += [model_name] * len(x_values)
                 df = pd.DataFrame(joyplot_data)
                 df = df.dropna(axis=0, how='any')  # Remove rows with NaN
-
+                if df.empty:
+                    continue
                 nobs = {model_name: len(df['x'][df['g'] == model_name]) for model_name in model_names}
                 print(nobs)
 
@@ -203,28 +204,22 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
                 pdf.savefig(g.fig)
 
 
-
-    pass
-
-
-
-
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test2')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_DDF.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test2.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     feature_names = ('objid', 'redshift', 'skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
-                     'entropy', 'von-neumann', 'q31', 'rms', 'mad', 'stetsonj', 'somean', 'amplitude')
+                     'rms', 'mad', 'stetsonj', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann')
 
     # for data_release in ['20180316']:
     #     for field in ['DDF']:
     #         for model in [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
     #             plot_features(fpath, data_release, feature_names, field, model, fig_dir, sntypes_map)
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_joyplots')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test2')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     plot_features_joy_plot(fpath, '20180316', feature_names, 'DDF', fig_dir, sntypes_map)
