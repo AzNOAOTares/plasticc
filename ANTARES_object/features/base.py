@@ -134,8 +134,13 @@ class BaseMixin(object):
 
                 # difference between the 99th percentile and 1st pecentile of the flux as amplitude
                 # this is more robust than ptp if there are outliers
-                amp = np.abs(np.percentile(thisFlux, 99) - np.percentile(thisFlux, 1))
-
+                if self.mag:
+                    amp = np.abs(np.percentile(thisFlux, 99) - np.percentile(thisFlux, 1))
+                else:
+                    # we should really use the trigger flux, not the median flux
+                    medianFlux = np.median(thisFlux)
+                    amp = np.abs(np.percentile(thisFlux, 99) - np.percentile(thisFlux, 1))
+                    amp /= medianFlux 
                 outamp[pb] = amp
         self.setattr_from_dict_default('amplitude', outamp, np.nan)
         self.amplitude = outamp
