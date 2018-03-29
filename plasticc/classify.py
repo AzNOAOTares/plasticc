@@ -19,8 +19,11 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, pb
         field, model, base, snid = objid.astype(str).split('_')
         y.append(int(model))
         x = []
+        # for f in feature_names:
+        #     x.append(features[i]["%s_%s" % (f, pb)])
         for f in feature_names:
-            x.append(features[i]["%s_%s" % (f, pb)])
+            for pb in ['r', 'i', 'z', 'Y']:
+                x.append(features[i]["%s_%s" % (f, pb)])
         x = np.array(x)
         X.append(x)
 
@@ -33,32 +36,40 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, pb
     y = y[mask]
 
     # Remove extreme values over 10 standard deviations from the median 10 times iteratively
-    for ii in range(10):
-        for f in range(X.shape[1]):
-            std = np.std(X[:, f])
-            median = np.median(X[:, f])
-            mask = np.where(abs(X[:, f] - median) < 10 * std)[0]
-            if np.where(abs(X[:, f] - median) > 10 * std)[0].any():
-                pass
-            X = X[mask]
-            y = y[mask]
+    # for ii in range(10):
+    #     for f in range(X.shape[1]):
+    #         std = np.std(X[:, f])
+    #         median = np.median(X[:, f])
+    #         mask = np.where(abs(X[:, f] - median) < 10 * std)[0]
+    #         if np.where(abs(X[:, f] - median) > 10 * std)[0].any():
+    #             pass
+    #         X = X[mask]
+    #         y = y[mask]
 
     return X, y
 
 
 def classify(X, y, models, sntypes_map, feature_names):
+    # # Remove models before training:
+    # mask = np.where(y != 1)[0]
+    # X = X[mask]
+    # y = y[mask]
+    # mask = np.where(y != 2)[0]
+    # X = X[mask]
+    # y = y[mask]
+
     # Split into train/test
-    XTrain, XTest, yTrain, yTest = train_test_split(X, y)
+    XTrain, XTest, yTrain, yTest = train_test_split(X, y, train_size=0.75, shuffle=True)
 
     # Train model
-    model = RandomForestClassifier()
+    model = RandomForestClassifier(n_estimators=50)
     model.fit(XTrain, yTrain)
 
     # visualize test performance
     yPred = model.predict(XTest)
 
-    accuracy = len(np.where(y==yPred)[0])
-    print("Accuracy is: {}".format(accuracy))
+    accuracy = len(np.where(yPred==yTest)[0])
+    print("Accuracy is: {}/{} = {}".format(accuracy, len(yPred), accuracy/len(yPred)))
 
     colors = ('r', 'b', 'g', 'm', 'c')
     fig, ax = plt.subplots(nrows=len(feature_names), ncols=len(feature_names), sharex='col', sharey='row', figsize=(18,15))
@@ -80,19 +91,20 @@ def main():
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_DDF.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test2.hdf5')
     sntypes_map = helpers.get_sntypes()
 
-    data_release = '20180221'
+    data_release = '20180316'
     field = 'DDF'
     model = '%'
 
-    feature_names = ('variance', 'kurtosis', 'amplitude', 'skew', 'somean', 'shapiro', 'q31', 'rms', 'mad', 'stetsonj', 'stetsonk', 'acorr', 'hlratio')
+    feature_names = ('skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
+                     'rms', 'mad', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann')
     # feature_names = ('variance', 'kurtosis', 'amplitude', 'skew')
 
     X, y = get_labels_and_features(fpath, data_release, field, model, feature_names, 'r')
 
-    models = [1, 2, 3, 42, 45, 60, 61, 62, 63]
+    models = [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63, 80, 81, 82]
     classify(X, y, models, sntypes_map, feature_names)
 
     plt.show()

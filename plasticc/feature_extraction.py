@@ -2,6 +2,7 @@ import os
 import sys
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 import numpy as np
+import scipy
 import pandas as pd
 from astropy.stats import sigma_clip
 import astropy.table as at
@@ -12,6 +13,7 @@ import h5py
 import multiprocessing as mp
 import extinction
 from . import database
+import matplotlib.pyplot as plt
 
 DIRNAMES = 1
 
@@ -63,12 +65,13 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     Return as a DataFrame with columns being the features, and rows being the objid&passband
     """
     print(fname)
-    passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
+    passbands = ['r']
     features_out = []
-    feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'amplitude_%s' % p, 'skew_%s' % p, 'somean_%s' % p,
-                           'shapiro_%s' % p, 'q31_%s' % p, 'rms_%s' % p, 'mad_%s' % p, 'entropy_%s' % p,
-                           'stetsonj_%s' % p, 'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p,
-                           'hlratio_%s' % p] for p in passbands], [])
+    # This needs to be the same order as the order of the features dictionary # TODO: improve this to be order invariant
+    feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'skew_%s' % p, 'shapiro_%s' % p,  'q31_%s' % p,
+                           'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
+                           'amplitude_%s' % p, 'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p, 'stetsonj_%s' % p,
+                           'entropy_%s' % p] for p in passbands], [])
 
     mysql_fields = ['objid', 'redshift'] + feature_fields
 
@@ -84,9 +87,15 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         obsid = np.arange(len(lc))
         t = lc['mjd'] - peak_mjd  # subtract peakmjd from each mjd.
         flux, fluxerr = renorm_flux_lightcurve(flux=lc['flux'], fluxerr=lc['dflux'], mu=dlmu)
+
+        t, flux, fluxerr, obsid, lc['pb'], lc['zpt'] = np.array(t), np.array(flux), np.array(fluxerr), np.array(obsid), np.array(lc['pb']), np.array(lc['zpt'])
         try:
             laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr,
-                                obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False)
+                                obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, photflag=lc['photflag'])
+
+            photmask = lc['photflag'] >= 4096
+            # laobject2 = LAobject(locusId=objid, objectId=objid, time=t[photmask], flux=flux[photmask], fluxErr=fluxerr[photmask],
+            #                      obsId=obsid[photmask], passband=lc['pb'][photmask], zeropoint=lc['zpt'][photmask], per=False, mag=False, photflag=None)
         except ValueError as err:
             print(err)
             continue
@@ -94,38 +103,45 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
 
-        for p in passbands:
+        def gf(func, p, name):
+            """ Try to get feature, otherwise return nan. """
             try:
-                stats = laobject.get_stats()[p]
-                if stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
-                    features = set_keys_to_nan(feature_fields, p, features)
-                    continue
-                features['variance_%s' % p] = stats.variance
-                features['kurtosis_%s' % p] = stats.kurtosis
-                try:
-                    features['amplitude_%s' % p] = laobject.get_amplitude()[p]
-                except AttributeError as err:
-                    # TODO: AttributeError is caused by not enough nobs in get_amplitude function in the ANTARES object. Look into why this differs from stats.nobs
-                    # print("Attribute error for {}, {}-band: {}".format(objid, p, err))
-                    features['amplitude_%s' % p] = np.nan
-
-                features['skew_%s' % p] = laobject.get_skew()[p]
-                features['somean_%s' % p] = laobject.get_StdOverMean()[p]
-                features['shapiro_%s' % p] = laobject.get_ShapiroWilk()[p]
-                features['q31_%s' % p] = laobject.get_Q31()[p]
-                features['rms_%s' % p] = laobject.get_RMS()[p]
-                features['mad_%s' % p] = laobject.get_MAD()[p]
-                features['entropy_%s' % p] = laobject.get_ShannonEntropy()[p]
-                features['stetsonj_%s' % p] = laobject.get_StetsonJ()[p]
-                features['stetsonk_%s' % p] = laobject.get_StetsonK()[p]
-                features['acorr_%s' % p] = laobject.get_AcorrIntegral()[p]
-                features['von-neumann_%s' % p] = laobject.get_vonNeumannRatio()[p]
-                features['hlratio_%s' % p] = laobject.get_hlratio()[p]
+                if name == 'stats':
+                    return func[p]
+                else:
+                    return float(func[p])
             except KeyError as err:
+                print('No {} for {} {}'.format(name, objid, p))
+                return np.nan
+
+        for p in passbands:
+            stats = gf(laobject.get_stats(recompute=True), p, 'stats')
+            if not isinstance(stats, scipy.stats.stats.DescribeResult) or stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
                 features = set_keys_to_nan(feature_fields, p, features)
-                print('NO FEATURES FOR: ', objid, p)
                 continue
+            features['variance_%s' % p] = stats.variance
+            features['kurtosis_%s' % p] = stats.kurtosis
+            features['skew_%s' % p] = gf(laobject.get_skew(recompute=True), p, 'skew')
+            features['shapiro_%s' % p] = gf(laobject.get_ShapiroWilk(recompute=True), p, 'shapiro')
+            features['q31_%s' % p] = gf(laobject.get_Q31(recompute=True), p, 'q31')
+            features['stetsonk_%s' % p] = gf(laobject.get_StetsonK(recompute=True), p, 'stetsonk')
+            features['acorr_%s' % p] = gf(laobject.get_AcorrIntegral(recompute=True), p, 'acorr')
+            features['von-neumann_%s' % p] = gf(laobject.get_vonNeumannRatio(recompute=True), p, 'von-neumann')
+            features['hlratio_%s' % p] = gf(laobject.get_hlratio(recompute=True), p, 'hlratio')
+            features['amplitude_%s' % p] = gf(laobject.get_amplitude(recompute=True), p, 'amplitude')
+            features['somean_%s' % p] = gf(laobject.get_StdOverMean(recompute=True), p, 'somean')
+            features['rms_%s' % p] = gf(laobject.get_RMS(recompute=True), p, 'rms')
+            features['mad_%s' % p] = gf(laobject.get_MAD(recompute=True), p, 'mad')
+            features['stetsonj_%s' % p] = gf(laobject.get_StetsonJ(recompute=True), p, 'stetsonj')
+            features['entropy_%s' % p] = gf(laobject.get_ShannonEntropy(recompute=True), p, 'entropy')
+
+            print('amplitude', objid, features['amplitude_r'])
+            plt.figure()
+            plt.errorbar(t[lc['pb'] == 'r'], lc['flux'][lc['pb'] == 'r'], yerr=lc['dflux'][lc['pb'] == 'r'])
+            plt.show()
+
         count += 1
+        print("amplitude", objid, features['amplitude_r'])
         # field, model, base, snid = objid.astype(str).split('_')
         print(objid.encode('utf8'), offset, count, os.path.basename(fname))
         features_out += [list(features.values())]
@@ -145,7 +161,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
 
 def combine_hdf_files(save_dir, data_release):
     fnames = os.listdir(save_dir)
-    fname_out = os.path.join(ROOT_DIR, 'plasticc', 'features_all_DDF.hdf5')
+    fname_out = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test.hdf5')
     output_file = h5py.File(fname_out, 'w')
 
     # keep track of the total number of rows
@@ -178,7 +194,7 @@ def create_all_hdf_files(data_release, i, save_dir, field_in, model_in, batch_si
                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)
 
 def main():
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_test')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -195,27 +211,27 @@ def main():
     nobjects = next(getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True, big=False))
     print("{} objects for model {} in field {}".format(nobjects, model, field))
 
-    batch_size = 2000
+    batch_size = 1000
     sort = True
     redo = True
 
-    # offset = 0
-    # i = 0
-    # while offset < 1000:
-    #     fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
-    #     save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
-    #                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)
-    #     offset += batch_size
-    #     i += 1
+    offset = 0
+    i = 0
+    while offset < 1000:
+        fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
+        save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
+                              batch_size=batch_size, offset=offset, sort=sort, redo=redo)
+        offset += batch_size
+        i += 1
 
-    # Multiprocessing
-    i_list = np.arange(0, int(nobjects/batch_size) + 1)
-    print(i_list)
-    pool = mp.Pool()
-    results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
-    print(results)
-    pool.close()
-    pool.join()
+    # # Multiprocessing
+    # i_list = np.arange(0, int(nobjects/batch_size) + 1)
+    # print(i_list)
+    # pool = mp.Pool()
+    # results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
+    # print(results)
+    # pool.close()
+    # pool.join()
 
     # The last file with less than the batch_size number of objects isn't getting saved. If so, retry saving it here:
     fname_last = os.path.join(save_dir, 'features_{}.hdf5'.format(i_list[-1]))
