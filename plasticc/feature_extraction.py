@@ -30,7 +30,8 @@ def renorm_flux_lightcurve(flux, fluxerr, mu):
     d = 10 ** (mu/5 + 1)
     dsquared = d**2
 
-    norm = 1e19
+    norm = 1e18
+    # print('d**2', dsquared/norm)
 
     fluxout = flux * dsquared / norm
     fluxerrout = fluxerr * dsquared / norm
@@ -71,9 +72,20 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'skew_%s' % p, 'shapiro_%s' % p,  'q31_%s' % p,
                            'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
                            'amplitude_%s' % p, 'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p, 'stetsonj_%s' % p,
-                           'entropy_%s' % p] for p in passbands], [])
+                           'entropy_%s' % p, 'rescaled-flux_%s' % p] for p in passbands], [])
 
     mysql_fields = ['objid', 'redshift'] + feature_fields
+
+    def _gf(func, p, name):
+        """ Try to get feature, otherwise return nan. """
+        try:
+            if name == 'stats':
+                return func[p]
+            else:
+                return float(func[p])
+        except KeyError as err:
+            print('No {} for {} {}'.format(name, objid, p))
+            return np.nan
 
     getter = GetData(data_release)
     result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host', 'mwebv', 'sim_dlmu'], field=field_in,
@@ -103,42 +115,34 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
 
-        def gf(func, p, name):
-            """ Try to get feature, otherwise return nan. """
-            try:
-                if name == 'stats':
-                    return func[p]
-                else:
-                    return float(func[p])
-            except KeyError as err:
-                print('No {} for {} {}'.format(name, objid, p))
-                return np.nan
-
         for p in passbands:
-            stats = gf(laobject.get_stats(recompute=True), p, 'stats')
+            stats = _gf(laobject.get_stats(recompute=True), p, 'stats')
             if not isinstance(stats, scipy.stats.stats.DescribeResult) or stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
                 features = set_keys_to_nan(feature_fields, p, features)
                 continue
             features['variance_%s' % p] = stats.variance
             features['kurtosis_%s' % p] = stats.kurtosis
-            features['skew_%s' % p] = gf(laobject.get_skew(recompute=True), p, 'skew')
-            features['shapiro_%s' % p] = gf(laobject.get_ShapiroWilk(recompute=True), p, 'shapiro')
-            features['q31_%s' % p] = gf(laobject.get_Q31(recompute=True), p, 'q31')
-            features['stetsonk_%s' % p] = gf(laobject.get_StetsonK(recompute=True), p, 'stetsonk')
-            features['acorr_%s' % p] = gf(laobject.get_AcorrIntegral(recompute=True), p, 'acorr')
-            features['von-neumann_%s' % p] = gf(laobject.get_vonNeumannRatio(recompute=True), p, 'von-neumann')
-            features['hlratio_%s' % p] = gf(laobject.get_hlratio(recompute=True), p, 'hlratio')
-            features['amplitude_%s' % p] = gf(laobject.get_amplitude(recompute=True), p, 'amplitude')
-            features['somean_%s' % p] = gf(laobject.get_StdOverMean(recompute=True), p, 'somean')
-            features['rms_%s' % p] = gf(laobject.get_RMS(recompute=True), p, 'rms')
-            features['mad_%s' % p] = gf(laobject.get_MAD(recompute=True), p, 'mad')
-            features['stetsonj_%s' % p] = gf(laobject.get_StetsonJ(recompute=True), p, 'stetsonj')
-            features['entropy_%s' % p] = gf(laobject.get_ShannonEntropy(recompute=True), p, 'entropy')
+            features['skew_%s' % p] = _gf(laobject.get_skew(recompute=True), p, 'skew')
+            features['shapiro_%s' % p] = _gf(laobject.get_ShapiroWilk(recompute=True), p, 'shapiro')
+            features['q31_%s' % p] = _gf(laobject.get_Q31(recompute=True), p, 'q31')
+            features['stetsonk_%s' % p] = _gf(laobject.get_StetsonK(recompute=True), p, 'stetsonk')
+            features['acorr_%s' % p] = _gf(laobject.get_AcorrIntegral(recompute=True), p, 'acorr')
+            features['von-neumann_%s' % p] = _gf(laobject.get_vonNeumannRatio(recompute=True), p, 'von-neumann')
+            features['hlratio_%s' % p] = _gf(laobject.get_hlratio(recompute=True), p, 'hlratio')
+            features['amplitude_%s' % p] = _gf(laobject.get_amplitude(recompute=True), p, 'amplitude')
+            features['somean_%s' % p] = _gf(laobject.get_StdOverMean(recompute=True), p, 'somean')
+            features['rms_%s' % p] = _gf(laobject.get_RMS(recompute=True), p, 'rms')
+            features['mad_%s' % p] = _gf(laobject.get_MAD(recompute=True), p, 'mad')
+            features['stetsonj_%s' % p] = _gf(laobject.get_StetsonJ(recompute=True), p, 'stetsonj')
+            features['entropy_%s' % p] = _gf(laobject.get_ShannonEntropy(recompute=True), p, 'entropy')
+            features['rescaled-flux_%s' % p] = (flux[lc['pb'] == p] - 0)/(max(flux[lc['pb'] == p])-0)
 
-            print('amplitude', objid, features['amplitude_r'])
-            plt.figure()
-            plt.errorbar(t[lc['pb'] == 'r'], lc['flux'][lc['pb'] == 'r'], yerr=lc['dflux'][lc['pb'] == 'r'])
-            plt.show()
+            # print('amplitude', objid, features['amplitude_r'], 'dlmu', dlmu, 'mwebv', mwebv)
+            # print(list(zip(t[lc['pb'] == 'r'], flux[lc['pb'] == 'r'], lc['photflag'][lc['pb'] == 'r'])))
+            # plt.figure()
+            # plt.errorbar(t[lc['pb'] == 'r'], flux[lc['pb'] == 'r'], yerr=fluxerr[lc['pb'] == 'r'])
+            # plt.plot(t[lc['pb'] == 'r'], lc['flux'][lc['pb'] == 'r'], 'o')
+            # plt.show()
 
         count += 1
         print("amplitude", objid, features['amplitude_r'])
@@ -148,7 +152,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
 
     # print('__B__', offset, count, len(features_out), os.path.basename(fname))
     # Set all columns to floats except set first column to string (objid)
-    dtypes = ['S24'] + [np.float64] * (len(mysql_fields) - 1)
+    dtypes = ['S24'] + [np.float64] * (len(mysql_fields) - 2) + [list]
 
     # Save to hdf5 in batches of 10000
     features_out = np.array(features_out)
@@ -215,23 +219,23 @@ def main():
     sort = True
     redo = True
 
-    offset = 0
-    i = 0
-    while offset < 1000:
-        fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
-        save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
-                              batch_size=batch_size, offset=offset, sort=sort, redo=redo)
-        offset += batch_size
-        i += 1
+    # offset = 0
+    # i = 0
+    # while offset < 1000:
+    #     fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
+    #     save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
+    #                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)
+    #     offset += batch_size
+    #     i += 1
 
-    # # Multiprocessing
-    # i_list = np.arange(0, int(nobjects/batch_size) + 1)
-    # print(i_list)
-    # pool = mp.Pool()
-    # results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
-    # print(results)
-    # pool.close()
-    # pool.join()
+    # Multiprocessing
+    i_list = np.arange(0, int(nobjects/batch_size) + 1)
+    print(i_list)
+    pool = mp.Pool()
+    results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
+    print(results)
+    pool.close()
+    pool.join()
 
     # The last file with less than the batch_size number of objects isn't getting saved. If so, retry saving it here:
     fname_last = os.path.join(save_dir, 'features_{}.hdf5'.format(i_list[-1]))

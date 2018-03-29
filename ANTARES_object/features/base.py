@@ -141,11 +141,14 @@ class BaseMixin(object):
                 # this is more robust than ptp if there are outliers
                 if photflag is not None:
                     photmask = photflag >= 4096
-                    thisFlux = thisFlux[photmask]
-                if len(thisFlux) == 0:  # if this Flux is empty
+                    newflux = thisFlux[photmask]
+                if len(newflux) == 0:  # if this Flux is empty
                     amp = 0
                 else:
-                    amp = np.abs(np.percentile(thisFlux, 99) - np.percentile(thisFlux, 1))
+                    if self.mag is True:
+                        amp = np.abs(np.percentile(newflux, 99) - np.percentile(newflux, 1))
+                    else:
+                        amp = np.abs(np.percentile(newflux, 99))
 
                 outamp[pb] = amp
         self.setattr_from_dict_default('amplitude', outamp, np.nan)

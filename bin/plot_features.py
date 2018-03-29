@@ -117,8 +117,8 @@ def get_limits(y, feature=None):
     # ymin, ymax = min(y), max(y)
     #
     if feature is not None:
-        minmax = {'kurtosis': (None, 14), 'amplitude': (-2, 8), 'skew': (None, None), 'somean': (-1, 1.5),
-                  'shapiro': (None, None), 'q31': (-1, 8), 'rms': (-1, 4), 'mad': (-1, 4), 'stetsonj': (-3, 10),
+        minmax = {'kurtosis': (None, 14), 'amplitude': (0, 1000), 'skew': (None, None), 'somean': (-1, 1.5),
+                  'shapiro': (None, None), 'q31': (-1, 15), 'rms': (-1, 20), 'mad': (-1, 20), 'stetsonj': (-3, 10),
                   'stetsonk': (-0.25, 1.5), 'acorr': (-2, 13), 'hlratio': (None, 5), 'entropy': (-1, 1),
                   'von-neumann': (None, None), 'variance': (-1, 25)}
 
@@ -196,7 +196,11 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
                 # Set limits
                 xmin, xmax = get_limits(df['x'].values, feature)
-                g.set(xlim=(xmin, xmax))
+                if feature in ['stetsonj', 'amplitude', 'q31']:
+                    print('here')
+                    g.set(xlim=(xmin, xmax), ylim=(0, 0.01))
+                else:
+                    g.set(xlim=(xmin, xmax))
 
                 # Save figures
                 g.fig.suptitle("{} {}".format(feature, pb))
@@ -205,10 +209,10 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test2')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test2.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     feature_names = ('objid', 'redshift', 'skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
@@ -219,7 +223,7 @@ def main():
     #         for model in [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
     #             plot_features(fpath, data_release, feature_names, field, model, fig_dir, sntypes_map)
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test2')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     plot_features_joy_plot(fpath, '20180316', feature_names, 'DDF', fig_dir, sntypes_map)
