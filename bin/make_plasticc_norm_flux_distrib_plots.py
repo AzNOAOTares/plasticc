@@ -12,7 +12,7 @@ import numpy as np
 import ANTARES_object
 import plasticc
 import plasticc.database
-import plasticc.make_index
+import make_index
 import plasticc.get_data
 import matplotlib.colors as mcl
 import matplotlib.pyplot as plt
@@ -70,7 +70,6 @@ def main():
 
 
             kwargs['model'] = model
-            kwargs['sntype'] = model
             lcdata = getter.get_lcs_data(**kwargs)
             if lcdata is None:
                 continue
@@ -91,12 +90,12 @@ def main():
                 obs = lc['flux'] 
                 flux_err = lc['dflux']
 
-                if (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR', 'String')):
+                if sntypes.get(model) in ('RRLyrae','BSR','String','Mdwarf'):
                     tfield, tmodel, tbase, tid  = obsid.split('_')
                     header_dir = 'LSST_{}_MODEL{}'.format(tfield, tmodel)
                     header_file = 'LSST_{}_{}_HEAD.FITS.gz'.format(tfield, tbase)
                     header_file = os.path.join(DATA_DIR, data_release, header_dir, header_file)
-                    header_data = plasticc.make_index.get_file_data(header_file, extension=1)
+                    header_data = make_index.get_file_data(header_file, extension=1)
                     snid = np.array([x.strip() for x in header_data['SNID']])
                     ind = (snid == tid)
                     tu = header_data['LCLIB(TEMPLATE_MAG_u)'][ind][0]
@@ -138,8 +137,8 @@ def main():
            
             norm_flux = (obs_flux - sim_flux)/sig_flux
 
-            if not (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR', 'String')):
-                continue 
+            #if not (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR', 'String')):
+            #    continue 
 
             c = next(color)
             print(sntypes.get(model), nobj, describe(norm_flux))
