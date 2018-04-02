@@ -3,8 +3,6 @@ import sys
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 import numpy as np
 import scipy
-import pandas as pd
-from astropy.stats import sigma_clip
 import astropy.table as at
 from collections import OrderedDict
 from plasticc.get_data import GetData
@@ -12,7 +10,6 @@ from ANTARES_object.LAobject import LAobject
 import h5py
 import multiprocessing as mp
 import extinction
-from . import database
 import matplotlib.pyplot as plt
 
 DIRNAMES = 1
@@ -66,7 +63,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     Return as a DataFrame with columns being the features, and rows being the objid&passband
     """
     print(fname)
-    passbands = ['r']
+    passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
     features_out = []
     # This needs to be the same order as the order of the features dictionary # TODO: improve this to be order invariant
     feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'skew_%s' % p, 'shapiro_%s' % p,  'q31_%s' % p,
@@ -135,7 +132,11 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             features['mad_%s' % p] = _gf(laobject.get_MAD(recompute=True), p, 'mad')
             features['stetsonj_%s' % p] = _gf(laobject.get_StetsonJ(recompute=True), p, 'stetsonj')
             features['entropy_%s' % p] = _gf(laobject.get_ShannonEntropy(recompute=True), p, 'entropy')
-            features['rescaled-flux_%s' % p] = (flux[lc['pb'] == p] - 0)/(max(flux[lc['pb'] == p])-0)
+            flux_new = flux[lc['pb'] == p]
+            # photflag_new = lc['photflag'][lc['pb'] == p]
+            # zeros = np.where(photflag_new==0)[0]
+            # flux_new[zeros] = 0
+            features['rescaled-flux_%s' % p] = str((flux_new - 0)/(max(flux_new)-0))
 
             # print('amplitude', objid, features['amplitude_r'], 'dlmu', dlmu, 'mwebv', mwebv)
             # print(list(zip(t[lc['pb'] == 'r'], flux[lc['pb'] == 'r'], lc['photflag'][lc['pb'] == 'r'])))
@@ -145,19 +146,21 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             # plt.show()
 
         count += 1
-        print("amplitude", objid, features['amplitude_r'])
         # field, model, base, snid = objid.astype(str).split('_')
         print(objid.encode('utf8'), offset, count, os.path.basename(fname))
         features_out += [list(features.values())]
 
     # print('__B__', offset, count, len(features_out), os.path.basename(fname))
     # Set all columns to floats except set first column to string (objid)
-    dtypes = ['S24'] + [np.float64] * (len(mysql_fields) - 2) + [list]
+    print('AA', len(feature_fields) - 1)
+    dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands) - 1) + [bytes]) * len(passbands)
+    print(list(zip(dtypes, mysql_fields)))
 
     # Save to hdf5 in batches of 10000
-    features_out = np.array(features_out)
+    features_out = np.array(features_out, dtype=object)
     features_out = at.Table(features_out, names=mysql_fields, dtype=dtypes)
     features_out.write(fname, path=data_release, append=False, overwrite=redo)
+    print(features_out)
     print("saved %s" % fname)
 
     return fname
@@ -165,7 +168,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
 
 def combine_hdf_files(save_dir, data_release):
     fnames = os.listdir(save_dir)
-    fname_out = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test.hdf5')
+    fname_out = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test2.hdf5')
     output_file = h5py.File(fname_out, 'w')
 
     # keep track of the total number of rows
@@ -197,6 +200,7 @@ def create_all_hdf_files(data_release, i, save_dir, field_in, model_in, batch_si
     save_antares_features(data_release=data_release, fname=fname, field_in=field_in, model_in=model_in,
                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)
 
+
 def main():
     save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_test')
     if not os.path.exists(save_dir):
@@ -221,7 +225,7 @@ def main():
 
     # offset = 0
     # i = 0
-    # while offset < 1000:
+    # while offset < 10:
     #     fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
     #     save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
     #                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)

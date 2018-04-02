@@ -9,7 +9,7 @@ import pandas as pd
 import seaborn as sns
 import helpers
 
-ROOT_DIR = '..' # os.getenv('PLASTICC_DIR')
+ROOT_DIR = os.getenv('PLASTICC_DIR')
 
 
 def get_features(fpath, data_release, field_in='%', model_in='%'):
@@ -28,14 +28,50 @@ def get_features(fpath, data_release, field_in='%', model_in='%'):
 
     features = features[indexes]
 
+    # rescaled_flux_new = []
+    # rescaled_flux = features['rescaled-flux_r']
+    # for s in rescaled_flux:
+    #     s = s.decode('utf-8').replace('[', '')
+    #     s = s.replace(']', '')
+    #     s = s.replace('\\n', '')
+    #     s = np.array(s.split()).astype(float)
+    #     # rescaled_flux_new.append(s)
+    #     rescaled_flux_new += list(s)
+    # rescaled_flux_new = np.asarray(rescaled_flux_new)
+    #
+    # fig = plt.figure()
+    #
+    # num_bins = 50
+    # # the histogram of the data
+    # # n, bins, patches = plt.hist(rescaled_flux_new, num_bins, normed=1, facecolor='green', alpha=0.5)
+    # sns.kdeplot(rescaled_flux_new)
+    # plt.xlabel('rescaled-flux')
+    # plt.title(model_in)
+    # plt.show()
+
     return features
 
+def convert_rescaled_flux_to_array(rescaled_flux_str_array):
+    rescaled_flux_new = []
+    for s in rescaled_flux_str_array:
+        s = s.decode('utf-8').replace('[', '')
+        s = s.replace(']', '')
+        s = s.replace('\\n', '')
+        try:
+            s = np.array(s.split()).astype(float)
+        except Exception as err: # Weird value error due to trailing '-' in array
+            print(s, err)
+            continue
+        # rescaled_flux_new.append(s)
+        rescaled_flux_new += list(s)
+    rescaled_flux_new = np.asarray(rescaled_flux_new)
+    return rescaled_flux_new
 
 def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1'):
 
     features = get_features(fpath, data_release, field, model)
 
-    features_dict = {'r': {}}
+    features_dict = {'u': {}, 'g': {}, 'r': {}, 'i': {}, 'z': {}, 'Y': {}}
     for pb in features_dict.keys():
         for f in feature_names:
             if f in ['objid', 'redshift']:
@@ -50,7 +86,7 @@ def get_features_dict(fpath, data_release, feature_names=('redshift',), field='D
 def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', fig_dir='.', sntypes_map=None):
 
     model_name = sntypes_map[int(model)]
-    passbands = ('r')
+    passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     features_dict = get_features_dict(fpath, data_release, feature_names, field, model)
 
     xlabel = 'redshift'
@@ -120,7 +156,7 @@ def get_limits(y, feature=None):
         minmax = {'kurtosis': (None, 14), 'amplitude': (0, 1000), 'skew': (None, None), 'somean': (-1, 1.5),
                   'shapiro': (None, None), 'q31': (-1, 15), 'rms': (-1, 20), 'mad': (-1, 20), 'stetsonj': (-3, 10),
                   'stetsonk': (-0.25, 1.5), 'acorr': (-2, 13), 'hlratio': (None, 5), 'entropy': (-1, 1),
-                  'von-neumann': (None, None), 'variance': (-1, 25)}
+                  'von-neumann': (None, None), 'variance': (-1, 25), 'rescaled-flux': (-2, 2)}
 
         ymin, ymax = minmax[feature]
     # ymin, ymax = np.percentile(y, 0), np.percentile(y, 99)
@@ -130,7 +166,7 @@ def get_limits(y, feature=None):
 
 def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), field='DDF', fig_dir='.', sntypes_map=None):
     sns.set(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
-    passbands = ('r')
+    passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     model_names = []
     features_by_model = {}
     for model in [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]:
@@ -156,6 +192,8 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
                     if feature not in features_by_model[pb][model_name].keys():
                         continue
                     x_values = list(features_by_model[pb][model_name][feature].values)
+                    if feature == 'rescaled-flux':
+                        x_values = list(convert_rescaled_flux_to_array(x_values))
                     if len(x_values) == 0:
                         print("No entries for ", model_name, pb, feature)
                         continue
@@ -166,7 +204,7 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
                 if df.empty:
                     continue
                 nobs = {model_name: len(df['x'][df['g'] == model_name]) for model_name in model_names}
-                print(nobs)
+                print(pb, feature, nobs)
 
                 # Using example joyplot: https://seaborn.pydata.org/examples/kde_joyplot.html
                 # Initialize the FacetGrid object
@@ -209,21 +247,21 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test2')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test2.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     feature_names = ('objid', 'redshift', 'skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
-                     'rms', 'mad', 'stetsonj', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann')
+                     'rms', 'mad', 'stetsonj', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann', 'rescaled-flux')
 
     # for data_release in ['20180316']:
     #     for field in ['DDF']:
     #         for model in [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
     #             plot_features(fpath, data_release, feature_names, field, model, fig_dir, sntypes_map)
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test2')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     plot_features_joy_plot(fpath, '20180316', feature_names, 'DDF', fig_dir, sntypes_map)
