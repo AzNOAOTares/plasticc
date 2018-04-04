@@ -69,7 +69,8 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     feature_fields = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'skew_%s' % p, 'shapiro_%s' % p,  'q31_%s' % p,
                            'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
                            'amplitude_%s' % p, 'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p, 'stetsonj_%s' % p,
-                           'entropy_%s' % p, 'rescaled-flux_%s' % p] for p in passbands], [])
+                           'entropy_%s' % p, 'nobs4096_%s' % p] for p in passbands], [])
+                        # 'entropy_%s' % p, 'nobs4096_%s' % p, 'rescaled-flux_%s' % p] for p in passbands], [])
 
     mysql_fields = ['objid', 'redshift'] + feature_fields
 
@@ -102,7 +103,11 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr,
                                 obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, photflag=lc['photflag'])
 
-            photmask = lc['photflag'] >= 4096
+            rescaled_flux = (flux - min(flux))/(max(flux)-min(flux))
+            rescaled_fluxerr = fluxerr/(max(flux)-min(flux))
+            laobject_rescaled = LAobject(locusId=objid, objectId=objid, time=t, flux=rescaled_flux, fluxErr=rescaled_fluxerr,
+                                obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, photflag=lc['photflag'])
+            # photmask = lc['photflag'] >= 4096
             # laobject2 = LAobject(locusId=objid, objectId=objid, time=t[photmask], flux=flux[photmask], fluxErr=fluxerr[photmask],
             #                      obsId=obsid[photmask], passband=lc['pb'][photmask], zeropoint=lc['zpt'][photmask], per=False, mag=False, photflag=None)
         except ValueError as err:
@@ -113,6 +118,8 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         features['redshift'] = redshift
 
         for p in passbands:
+            flux_pb = flux[lc['pb'] == p]
+
             stats = _gf(laobject.get_stats(recompute=True), p, 'stats')
             if not isinstance(stats, scipy.stats.stats.DescribeResult) or stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
                 features = set_keys_to_nan(feature_fields, p, features)
@@ -121,22 +128,23 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             features['kurtosis_%s' % p] = stats.kurtosis
             features['skew_%s' % p] = _gf(laobject.get_skew(recompute=True), p, 'skew')
             features['shapiro_%s' % p] = _gf(laobject.get_ShapiroWilk(recompute=True), p, 'shapiro')
-            features['q31_%s' % p] = _gf(laobject.get_Q31(recompute=True), p, 'q31')
+            features['q31_%s' % p] = _gf(laobject_rescaled.get_Q31(recompute=True), p, 'q31')
             features['stetsonk_%s' % p] = _gf(laobject.get_StetsonK(recompute=True), p, 'stetsonk')
             features['acorr_%s' % p] = _gf(laobject.get_AcorrIntegral(recompute=True), p, 'acorr')
             features['von-neumann_%s' % p] = _gf(laobject.get_vonNeumannRatio(recompute=True), p, 'von-neumann')
             features['hlratio_%s' % p] = _gf(laobject.get_hlratio(recompute=True), p, 'hlratio')
-            features['amplitude_%s' % p] = _gf(laobject.get_amplitude(recompute=True), p, 'amplitude')
+            features['amplitude_%s' % p] = _gf(laobject_rescaled.get_amplitude(recompute=True), p, 'amplitude')
             features['somean_%s' % p] = _gf(laobject.get_StdOverMean(recompute=True), p, 'somean')
-            features['rms_%s' % p] = _gf(laobject.get_RMS(recompute=True), p, 'rms')
-            features['mad_%s' % p] = _gf(laobject.get_MAD(recompute=True), p, 'mad')
-            features['stetsonj_%s' % p] = _gf(laobject.get_StetsonJ(recompute=True), p, 'stetsonj')
-            features['entropy_%s' % p] = _gf(laobject.get_ShannonEntropy(recompute=True), p, 'entropy')
-            flux_new = flux[lc['pb'] == p]
-            # photflag_new = lc['photflag'][lc['pb'] == p]
-            # zeros = np.where(photflag_new==0)[0]
-            # flux_new[zeros] = 0
-            features['rescaled-flux_%s' % p] = str((flux_new - 0)/(max(flux_new)-0))
+            features['rms_%s' % p] = _gf(laobject_rescaled.get_RMS(recompute=True), p, 'rms')
+            features['mad_%s' % p] = _gf(laobject_rescaled.get_MAD(recompute=True), p, 'mad')
+            features['stetsonj_%s' % p] = _gf(laobject_rescaled.get_StetsonJ(recompute=True), p, 'stetsonj')
+            features['entropy_%s' % p] = _gf(laobject_rescaled.get_ShannonEntropy(recompute=True), p, 'entropy')
+            features['nobs4096_%s' % p] = len(flux_pb[lc['photflag'][lc['pb'] == p] >= 4096])/len(flux_pb)
+            # features['rescaled-flux_%s' % p] = str(rescaled_flux)
+
+            # # photflag_new = lc['photflag'][lc['pb'] == p]
+            # # zeros = np.where(photflag_new==0)[0]
+            # # flux_new[zeros] = 0
 
             # print('amplitude', objid, features['amplitude_r'], 'dlmu', dlmu, 'mwebv', mwebv)
             # print(list(zip(t[lc['pb'] == 'r'], flux[lc['pb'] == 'r'], lc['photflag'][lc['pb'] == 'r'])))
@@ -152,8 +160,9 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
 
     # print('__B__', offset, count, len(features_out), os.path.basename(fname))
     # Set all columns to floats except set first column to string (objid)
-    print('AA', len(feature_fields) - 1)
-    dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands) - 1) + [bytes]) * len(passbands)
+    print('AA', len(feature_fields))
+    dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands))) * len(passbands)
+    # dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands) - 1) + [bytes]) * len(passbands)
     print(list(zip(dtypes, mysql_fields)))
 
     # Save to hdf5 in batches of 10000
@@ -166,9 +175,9 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     return fname
 
 
-def combine_hdf_files(save_dir, data_release):
+def combine_hdf_files(save_dir, data_release, combine_savename):
     fnames = os.listdir(save_dir)
-    fname_out = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test2.hdf5')
+    fname_out = os.path.join(ROOT_DIR, 'plasticc')
     output_file = h5py.File(fname_out, 'w')
 
     # keep track of the total number of rows
@@ -202,7 +211,7 @@ def create_all_hdf_files(data_release, i, save_dir, field_in, model_in, batch_si
 
 
 def main():
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_test')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_all')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -249,7 +258,7 @@ def main():
         save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
                               batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
 
-    combine_hdf_files(save_dir, data_release)
+    combine_hdf_files(save_dir, data_release, 'features_all.hdf5')
 
 
 if __name__ == '__main__':

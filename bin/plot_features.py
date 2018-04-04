@@ -153,10 +153,10 @@ def get_limits(y, feature=None):
     # ymin, ymax = min(y), max(y)
     #
     if feature is not None:
-        minmax = {'kurtosis': (None, 14), 'amplitude': (0, 1000), 'skew': (None, None), 'somean': (-1, 1.5),
-                  'shapiro': (None, None), 'q31': (-1, 15), 'rms': (-1, 20), 'mad': (-1, 20), 'stetsonj': (-3, 10),
-                  'stetsonk': (-0.25, 1.5), 'acorr': (-2, 13), 'hlratio': (None, 5), 'entropy': (-1, 1),
-                  'von-neumann': (None, None), 'variance': (-1, 25), 'rescaled-flux': (-2, 2)}
+        minmax = {'kurtosis': (None, 6), 'amplitude': (None, None), 'skew': (None, None), 'somean': (-1, 2),
+                  'shapiro': (None, None), 'q31': (None, 1), 'rms': (None, None), 'mad': (None, None), 'stetsonj': (0, 400),
+                  'stetsonk': (None, None), 'acorr': (None, 6), 'hlratio': (None, 6), 'entropy': (None, 12),
+                  'von-neumann': (None, None), 'variance': (None, None), 'rescaled-flux': (-2, 2), 'nobs4096': (None, None)}
 
         ymin, ymax = minmax[feature]
     # ymin, ymax = np.percentile(y, 0), np.percentile(y, 99)
@@ -169,7 +169,7 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
     passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     model_names = []
     features_by_model = {}
-    for model in [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]:
+    for model in [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]: #[1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
         model_name = sntypes_map[int(model)]
         model_names.append(model_name)
         features_by_pb = get_features_dict(fpath, data_release, feature_names, field, model)
@@ -234,7 +234,7 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
                 # Set limits
                 xmin, xmax = get_limits(df['x'].values, feature)
-                if feature in ['stetsonj', 'amplitude', 'q31']:
+                if feature in ['stetsonj']:
                     print('here')
                     g.set(xlim=(xmin, xmax), ylim=(0, 0.01))
                 else:
@@ -247,21 +247,22 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test2')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test2.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF.hdf5')
     sntypes_map = helpers.get_sntypes()
 
+    # feature_names = ('objid', 'redshift', 'stetsonj')
     feature_names = ('objid', 'redshift', 'skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
-                     'rms', 'mad', 'stetsonj', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann', 'rescaled-flux')
+                     'rms', 'mad', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann', 'nobs4096')
 
     # for data_release in ['20180316']:
     #     for field in ['DDF']:
     #         for model in [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
     #             plot_features(fpath, data_release, feature_names, field, model, fig_dir, sntypes_map)
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test2')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     plot_features_joy_plot(fpath, '20180316', feature_names, 'DDF', fig_dir, sntypes_map)
