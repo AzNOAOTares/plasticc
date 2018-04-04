@@ -22,7 +22,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, pb
         # for f in feature_names:
         #     x.append(features[i]["%s_%s" % (f, pb)])
         for f in feature_names:
-            for pb in ['r', 'i', 'z', 'Y']:
+            for pb in ['u', 'g', 'r', 'i', 'z', 'Y']:
                 x.append(features[i]["%s_%s" % (f, pb)])
         x = np.array(x)
         X.append(x)
@@ -30,26 +30,28 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, pb
     X = np.array(X)
     y = np.array(y)
 
+    print("Num objects before removing objects where any features are NaN: ", len(X))
     # Remove rows that contain any NaNs in them
     mask = ~np.isnan(X).any(axis=1)
     X = X[mask]
     y = y[mask]
+    print("Num objects after removing objects where any features are NaN: ", len(X))
 
-    # Remove extreme values over 10 standard deviations from the median 10 times iteratively
-    # for ii in range(10):
-    #     for f in range(X.shape[1]):
-    #         std = np.std(X[:, f])
-    #         median = np.median(X[:, f])
-    #         mask = np.where(abs(X[:, f] - median) < 10 * std)[0]
-    #         if np.where(abs(X[:, f] - median) > 10 * std)[0].any():
-    #             pass
-    #         X = X[mask]
-    #         y = y[mask]
+    # Remove extreme values over 20 standard deviations from the median 10 times iteratively
+    for ii in range(1):
+        for f in range(X.shape[1]):
+            std = np.std(X[:, f])
+            median = np.median(X[:, f])
+            mask = np.where(abs(X[:, f] - median) < 20 * std)[0]
+            if np.where(abs(X[:, f] - median) > 20 * std)[0].any():
+                pass
+            X = X[mask]
+            y = y[mask]
 
     return X, y
 
 
-def classify(X, y, models, sntypes_map, feature_names):
+def classify(X, y, models, sntypes_map, feature_names, fig_dir='.'):
     # # Remove models before training:
     # mask = np.where(y != 1)[0]
     # X = X[mask]
@@ -71,7 +73,7 @@ def classify(X, y, models, sntypes_map, feature_names):
     accuracy = len(np.where(yPred==yTest)[0])
     print("Accuracy is: {}/{} = {}".format(accuracy, len(yPred), accuracy/len(yPred)))
 
-    colors = ('r', 'b', 'g', 'm', 'c')
+    colors = ('#e6194b', '#0082c8', '#3cb44b', '#f032e6', '#46f0f0', '#ffe119', '#f58231', '#911eb4', '#d2f53c', '#008080', '#fabebe', '#e6beff', '#aa6e28', '#000080', '#000000')
     fig, ax = plt.subplots(nrows=len(feature_names), ncols=len(feature_names), sharex='col', sharey='row', figsize=(18,15))
     fig.subplots_adjust(wspace=0, hspace=0)
     for i, feat1 in enumerate(feature_names):
@@ -86,12 +88,14 @@ def classify(X, y, models, sntypes_map, feature_names):
                     ax[i, j].set_ylabel(feat1)
     ax[0, j].legend(loc='upper left', bbox_to_anchor=(1,1))
 
+    fig.savefig(os.path.join(fig_dir, 'feature_space'))
+
 
 def main():
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_test2.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     data_release = '20180316'
@@ -99,13 +103,13 @@ def main():
     model = '%'
 
     feature_names = ('skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
-                     'rms', 'mad', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann')
+                     'rms', 'mad', 'amplitude', 'q31', 'entropy', 'von-neumann')
     # feature_names = ('variance', 'kurtosis', 'amplitude', 'skew')
 
     X, y = get_labels_and_features(fpath, data_release, field, model, feature_names, 'r')
 
-    models = [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63, 80, 81, 82]
-    classify(X, y, models, sntypes_map, feature_names)
+    models = [1, 2, 3, 4, 41, 42, 45, 60, 61, 62, 63]
+    classify(X, y, models, sntypes_map, feature_names, fig_dir)
 
     plt.show()
 
