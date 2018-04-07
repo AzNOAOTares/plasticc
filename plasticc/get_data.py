@@ -162,7 +162,10 @@ class GetData(object):
             E.g. Access the magnitude in the z filter with phot_out['z']['MAG'].
         """
         field, model, base, snid = objid.split('_')
-        filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
+        if field == 'IDEAL':
+            filename = "{0}_MODEL{1}/{0}_{2}_PHOT.FITS".format(field, model, base)
+        else:
+            filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
         phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
         if not os.path.exists(phot_file):
             phot_file = phot_file + '.gz'
