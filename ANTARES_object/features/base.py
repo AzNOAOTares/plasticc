@@ -46,19 +46,6 @@ class BaseMixin(object):
                 thispbphase = phase[mask]
                 minph = thispbphase.min()
                 maxph = thispbphase.max()
-
-                # generate a phase array onto which we will interpolate the lightcurve
-                # if self.per:
-                #    # if it is periodic, always generate a smooth curve from 0 to 2
-                #    outphase = np.linspace(0.,2.0,num=200,endpoint=True)
-                # else:
-                #
-                #    # if it is not periodic, either just return at the locations of the data
-                #    # or make a smooth curve if there were enough observations in this filter
-                #    npb = len(thispbphase)
-                #    if npb > 25:
-                #        outphase = np.linspace(minph, maxph, num=100, endpoint=True)
-                #    else:
                 outphase = thispbphase
 
                 if gpr:
@@ -94,6 +81,7 @@ class BaseMixin(object):
                 thisFluxErr = self.fluxErr[mask][m2]
 
                 if len(thisFlux) > 0:
+                    # kinda hackish way to get photflag as well
                     if usephotflag and self.photflag is not None:
                         photflag = self.photflag[mask][m2]
                     else:
@@ -102,7 +90,7 @@ class BaseMixin(object):
             self._outlc = outlc
         return outlc
 
-    def get_amplitude(self, smoothed=False, per=None, gpr=True, phase_offset=None, recompute=False):
+    def get_amplitude(self, smoothed=False, per=None, gpr=True, phase_offset=None, recompute=False, usephotflag=True):
         """
         Return the amplitude
         """
@@ -120,37 +108,30 @@ class BaseMixin(object):
             thislc = outlc.get(pb)
 
             thispbphase, thisFlux, thisFluxErr, photflag = thislc
-            nobs = len(thispbphase)
-
-            # if we have only one observation, assume that the survey had a
-            # reason to trip on this alert and that it was some excursion
-            # over the background, and that this is stored under pbRef
-            # in the header
-            if nobs == 1:
-                key = '{}Ref'.format(pb)
-                amp = thisFlux - self.header.get(key, np.nan)
-                outamp[pb] = amp
-            else:
-                # if we have multiple observations, simply calculate the
-
-                # ptp value as amplitude
-                # amp = thisFlux.ptp()
-                # Edit - this is really sensitive to outliers
-
-                # difference between the 99th percentile and 1st pecentile of the flux as amplitude
-                # this is more robust than ptp if there are outliers
-                if photflag is not None:
-                    photmask = photflag >= 4096
-                    newflux = thisFlux[photmask]
-                if len(newflux) == 0:  # if this Flux is empty
-                    amp = 0
+                
+            if usephotflag and photflag is not None:
+                # we have a way to filter observations
+                photmask = photflag >= 4096
+                if len(thisFlux[photmask]) <= 1:
+                    # not enough observations that have photflag 
+                    newflux = thisFlux
                 else:
-                    f_99 = np.percentile(newflux, 99)
-                    f_01 = np.percentile(newflux,  1)
-                    f_50 = np.percentile(newflux, 50)
-                    amp = np.abs((f_99 - f_01)/f_50)
-                outamp[pb] = amp
-        self.setattr_from_dict_default('amplitude', outamp, np.nan)
+                    newflux = thisFlux[photmask]
+            else:
+                newflux = thisFlux 
+
+            if len(newflux) <= 1:  # if this Flux is empty or there's only measure
+                amp = 0.
+            else:
+                f_99 = np.percentile(newflux, 99)
+                f_01 = np.percentile(newflux,  1)
+                f_50 = np.percentile(newflux, 50)
+                amp = np.abs((f_99 - f_01)/(f_50 - f_01))
+                if not np.isfinite(amp):
+                    amp = 0. 
+            outamp[pb] = amp
+
+        self.setattr_from_dict_default('amplitude', outamp, 0.)
         self.amplitude = outamp
         return outamp
 
@@ -289,15 +270,14 @@ class BaseMixin(object):
 
             if photflag is not None:
                 photmask = photflag >= 4096
-                thisFlux = thisFlux[photmask]
+                thisFlux    = thisFlux[photmask]
+                thisFluxErr = thisFluxErr[photmask] 
+
             if len(thisFlux) == 0:  # if this Flux is empty
                 rms[pb] = 0
                 continue
-
-            thisstats = outstats.get(pb)
-            if thisstats is None:
-                continue
-            thismean = thisstats[2]
+            
+            thismean = np.mean(thisFlux)
             thisrms = math.fsum(((thisFlux - thismean) / thisFluxErr) ** 2.)
             thisrms /= math.fsum(1. / thisFluxErr ** 2.)
             thisrms = thisrms ** 0.5
