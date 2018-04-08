@@ -214,7 +214,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
                 bad1 = filtered_err.mask
 
                 if 'photflag' in self._extra_cols:
-                    saveind = (self.photflag[indf][bad1] > 0)
+                    saveind = np.where(self.photflag[indf][bad1] > 0)
                     bad1[saveind] = False
 
                 useind = ~bad1
