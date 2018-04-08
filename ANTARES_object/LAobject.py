@@ -277,10 +277,10 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         Remove extinction for light curve assuming Fitzpatrick '99 reddening
         law, given some value of E(B-V)
         """
-        self.fluxUnred = self.flux.copy()
-        self.fluxErrUnred = self.fluxErr.copy()
-        if self.ebv == 0.:
-            return
+        self.fluxUnred     = self.flux.copy()
+        self.fluxErrUnred  = self.fluxErr.copy()
+        self.fluxRenorm    = self.flux.copy()
+        self.fluxErrRenorm = self.fluxErr.copy()
 
         # Using negative a_v so that extinction.apply works in reverse and removes the extinction
         extinctions = extinction.fitzpatrick99(wave=self._good_filter_wave,\
@@ -288,16 +288,39 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
 
         for i, pb in enumerate(self._good_filters):
             mask = (self.passband == pb)
-            flux_pb = self.flux[mask]
-            if len(flux_pb) == 0:
-                continue
+
+            flux_pb    = self.flux[mask]
             fluxerr_pb = self.fluxErr[mask]
+            npbobs     = len(flux_pb)
 
-            flux_out = extinction.apply(extinctions[i], flux_pb, inplace=False)
-            fluxerr_out = extinction.apply(extinctions[i], fluxerr_pb, inplace=False)
+            if npbobs > 1:
+                # there's at least enough observations to find minimum and maximum
+                flux_out = extinction.apply(extinctions[i], flux_pb, inplace=False)
+                fluxerr_out = extinction.apply(extinctions[i], fluxerr_pb, inplace=False)
+                self.fluxUnred[mask] = flux_out
+                self.fluxErrUnred[mask] = fluxerr_pb
+                
+                minfluxpb = self.flux_out.min()
+                maxfluxpb = self.flux_out.max()
+                norm = maxfluxpb - minfluxpb 
 
-            self.fluxUnred[mask] = flux_out
-            self.fluxErrUnred[mask] = fluxerr_pb
+                self.fluxRenorm[mask] -= minfluxpb
+
+                self.fluxRenorm[mask] /= norm 
+                self.fluxRenormErr[mask] /= norm
+            elif npbobs == 1:
+                # deal with the case with one observation in this passband by setting renorm = 0.5 
+                flux_out = extinction.apply(extinctions[i], flux_pb, inplace=False)
+                fluxerr_out = extinction.apply(extinctions[i], fluxerr_pb, inplace=False)
+                self.fluxUnred[mask] = flux_out
+                self.fluxErrUnred[mask] = fluxerr_pb
+
+                norm = self.fluxUnred[mask]/0.5
+                self.fluxRenorm[mask] /= norm 
+                self.fluxRenormErr[mask] /= norm
+            else:
+                pass
+
         return
 
 
