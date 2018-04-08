@@ -313,7 +313,8 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
                 maxfluxpb = flux_out.max()
                 norm = maxfluxpb - minfluxpb 
 
-                self.fluxRenorm[mask] -= minfluxpb
+                self.fluxRenorm[mask] = flux_out - minfluxpb 
+                self.fluxErrRenorm[mask] = fluxerr_pb
 
                 self.fluxRenorm[mask] /= norm 
                 self.fluxErrRenorm[mask] /= norm
