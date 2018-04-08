@@ -62,24 +62,27 @@ def get_features_for_light_curve_batch(data_release, field_in='%', model_in='%',
     NOSHUFFLE = False
 
     getter = GetData(data_release)
-    result = getter.get_lcs_data(field=field_in, model=model_in,\
+    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host', 'mwebv', 'sim_dlmu'],\
+                                field=field_in, model=model_in,\
                                 shuffle=NOSHUFFLE, sort=SORT,\
                                 limit=batch_size, offset=offset)
     for head, phot in result:
+        objid, ptrobs_min, ptrobs_max, peak_mjd, redshift, mwebv, dlmu = head
+        header = {'redshift':redshift, 'dlmu':dlmu, 'peakmjd':peak_mjd}
 
-        objid, _, _ = head
         lc = getter.convert_pandas_lc_to_recarray_lc(phot)
         obsid = np.arange(len(lc))
-        laobj = ANTARES_object.LAobject(objid, objid, lc['mjd'], lc['flux'], lc['dflux'],\
-                                    obsid, lc['pb'], lc['zpt'], per=False, mag=False, clean=True)
 
-        amp = laobj.get_amplitude()
+        kwargs = {'photflag':lc['photflag']} 
+        laobj = ANTARES_object.LAobject(objid, objid, lc['mjd'], lc['flux'], lc['dflux'],\
+                                    obsid, lc['pb'], lc['zpt'], header=header, ebv=mwebv, per=False, mag=False, clean=True, **kwargs)
+        yield laobj
 
 
 
 
 def main():
-    get_features_for_light_curve_batch('20180221', field_in='DDF', model_in=1, batch_size=10)
+    get_features_for_light_curve_batch('20180407', field_in='DDF', model_in=1, batch_size=10)
 
 
 if __name__=='__main__':
