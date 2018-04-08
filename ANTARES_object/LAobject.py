@@ -112,7 +112,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
                     self._extra_cols.append(key)
 
         # keep track of what passbands we have
-        self.filters = list(set(self.passband))
+        self.filters = set(self.passband)
 
         # save the other inputs
         self.mag = mag
@@ -178,7 +178,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
                 return self.finalize()
 
             # we should still update filters in case all the data in a filter was invalid
-            self.filters = list(set(self.passband))
+            self.filters = set(self.passband)
 
             # begin cleaning the lightcurve - hic sunt dracones
             if mag:
@@ -300,14 +300,14 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
                 self.fluxUnred[mask] = flux_out
                 self.fluxErrUnred[mask] = fluxerr_pb
                 
-                minfluxpb = self.flux_out.min()
-                maxfluxpb = self.flux_out.max()
+                minfluxpb = flux_out.min()
+                maxfluxpb = flux_out.max()
                 norm = maxfluxpb - minfluxpb 
 
                 self.fluxRenorm[mask] -= minfluxpb
 
                 self.fluxRenorm[mask] /= norm 
-                self.fluxRenormErr[mask] /= norm
+                self.fluxErrRenorm[mask] /= norm
             elif npbobs == 1:
                 # deal with the case with one observation in this passband by setting renorm = 0.5 
                 flux_out = extinction.apply(extinctions[i], flux_pb, inplace=False)
@@ -317,7 +317,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
 
                 norm = self.fluxUnred[mask]/0.5
                 self.fluxRenorm[mask] /= norm 
-                self.fluxRenormErr[mask] /= norm
+                self.fluxErrRenorm[mask] /= norm
             else:
                 pass
 
@@ -335,17 +335,16 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         # this forces only some filters will be used for feature computation
         # this is not ideal, but a necessary stop-gap while we revise
         # the PropertyTable SQL
-        self._good_filters = set(['u', 'g', 'r', 'i', 'z', 'Y'])
+        self._good_filters = ['u', 'g', 'r', 'i', 'z', 'Y']
         self._good_filter_wave = np.array([3569.5, 4766.5, 6214.5, 7544.5, 8707.5, 10039.5])
 
-        avail_filters = set(self.passband)
-        use_filters = self._good_filters & avail_filters
-        if not avail_filters.issubset(use_filters):
+        use_filters = set(self._good_filters) & self.filters
+        if not self.filters.issubset(use_filters):
             message = 'Number of useful filters ({}) does not equal number available filters ({}) - some filters will not be used'.format(
-                ''.join(use_filters), ''.join(avail_filters))
+                ''.join(use_filters), ''.join(self.filters))
             warnings.warn(message, RuntimeWarning)
-        self.filters = list(use_filters)
-        mask = np.array([True if x in self.filters for x in self.passband else False])
+        self.filters = set(use_filters)
+        mask = np.array([True if x in self.filters else False for x in self.passband])
 
         self.time      = self.time[mask]
         self.flux      = self.flux[mask]
