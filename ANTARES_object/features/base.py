@@ -65,8 +65,8 @@ class BaseMixin(object):
                     thisgp = outgp.get(pb)
                     if thisgp is None:
                         continue
-                    bestgp, thisphase, thismag, thismag_err = thisgp
-                    interpy, cov = bestgp.predict(thismag, outphase)
+                    bestgp, thisphase, thisFlux, thisFluxErr = thisgp
+                    interpy, cov = bestgp.predict(thisFlux, outphase)
                     interpyerr = np.sqrt(np.diag(cov))
                 else:
                     thistck, thisu = outtck.get(pb)
@@ -145,11 +145,10 @@ class BaseMixin(object):
                 if len(newflux) == 0:  # if this Flux is empty
                     amp = 0
                 else:
-                    if self.mag is True:
-                        amp = np.abs(np.percentile(newflux, 99) - np.percentile(newflux, 1))
-                    else:
-                        amp = np.abs(np.percentile(newflux, 99))
-
+                    f_99 = np.percentile(newflux, 99)
+                    f_01 = np.percentile(newflux,  1)
+                    f_50 = np.percentile(newflux, 50)
+                    amp = np.abs((f_99 - f_01)/f_50)
                 outamp[pb] = amp
         self.setattr_from_dict_default('amplitude', outamp, np.nan)
         self.amplitude = outamp
