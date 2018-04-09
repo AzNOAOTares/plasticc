@@ -76,6 +76,7 @@ class BaseMixin(object):
             thislc = outlc.get(pb)
             thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
                 
+            # this definition should give identical results for fluxUnred or fluxRenorm 
             if usephotflag and photflag is not None:
                 # we have a way to filter observations
                 photmask = photflag >= 4096
@@ -119,13 +120,13 @@ class BaseMixin(object):
 
             if usephotflag and photflag is not None:
                 photmask = photflag >= 4096
-                thisFlux = thisFlux[photmask]
-                if len(thisFlux) == 0:
-                    thisstat = scipy.stats.describe([0,0])
+                thisFluxRenorm = thisFluxRenorm[photmask]
+                if len(thisFluxRenorm) == 0:
+                    thisstat = scipy.stats.describe([0., 0., 0.])
                 else:
-                    thisstat = scipy.stats.describe(thisFlux)
+                    thisstat = scipy.stats.describe(thisFluxRenorm)
             else:
-                thisstat = scipy.stats.describe(thisFlux)
+                thisstat = scipy.stats.describe(thisFluxRenorm)
 
             outstats[pb] = thisstat
 
@@ -143,21 +144,19 @@ class BaseMixin(object):
 
         outskew = {}
         outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset)
-        outstats = self.get_stats(recompute=recompute, per=per, phase_offset=phase_offset)
-
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
             thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
-            npb = len(thisFlux)
+            npb = len(thisFluxRenorm)
 
             thisstats = outstats.get(pb)
             if thisstats is None:
                 continue
-            thismean = thisstats[2]
-            thisvar = thisstats[3]
-            thisstd = thisvar ** 0.5
 
-            thisskew = (1. / npb) * math.fsum(((thisFlux - thismean) ** 3.) / (thisstd ** 3.))
+            thismean = np.mean(thisFluxRenorm)
+            thisstd  = np.std(thisFluxRenorm)
+
+            thisskew = (1. / npb) * math.fsum(((thisFluxRenorm - thismean) ** 3.) / (thisstd ** 3.))
             outskew[pb] = thisskew
 
         self.skew = outskew
@@ -187,7 +186,7 @@ class BaseMixin(object):
             thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
             if len(thisFlux) <= 3:
                 continue
-            thissw, _ = scipy.stats.shapiro(thisFlux)
+            thissw, _ = scipy.stats.shapiro(thisFluxRenorm)
             sw[pb] = thissw
         self.ShapiroWilk = sw
         return sw
@@ -202,12 +201,12 @@ class BaseMixin(object):
                 return q31
 
         q31 = {}
-        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
             thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
-            thisq31 = np.percentile(thisFlux, 75) - np.percentile(thisFlux, 25)
+            thisq31 = np.percentile(thisFluxRenorm, 75) - np.percentile(thisFluxRenorm, 25)
             q31[pb] = thisq31
         self.Q31 = q31
         return q31
@@ -231,16 +230,16 @@ class BaseMixin(object):
 
             if photflag is not None:
                 photmask = photflag >= 4096
-                thisFlux    = thisFlux[photmask]
-                thisFluxErr = thisFluxErr[photmask] 
+                thisFluxRenorm    = thisFluxRenorm[photmask]
+                thisFluxErrRenorm = thisFluxErrRenorm[photmask] 
 
             if len(thisFlux) == 0:  # if this Flux is empty
                 rms[pb] = 0
                 continue
             
-            thismean = np.mean(thisFlux)
-            thisrms = math.fsum(((thisFlux - thismean) / thisFluxErr) ** 2.)
-            thisrms /= math.fsum(1. / thisFluxErr ** 2.)
+            thismean = np.mean(thisFluxRenorm)
+            thisrms = math.fsum(((thisFluxRenorm - thismean) / thisFluxErrRenorm) ** 2.)
+            thisrms /= math.fsum(1. / thisFluxErrRenorm ** 2.)
             thisrms = thisrms ** 0.5
             rms[pb] = thisrms
         self.RMS = rms
@@ -261,7 +260,7 @@ class BaseMixin(object):
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
             thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
-            thisEntropy = stats_computation.shannon_entropy(thisFlux, thisFluxErr)
+            thisEntropy = stats_computation.shannon_entropy(thisFluxRenorm, thisFluxErrRenorm)
             entropy[pb] = thisEntropy
         self.entropy = entropy
         return entropy
@@ -285,11 +284,11 @@ class BaseMixin(object):
 
             if photflag is not None:
                 photmask = photflag >= 4096
-                thisFlux = thisFlux[photmask]
-            if len(thisFlux) == 0:  # if this Flux is empty
+                thisFluxRenorm = thisFluxRenorm[photmask]
+            if len(thisFluxRenorm) == 0:  # if this Flux is empty
                 thismad = 0
             else:
-                thismad = median_absolute_deviation(thisFlux)
+                thismad = median_absolute_deviation(thisFluxRenorm)
             mad[pb] = thismad
         self.MAD = mad
         return mad
@@ -321,7 +320,7 @@ class BaseMixin(object):
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
             thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
-            delta = math.fsum(((thisFlux[1:] - thisFlux[:-1]) ** 2.) / (len(thisFlux) - 1))
+            delta = math.fsum(((thisFluxRenorm[1:] - thisFluxRenorm[:-1]) ** 2.) / (len(thisFluxRenorm) - 1))
             thisstats = outstats.get(pb)
             if thisstats is None:
                 continue
@@ -334,6 +333,7 @@ class BaseMixin(object):
     def get_StetsonJ(self, per=False, phase_offset=None, recompute=False):
         """
         Compute the Stetson J statistic of the lightcurve
+        http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.257.466&rep=rep1&type=pdf
         """
 
         stetsonJ = getattr(self, 'stetsonJ', None)
@@ -355,15 +355,16 @@ class BaseMixin(object):
 
             if photflag is not None:
                 photmask = photflag >= 4096
-                thisFlux = thisFlux[photmask]
+                thisFluxRenorm    = thisFluxRenorm[photmask]
+                thisFluxErrRenorm = thisFluxErrRenorm[photmask]
 
             thismean = thisstats[2]
-            npb = len(thisFlux)
+            npb = len(thisFluxRenorm)
 
             if npb < 2:
                 continue
 
-            delta = (npb / (npb - 1)) * ((thisFlux - thismean) / thisFluxErr)
+            delta = (npb / (npb - 1)) * ((thisFluxRenorm - thismean) / thisFluxErrRenorm)
             val = np.nan_to_num(delta[0:-1] * delta[1:])
             sign = np.sign(val)
             thisJ = math.fsum(sign * (np.abs(val) ** 0.5))
@@ -394,14 +395,38 @@ class BaseMixin(object):
                 continue
 
             thismean = thisstats[2]
-            npb = len(thisFlux)
+            npb = len(thisFluxRenorm)
 
-            residual = (thisFlux - thismean) / thisFluxErr
-            thisK = np.sum(np.fabs(residual)) / np.sqrt(np.sum(residual * residual)) / np.sqrt(npb)
+            delta = (npb / (npb - 1)) * ((thisFluxRenorm - thismean) / thisFluxErrRenorm)
+    
+
+            thisK = (np.sum(np.fabs(residual))/npb) / np.sqrt(np.sum(residual * residual) /npb)
             thisK = np.nan_to_num(thisK)
             stetsonK[pb] = thisK
         self.stetsonK = stetsonK
         return stetsonK
+
+    def get_StetsonL(self, per=False, phase_offset=None, recompute=False):
+        """
+        Get the Stetson L variability index
+        """
+        stetsonL = getattr(self, 'stetsonL', None)
+        if stetsonL is not None:
+            if not recompute:
+                return stetsonL
+
+        stetsonJ = self. get_StetsonJ(per=per, phase_offset=phase_offset, recompute=recompute)
+        stetsonK = self. get_StetsonK(per=per, phase_offset=phase_offset, recompute=recompute)
+
+        stetsonL = {}
+        for pb in stetsonJ:
+            thisJ = stetsonJ.get(pb, 0.)
+            thisK = stetsonK.get(pb, 0.)
+            thisL = thisJ*thisK/0.798
+            thisL = np.nan_to_num(thisL)
+            stetsonL[pb] = thisL
+        self.stetsonL = stetsonL 
+        return stetsonL 
 
     def get_AcorrIntegral(self, per=False, phase_offset=None, recompute=False):
         """
@@ -430,12 +455,12 @@ class BaseMixin(object):
             if thisrms is None:
                 continue
 
-            npb = len(thisFlux)
+            npb = len(thisFluxRenorm)
             t = np.arange(1, npb)
             sum_list = []
             val_list = []
             for i in t:
-                sum_list.append(math.fsum((thisFlux[0:npb - i] - thismean) * (thisFlux[i:npb] - thismean)))
+                sum_list.append(math.fsum((thisFluxRenorm[0:npb - i] - thismean) * (thisFluxRenorm[i:npb] - thismean)))
                 val_list.append(1. / ((npb - i) * thisrms ** 2.))
             thisAcorr = np.abs(math.fsum([x * y for x, y in zip(sum_list, val_list)]))
             AcorrInt[pb] = thisAcorr
@@ -463,22 +488,22 @@ class BaseMixin(object):
             thislc = outlc.get(pb)
             thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
 
-            thisWeight = 1. / thisFluxErr
+            thisWeight = 1. / thisFluxErrRenorm 
 
             thisstats = outstats.get(pb)
             if thisstats is None:
                 continue
             thismean = thisstats[2]
-            il = thisFlux > thismean
+            il = thisFluxRenorm > thismean
             wl = thisWeight[il]
             wlsum = np.sum(wl)
-            fl = thisFlux[il]
+            fl = thisFluxRenorm[il]
             wl_weighted_std = np.sum(wl * (fl - thismean) ** 2) / wlsum
 
-            ih = thisFlux <= thismean
+            ih = thisFluxRenorm <= thismean
             wh = thisWeight[ih]
             whsum = np.sum(wh)
-            fh = thisFlux[ih]
+            fh = thisFluxRenorm[ih]
             wh_weighted_std = np.sum(wh * (fh - thismean) ** 2) / whsum
 
             hlratio[pb] = np.nan_to_num(np.sqrt(wl_weighted_std / wh_weighted_std))
