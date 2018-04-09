@@ -59,7 +59,7 @@ class BaseMixin(object):
         self._outlc = outlc
         return outlc
 
-    def get_amplitude(self, per=None, phase_offset=None, recompute=False, usephotflag=True):
+    def get_amplitude(self, per=None, phase_offset=None, recompute=False, usephotflag=False):
         """
         Return the amplitude
         """
@@ -166,7 +166,7 @@ class BaseMixin(object):
         """
         Return the Standard Deviation over the Mean
         """
-        outstats = self.get_stats(recompute=recompute, per=per,  phase_offset=phase_offset, usephotflag=True)
+        outstats = self.get_stats(recompute=recompute, per=per,  phase_offset=phase_offset, usephotflag=False)
         outSOMean = {pb: (x[3] ** 0.5 / x[2]) for pb, x in outstats.items()}
         return outSOMean
 
@@ -221,8 +221,8 @@ class BaseMixin(object):
                 return rms
 
         rms = {}
-        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset)
-        outstats = self.get_stats(recompute=recompute, per=per,   phase_offset=phase_offset, usephotflag=True)
+        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset, usephotflag=True)
+        outstats = self.get_stats(recompute=recompute, per=per,   phase_offset=phase_offset, usephotflag=False)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
@@ -234,9 +234,9 @@ class BaseMixin(object):
                 thisFluxErrRenorm = thisFluxErrRenorm[photmask] 
 
             if len(thisFlux) == 0:  # if this Flux is empty
-                rms[pb] = 0
+                rms[pb] = 0.
                 continue
-            
+    
             thismean = np.mean(thisFluxRenorm)
             thisrms = math.fsum(((thisFluxRenorm - thismean) / thisFluxErrRenorm) ** 2.)
             thisrms /= math.fsum(1. / thisFluxErrRenorm ** 2.)
@@ -276,7 +276,7 @@ class BaseMixin(object):
                 return mad
 
         mad = {}
-        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset, usephotflag=True)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
@@ -342,8 +342,8 @@ class BaseMixin(object):
                 return stetsonJ
 
         stetsonJ = {}
-        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset)
-        outstats = self.get_stats(recompute=recompute, per=per,   phase_offset=phase_offset, usephotflag=True)
+        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset, usephotflag=True)
+        outstats = self.get_stats(recompute=recompute, per=per,   phase_offset=phase_offset, usephotflag=False)
 
         for i, pb in enumerate(outlc):
             thislc = outlc.get(pb)
@@ -362,6 +362,7 @@ class BaseMixin(object):
             npb = len(thisFluxRenorm)
 
             if npb < 2:
+                stetsonJ[pb] = 0.
                 continue
 
             delta = (npb / (npb - 1)) * ((thisFluxRenorm - thismean) / thisFluxErrRenorm)
@@ -392,15 +393,18 @@ class BaseMixin(object):
 
             thisstats = outstats.get(pb)
             if thisstats is None:
+                stetsonK[pb] = 0.
                 continue
 
             thismean = thisstats[2]
             npb = len(thisFluxRenorm)
 
-            delta = (npb / (npb - 1)) * ((thisFluxRenorm - thismean) / thisFluxErrRenorm)
-    
+            if npb < 2:
+                stetsonK[pb] = 0.
+                continue
 
-            thisK = (np.sum(np.fabs(residual))/npb) / np.sqrt(np.sum(residual * residual) /npb)
+            delta = (npb / (npb - 1)) * ((thisFluxRenorm - thismean) / thisFluxErrRenorm)
+            thisK = (np.sum(np.fabs(delta))/npb) / np.sqrt(np.sum(delta*delta) /npb)
             thisK = np.nan_to_num(thisK)
             stetsonK[pb] = thisK
         self.stetsonK = stetsonK
@@ -428,7 +432,7 @@ class BaseMixin(object):
         self.stetsonL = stetsonL 
         return stetsonL 
 
-    def get_AcorrIntegral(self, per=False, phase_offset=None, recompute=False):
+    def get_AcorrIntegral(self, per=False, phase_offset=None, recompute=False, usephotflag=False):
         """
         Compute the Autocorrelation get_AcorrIntegral
         """
