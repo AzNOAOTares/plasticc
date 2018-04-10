@@ -52,12 +52,22 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                            'stetsonj_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p] for p in passbands], [])
                         # 'entropy_%s' % p, 'nobs4096_%s' % p, 'rescaled-flux_%s' % p] for p in passbands], [])
 
-    mysql_fields = ['objid', 'redshift'] + feature_fields
+    color_fields = []
+    colors = []
+    for i, pb1 in enumerate(passbands):
+        for j, pb2 in enumerate(passbands):
+            if i < j:
+                color = pb1 + '-' + pb2
+                colors += [color]
+                color_fields += ['amp %s' % color]
+                color_fields += ['mean %s' % color]
+
+    mysql_fields = ['objid', 'redshift'] + color_fields + feature_fields
 
     def _gf(func, p, name):
         """ Try to get feature, otherwise return nan. """
         try:
-            if name in ['stats', 'filt-stats', 'shapiro']:
+            if name in ['stats', 'filt-stats', 'shapiro', 'coloramp', 'colormean']:
                 return func[p]
             else:
                 return float(func[p])
@@ -97,6 +107,13 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
 
+        coloramp = laobject.get_color_amplitudes(recompute=True)
+        colormean = laobject.get_color_mean(recompute=True)
+        print('colors', list(coloramp.keys()))
+        for color in colors:
+            features['amp %s' % color] = coloramp[color]
+            features['mean %s' % color] = colormean[color]
+
         for p in passbands:
             flux_pb = flux[lc['pb'] == p]
 
@@ -126,6 +143,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             features['stetsonj_%s' % p] = _gf(laobject.get_StetsonJ(recompute=True), p, 'stetsonj')
             features['entropy_%s' % p] = _gf(laobject.get_ShannonEntropy(recompute=True), p, 'entropy')
             features['nobs4096_%s' % p] = len(flux_pb[lc['photflag'][lc['pb'] == p] >= 4096])/len(flux_pb)
+
             # features['rescaled-flux_%s' % p] = str(rescaled_flux)
 
             # # photflag_new = lc['photflag'][lc['pb'] == p]
@@ -140,15 +158,14 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             # plt.show()
 
         count += 1
-        # field, model, base, snid = objid.astype(str).split('_')
         print(objid.encode('utf8'), offset, count, os.path.basename(fname))
         features_out += [list(features.values())]
 
-    # print('__B__', offset, count, len(features_out), os.path.basename(fname))
     # Set all columns to floats except set first column to string (objid)
-    print('AA', len(feature_fields))
-    dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands))) * len(passbands)
+    dtypes = ['S24', np.float64] + [np.float64] * len(color_fields) + ([np.float64] * int(len(feature_fields) / len(passbands))) * len(passbands)
+    # dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands))) * len(passbands)
     # dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands) - 1) + [bytes]) * len(passbands)
+    print('AA', len(mysql_fields), len(dtypes))
     print(list(zip(dtypes, mysql_fields)))
 
     # Save to hdf5 in batches of 10000
@@ -218,23 +235,23 @@ def main():
     sort = True
     redo = True
 
-    # offset = 0
-    # i = 0
-    # while offset < 10:
-    #     fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
-    #     save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
-    #                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)
-    #     offset += batch_size
-    #     i += 1
+    offset = 0
+    i = 0
+    while offset < 10:
+        fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
+        save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
+                              batch_size=batch_size, offset=offset, sort=sort, redo=redo)
+        offset += batch_size
+        i += 1
 
-    # Multiprocessing
-    i_list = np.arange(0, int(nobjects/batch_size) + 1)
-    print(i_list)
-    pool = mp.Pool()
-    results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
-    print(results)
-    pool.close()
-    pool.join()
+    # # Multiprocessing
+    # i_list = np.arange(0, int(nobjects/batch_size) + 1)
+    # print(i_list)
+    # pool = mp.Pool()
+    # results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
+    # print(results)
+    # pool.close()
+    # pool.join()
 
     # The last file with less than the batch_size number of objects isn't getting saved. If so, retry saving it here:
     fname_last = os.path.join(save_dir, 'features_{}.hdf5'.format(i_list[-1]))

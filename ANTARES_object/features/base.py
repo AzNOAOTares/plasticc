@@ -560,3 +560,62 @@ class BaseMixin(object):
             hlratio[pb] = np.nan_to_num(np.sqrt(wl_weighted_std / wh_weighted_std))
         self.hlratio = hlratio
         return hlratio
+
+
+    def get_color_amplitudes(self, recompute=False):
+        """
+        Get the amplitude difference between passbands
+        """
+        colorAmp = getattr(self, 'colorAmp', None)
+        if colorAmp is not None:
+            if not recompute:
+                return colorAmp
+
+        colorAmp = {}
+        amp = self.get_filtered_amplitude(recompute=recompute)
+
+        passbands = ('u', 'g', 'r', 'i', 'z', 'Y') # order of filters matters as it must be 'u-g' rather than 'g-u'
+        for i, pb1 in enumerate(passbands):
+            for j, pb2 in enumerate(passbands):
+                if i < j:
+                    color = pb1 + '-' + pb2
+                    if pb1 not in amp.keys():
+                        amp[pb1] = 0.
+                    if pb2 not in amp.keys():
+                        amp[pb2] = 0.
+                    colorAmp[color] = amp[pb1] - amp[pb2]
+
+        self.colorAmp = colorAmp
+        return colorAmp
+
+
+    def get_color_mean(self, recompute=False):
+        colorMean = getattr(self, 'colorMean', None)
+        if colorMean is not None:
+            if not recompute:
+                return colorMean
+
+        colorMean = {}
+        outlc = self.get_lc(recompute=recompute)
+
+        tmean = {}
+        for i, pb in enumerate(outlc):
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
+            tmean[pb] = np.mean(tFluxRenorm)
+
+        passbands = ('u', 'g', 'r', 'i', 'z', 'Y') # order of filters matters as it must be 'u-g' rather than 'g-u'
+        for i, pb1 in enumerate(passbands):
+            for j, pb2 in enumerate(passbands):
+                if i < j:
+                    color = pb1 + '-' + pb2
+                    if pb1 not in tmean.keys():
+                        tmean[pb1] = 0.
+                    if pb2 not in tmean.keys():
+                        tmean[pb2] = 0.
+                    colorMean[color] = tmean[pb1] - tmean[pb2]
+
+        self.colorMean = colorMean
+        return colorMean
+
+
