@@ -11,6 +11,7 @@ from six.moves import zip
 import scipy.stats
 import scipy.interpolate as scinterp
 from astropy.stats import median_absolute_deviation
+from .. import constants 
 from . import stats_computation
 
 
@@ -19,73 +20,51 @@ class BaseMixin(object):
     Methods to derive baseline features for LAobjects
     """
 
-    def get_lc(self, phase_offset=None, per=False, recompute=False, usephotflag=False):
+    def get_lc(self, recompute=False):
         """
+        Most often, we want a lightcurve broken up passband by passband to
+        compute features. This stores the input light curve in that format.
         Return a lightcurve suitable for computing features
         """
         outlc = getattr(self, '_outlc', None)
-        if outlc is not None:
-            if not recompute:
-                return outlc
+        if outlc is None or recompute:        
+            filters = self.filters
+            outlc = {}
 
-        phase = self.get_phase(phase_offset=phase_offset, per=per)
-        filters = self.filters
-        outlc = {}
+            # store the indices of each filter 
+            for i, pb in enumerate(self.filters):
+                mask = np.where(self.passband == pb)[0]
+                m2 = self.time[mask].argsort()
+                ind = mask[m2]
+                if len(ind) > 0:
+                    outlc[pb] = ind
+            self._outlc = outlc
+       
+        # for each of the default_cols, get the elements for t passband
+        out = {}
+        for pb, ind in outlc.items():
+            out[pb] = [getattr(self, column)[ind] for column in self._default_cols]
 
-        # Return the observations in the filter
-        for i, pb in enumerate(self.filters):
-            mask = (self.passband == pb)
-            m2 = phase[mask].argsort()
+        return out
 
-            thispbphase       = phase[mask][m2]
-            thisFlux          = self.flux[mask][m2]
-            thisFluxErr       = self.fluxErr[mask][m2]
-            thisFluxUnred     = self.fluxUnred[mask][m2]
-            thisFluxErrUnred  = self.fluxErrUnred[mask][m2]
-            thisFluxRenorm    = self.fluxRenorm[mask][m2]
-            thisFluxErrRenorm = self.fluxErrRenorm[mask][m2]
-
-            if len(thisFlux) > 0:
-                # kinda hackish way to get photflag as well
-                if usephotflag and self.photflag is not None:
-                    photflag = self.photflag[mask][m2]
-                else:
-                    photflag = None
-
-                outlc[pb] = (thispbphase, thisFlux, thisFluxErr,\
-                                            thisFluxUnred, thisFluxErrUnred,\
-                                            thisFluxRenorm, thisFluxErrRenorm,\
-                                            photflag)
-        self._outlc = outlc
-        return outlc
-
-    def get_amplitude(self, per=None, phase_offset=None, recompute=False, usephotflag=False):
+    def get_amplitude(self, recompute=False):
         """
         Return the amplitude
         """
-
         outamp = getattr(self, 'amplitude', None)
         if outamp is not None:
             if not recompute:
                 return outamp
 
         outamp = {}
-        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset, usephotflag=True)
+        outlc = self.get_lc(recompute=recompute)
 
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
                 
-            # this definition should give identical results for fluxUnred or fluxRenorm 
-            if usephotflag and photflag is not None:
-                # we have a way to filter observations
-                photmask = photflag >= 4096
-                print(len(thisFluxRenorm[photmask]))
-                newflux = thisFluxRenorm[photmask]
-            else:
-                newflux = thisFluxRenorm 
-
-            if len(newflux) <= 1:  # if this Flux is empty or there's only measure
+            newflux = tFluxRenorm
+            if len(newflux) <= 1:  # if t Flux is empty or there's only measure
                 amp = 0.
             else:
                 f_99 = np.percentile(newflux, 99)
@@ -100,7 +79,42 @@ class BaseMixin(object):
         self.amplitude = outamp
         return outamp
 
-    def get_stats(self, per=None, phase_offset=None, recompute=False, usephotflag=False):
+    def get_filtered_amplitude(self, recompute=False):
+        """
+        Return the amplitude
+        """
+        outamp = getattr(self, 'filtered_amplitude', None)
+        if outamp is not None:
+            if not recompute:
+                return outamp
+
+        outamp = {}
+        outlc = self.get_lc(recompute=recompute)
+
+        for i, pb in enumerate(outlc):
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
+                
+            photmask = tphotflag >= constants.GOOD_PHOTFLAG
+            newflux = tFluxRenorm[photmask]
+
+            if len(newflux) <= 1:  # if t Flux is empty or there's only measure
+                amp = 0.
+            else:
+                f_99 = np.percentile(newflux, 99)
+                f_01 = np.percentile(newflux,  1)
+                f_50 = np.percentile(newflux, 50)
+                amp = np.abs((f_99 - f_01)/(f_50 - f_01))
+                if not np.isfinite(amp):
+                    amp = 0. 
+            outamp[pb] = amp
+
+        self.setattr_from_dict_default('filtered_amplitude', outamp, 0.)
+        self.filtered_amplitude = outamp
+        return outamp
+
+
+    def get_stats(self, recompute=False):
         """
         Basic statistics for LAobject
         # min, max, mean, std, kurtosis, skewness
@@ -112,28 +126,55 @@ class BaseMixin(object):
                 return outstats
 
         outstats = {}
-        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset, usephotflag=usephotflag)
+        outlc = self.get_lc(recompute=recompute)
 
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            if usephotflag and photflag is not None:
-                photmask = photflag >= 4096
-                thisFluxRenorm = thisFluxRenorm[photmask]
-                if len(thisFluxRenorm) == 0:
-                    thisstat = scipy.stats.describe([0., 0., 0.])
-                else:
-                    thisstat = scipy.stats.describe(thisFluxRenorm)
+            if len(tFluxRenorm) == 0:
+                tstat = scipy.stats.describe([0., 0., 0.])
             else:
-                thisstat = scipy.stats.describe(thisFluxRenorm)
+                tstat = scipy.stats.describe(tFluxRenorm)
 
-            outstats[pb] = thisstat
+            outstats[pb] = tstat
 
         self.stats = outstats
         return outstats
 
-    def get_skew(self, per=None, phase_offset=None, recompute=False):
+
+    def get_filtered_stats(self, recompute=False):
+        """
+        Basic statistics for LAobject from filtered observations
+        # min, max, mean, std, kurtosis, skewness
+        """
+
+        outstats = getattr(self, 'filtered_stats', None)
+        if outstats is not None:
+            if not recompute:
+                return outstats
+
+        outstats = {}
+        outlc = self.get_lc(recompute=recompute)
+
+        for i, pb in enumerate(outlc):
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
+            mask = tphotflag >= constants.GOOD_PHOTFLAG
+            tFluxRenorm = tFluxRenorm[mask]
+
+            if len(tFluxRenorm) == 0:
+                tstat = scipy.stats.describe([0., 0., 0.])
+            else:
+                tstat = scipy.stats.describe(tFluxRenorm)
+
+            outstats[pb] = tstat
+
+        self.filtered_stats = outstats
+        return outstats
+
+
+    def get_skew(self, recompute=False):
         """
         Different definition of skewness
         """
@@ -143,36 +184,33 @@ class BaseMixin(object):
                 return outskew
 
         outskew = {}
-        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute)
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
-            npb = len(thisFluxRenorm)
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
+            npb = len(tFluxRenorm)
+            tmean = np.mean(tFluxRenorm)
+            tstd  = np.std(tFluxRenorm)
 
-            thisstats = outstats.get(pb)
-            if thisstats is None:
-                continue
-
-            thismean = np.mean(thisFluxRenorm)
-            thisstd  = np.std(thisFluxRenorm)
-
-            thisskew = (1. / npb) * math.fsum(((thisFluxRenorm - thismean) ** 3.) / (thisstd ** 3.))
-            outskew[pb] = thisskew
+            tskew = (1. / npb) * math.fsum(((tFluxRenorm - tmean) ** 3.) / (tstd ** 3.))
+            outskew[pb] = tskew
 
         self.skew = outskew
         return outskew
 
-    def get_StdOverMean(self, per=False, phase_offset=None, recompute=False):
+
+    def get_StdOverMean(self, recompute=False):
         """
         Return the Standard Deviation over the Mean
         """
-        outstats = self.get_stats(recompute=recompute, per=per,  phase_offset=phase_offset, usephotflag=False)
+        outstats = self.get_stats(recompute=recompute)
         outSOMean = {pb: (x[3] ** 0.5 / x[2]) for pb, x in outstats.items()}
         return outSOMean
 
-    def get_ShapiroWilk(self, per=False,  phase_offset=None, recompute=False):
+
+    def get_ShapiroWilk(self, recompute=False):
         """
-        Get the Shapriro-Wilk W statistic
+        Get the Shapriro-Wilk W statistic and the p-value for the test 
         """
 
         sw = getattr(self, 'ShapiroWilk', None)
@@ -180,18 +218,19 @@ class BaseMixin(object):
             if not recompute:
                 return sw
         sw = {}
-        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute)
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
-            if len(thisFlux) <= 3:
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
+            if len(tFlux) <= 3:
                 continue
-            thissw, _ = scipy.stats.shapiro(thisFluxRenorm)
-            sw[pb] = thissw
+            tsw, tswp = scipy.stats.shapiro(tFluxRenorm)
+            sw[pb] = (tsw, tswp)
         self.ShapiroWilk = sw
         return sw
 
-    def get_Q31(self, per=False, phase_offset=None, recompute=False):
+
+    def get_Q31(self, recompute=False):
         """
         Get the Q31 of the lightcurve
         """
@@ -201,17 +240,18 @@ class BaseMixin(object):
                 return q31
 
         q31 = {}
-        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute)
 
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
-            thisq31 = np.percentile(thisFluxRenorm, 75) - np.percentile(thisFluxRenorm, 25)
-            q31[pb] = thisq31
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
+            tq31 = np.percentile(tFluxRenorm, 75) - np.percentile(tFluxRenorm, 25)
+            q31[pb] = tq31
         self.Q31 = q31
         return q31
 
-    def get_RMS(self, per=False, phase_offset=None, recompute=False):
+
+    def get_RMS(self, recompute=False):
         """
         Get the RMS of the lightcurve
         """
@@ -221,31 +261,31 @@ class BaseMixin(object):
                 return rms
 
         rms = {}
-        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset, usephotflag=True)
-        outstats = self.get_stats(recompute=recompute, per=per,   phase_offset=phase_offset, usephotflag=False)
+        outlc = self.get_lc(recompute=recompute)
+        outstats = self.get_stats(recompute=recompute)
 
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            if photflag is not None:
-                photmask = photflag >= 4096
-                thisFluxRenorm    = thisFluxRenorm[photmask]
-                thisFluxErrRenorm = thisFluxErrRenorm[photmask] 
+            photmask = tphotflag >= constants.GOOD_PHOTFLAG
+            tFluxRenorm    = tFluxRenorm[photmask]
+            tFluxErrRenorm = tFluxErrRenorm[photmask] 
 
-            if len(thisFlux) == 0:  # if this Flux is empty
+            if len(tFluxRenorm) == 0:  # if t Flux is empty
                 rms[pb] = 0.
                 continue
     
-            thismean = np.mean(thisFluxRenorm)
-            thisrms = math.fsum(((thisFluxRenorm - thismean) / thisFluxErrRenorm) ** 2.)
-            thisrms /= math.fsum(1. / thisFluxErrRenorm ** 2.)
-            thisrms = thisrms ** 0.5
-            rms[pb] = thisrms
+            tmean = np.mean(tFluxRenorm)
+            trms = math.fsum(((tFluxRenorm - tmean) / tFluxErrRenorm) ** 2.)
+            trms /= math.fsum(1./ tFluxErrRenorm** 2.)
+            trms = trms ** 0.5
+            rms[pb] = trms
         self.RMS = rms
         return rms
 
-    def get_ShannonEntropy(self, per=False, phase_offset=None, recompute=False):
+
+    def get_ShannonEntropy(self, recompute=False):
         """
         Compute the Shannon Entropy of the lightcurve distribution
         """
@@ -255,17 +295,18 @@ class BaseMixin(object):
             if not recompute:
                 return entropy
         entropy = {}
-        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute)
 
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
-            thisEntropy = stats_computation.shannon_entropy(thisFluxRenorm, thisFluxErrRenorm)
-            entropy[pb] = thisEntropy
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
+            tEntropy = stats_computation.shannon_entropy(tFluxRenorm, tFluxErrRenorm)
+            entropy[pb] = tEntropy
         self.entropy = entropy
         return entropy
 
-    def get_MAD(self, per=False, phase_offset=None, recompute=False):
+
+    def get_MAD(self, recompute=False):
         """
         Compute the median absolute deviation of the lightcurve
         """
@@ -276,30 +317,30 @@ class BaseMixin(object):
                 return mad
 
         mad = {}
-        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset, usephotflag=True)
+        outlc = self.get_lc(recompute=recompute)
 
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            if photflag is not None:
-                photmask = photflag >= 4096
-                thisFluxRenorm = thisFluxRenorm[photmask]
-            if len(thisFluxRenorm) == 0:  # if this Flux is empty
-                thismad = 0
+            photmask = tphotflag >= constants.GOOD_PHOTFLAG
+            tFluxRenorm = tFluxRenorm[photmask]
+            if len(tFluxRenorm) == 0:  # if t Flux is empty
+                tmad = 0.
             else:
-                thismad = median_absolute_deviation(thisFluxRenorm)
-            mad[pb] = thismad
+                tmad = median_absolute_deviation(tFluxRenorm)
+            mad[pb] = tmad
         self.MAD = mad
         return mad
 
-    def get_vonNeumannRatio(self, per=False, phase_offset=None, recompute=False):
+
+    def get_vonNeumannRatio(self, recompute=False):
         """
         Compute the Von-Neumann Ratio of the lightcurve
         This is sometimes just called Eta in the context of variables
 
         The von Neumann ratio η was defined in 1941 by John von Neumann and serves as
-        the mean square successive difference divided by the sample variance. When this
+        the mean square successive difference divided by the sample variance. When t
         ratio is small, it is an indication of a strong positive correlation between
         the successive photometric data points.  See: (J. Von Neumann, The Annals of
         Mathematical Statistics 12, 367 (1941))
@@ -314,23 +355,24 @@ class BaseMixin(object):
                 return vnr
 
         vnr = {}
-        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset)
-        outstats = self.get_stats(recompute=recompute, per=per,   phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute)
+        outstats = self.get_stats(recompute=recompute)
 
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
-            delta = math.fsum(((thisFluxRenorm[1:] - thisFluxRenorm[:-1]) ** 2.) / (len(thisFluxRenorm) - 1))
-            thisstats = outstats.get(pb)
-            if thisstats is None:
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
+            delta = math.fsum(((tFluxRenorm[1:] - tFluxRenorm[:-1]) ** 2.) / (len(tFluxRenorm) - 1))
+            tstats = outstats.get(pb)
+            if tstats is None:
                 continue
-            thisvar = thisstats[3]
-            thisvnr = delta / (thisvar)
-            vnr[pb] = thisvnr
+            tvar = tstats[3]
+            tvnr = delta / (tvar)
+            vnr[pb] = tvnr
         self.VNR = vnr
         return vnr
 
-    def get_StetsonJ(self, per=False, phase_offset=None, recompute=False):
+
+    def get_StetsonJ(self, recompute=False):
         """
         Compute the Stetson J statistic of the lightcurve
         http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.257.466&rep=rep1&type=pdf
@@ -342,38 +384,38 @@ class BaseMixin(object):
                 return stetsonJ
 
         stetsonJ = {}
-        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset, usephotflag=True)
-        outstats = self.get_stats(recompute=recompute, per=per,   phase_offset=phase_offset, usephotflag=False)
+        outlc = self.get_lc(recompute=recompute)
+        outstats = self.get_stats(recompute=recompute)
 
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            thisstats = outstats.get(pb)
-            if thisstats is None:
+            tstats = outstats.get(pb)
+            if tstats is None:
                 continue
 
-            if photflag is not None:
-                photmask = photflag >= 4096
-                thisFluxRenorm    = thisFluxRenorm[photmask]
-                thisFluxErrRenorm = thisFluxErrRenorm[photmask]
+            photmask = tphotflag >= constants.GOOD_PHOTFLAG
+            tFluxRenorm    = tFluxRenorm[photmask]
+            tFluxErrRenorm = tFluxErrRenorm[photmask]
 
-            thismean = thisstats[2]
-            npb = len(thisFluxRenorm)
+            tmean = tstats[2]
+            npb = len(tFluxRenorm)
 
             if npb < 2:
                 stetsonJ[pb] = 0.
                 continue
 
-            delta = (npb / (npb - 1)) * ((thisFluxRenorm - thismean) / thisFluxErrRenorm)
+            delta = (npb / (npb - 1)) * ((tFluxRenorm - tmean) / tFluxErrRenorm)
             val = np.nan_to_num(delta[0:-1] * delta[1:])
             sign = np.sign(val)
-            thisJ = math.fsum(sign * (np.abs(val) ** 0.5))
-            stetsonJ[pb] = thisJ
+            tJ = math.fsum(sign * (np.abs(val) ** 0.5))
+            stetsonJ[pb] = tJ
         self.stetsonJ = stetsonJ
         return stetsonJ
 
-    def get_StetsonK(self, per=False,  phase_offset=None, recompute=False):
+
+    def get_StetsonK(self, recompute=False):
         """
         Compute the Stetson K statistic of the lightcurve
         """
@@ -384,33 +426,34 @@ class BaseMixin(object):
                 return stetsonK
 
         stetsonK = {}
-        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset)
-        outstats = self.get_stats(recompute=recompute, per=per,   phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute)
+        outstats = self.get_stats(recompute=recompute)
 
         for i, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            thisstats = outstats.get(pb)
-            if thisstats is None:
+            tstats = outstats.get(pb)
+            if tstats is None:
                 stetsonK[pb] = 0.
                 continue
 
-            thismean = thisstats[2]
-            npb = len(thisFluxRenorm)
+            tmean = tstats[2]
+            npb = len(tFluxRenorm)
 
             if npb < 2:
                 stetsonK[pb] = 0.
                 continue
 
-            delta = (npb / (npb - 1)) * ((thisFluxRenorm - thismean) / thisFluxErrRenorm)
-            thisK = (np.sum(np.fabs(delta))/npb) / np.sqrt(np.sum(delta*delta) /npb)
-            thisK = np.nan_to_num(thisK)
-            stetsonK[pb] = thisK
+            delta = (npb / (npb - 1)) * ((tFluxRenorm - tmean) / tFluxErrRenorm)
+            tK = (np.sum(np.fabs(delta))/npb) / np.sqrt(np.sum(delta*delta) /npb)
+            tK = np.nan_to_num(tK)
+            stetsonK[pb] = tK
         self.stetsonK = stetsonK
         return stetsonK
 
-    def get_StetsonL(self, per=False, phase_offset=None, recompute=False):
+
+    def get_StetsonL(self, recompute=False):
         """
         Get the Stetson L variability index
         """
@@ -419,20 +462,21 @@ class BaseMixin(object):
             if not recompute:
                 return stetsonL
 
-        stetsonJ = self. get_StetsonJ(per=per, phase_offset=phase_offset, recompute=recompute)
-        stetsonK = self. get_StetsonK(per=per, phase_offset=phase_offset, recompute=recompute)
+        stetsonJ = self. get_StetsonJ(recompute=recompute)
+        stetsonK = self. get_StetsonK(recompute=recompute)
 
         stetsonL = {}
         for pb in stetsonJ:
-            thisJ = stetsonJ.get(pb, 0.)
-            thisK = stetsonK.get(pb, 0.)
-            thisL = thisJ*thisK/0.798
-            thisL = np.nan_to_num(thisL)
-            stetsonL[pb] = thisL
+            tJ = stetsonJ.get(pb, 0.)
+            tK = stetsonK.get(pb, 0.)
+            tL = tJ*tK/0.798
+            tL = np.nan_to_num(tL)
+            stetsonL[pb] = tL
         self.stetsonL = stetsonL 
         return stetsonL 
 
-    def get_AcorrIntegral(self, per=False, phase_offset=None, recompute=False, usephotflag=False):
+
+    def get_AcorrIntegral(self, recompute=False):
         """
         Compute the Autocorrelation get_AcorrIntegral
         """
@@ -442,73 +486,73 @@ class BaseMixin(object):
                 return AcorrInt
 
         AcorrInt = {}
-        outlc = self.get_lc(recompute=recompute, per=per,   phase_offset=phase_offset)
-        outstats = self.get_stats(recompute=recompute, per=per,   phase_offset=phase_offset)
-        outrms = self.get_RMS(recompute=recompute, per=per,   phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute)
+        outstats = self.get_stats(recompute=recompute)
+        outrms = self.get_RMS(recompute=recompute)
 
         for j, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            thisstats = outstats.get(pb)
-            if thisstats is None:
+            tstats = outstats.get(pb)
+            if tstats is None:
                 continue
-            thismean = thisstats[2]
+            tmean = tstats[2]
 
-            thisrms = outrms[pb]
-            if thisrms is None:
+            trms = outrms[pb]
+            if trms is None:
                 continue
 
-            npb = len(thisFluxRenorm)
+            npb = len(tFluxRenorm)
             t = np.arange(1, npb)
             sum_list = []
             val_list = []
             for i in t:
-                sum_list.append(math.fsum((thisFluxRenorm[0:npb - i] - thismean) * (thisFluxRenorm[i:npb] - thismean)))
-                val_list.append(1. / ((npb - i) * thisrms ** 2.))
-            thisAcorr = np.abs(math.fsum([x * y for x, y in zip(sum_list, val_list)]))
-            AcorrInt[pb] = thisAcorr
+                sum_list.append(math.fsum((tFluxRenorm[0:npb - i] - tmean) * (tFluxRenorm[i:npb] - tmean)))
+                val_list.append(1. / ((npb - i) * trms ** 2.))
+            tAcorr = np.abs(math.fsum([x * y for x, y in zip(sum_list, val_list)]))
+            AcorrInt[pb] = tAcorr
         self.AcorrInt = AcorrInt
         return AcorrInt
 
-    def get_hlratio(self, per=False, phase_offset=None, recompute=False):
+
+    def get_hlratio(self, recompute=False):
         """
         Compute the ratio of amplitude of observations higher than the average
         to those lower than the average, taking into account observed
         uncertainties. This ratio should be higher for eclipsing binaries than
         pulsating variables.
         """
-
         hlratio = getattr(self, 'hlratio', None)
         if hlratio is not None:
             if not recompute:
                 return hlratio
 
         hlratio = {}
-        outlc = self.get_lc(recompute=recompute, per=per, phase_offset=phase_offset)
-        outstats = self.get_stats(recompute=recompute, per=per, phase_offset=phase_offset)
+        outlc = self.get_lc(recompute=recompute)
+        outstats = self.get_stats(recompute=recompute)
 
         for j, pb in enumerate(outlc):
-            thislc = outlc.get(pb)
-            thispbphase, thisFlux, thisFluxErr, thisFluxUnred, thisFluxErrUnred, thisFluxRenorm, thisFluxErrRenorm, photflag = thislc
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            thisWeight = 1. / thisFluxErrRenorm 
+            tWeight = 1. / tFluxErrRenorm 
 
-            thisstats = outstats.get(pb)
-            if thisstats is None:
+            tstats = outstats.get(pb)
+            if tstats is None:
                 continue
-            thismean = thisstats[2]
-            il = thisFluxRenorm > thismean
-            wl = thisWeight[il]
+            tmean = tstats[2]
+            il = tFluxRenorm > tmean
+            wl = tWeight[il]
             wlsum = np.sum(wl)
-            fl = thisFluxRenorm[il]
-            wl_weighted_std = np.sum(wl * (fl - thismean) ** 2) / wlsum
+            fl = tFluxRenorm[il]
+            wl_weighted_std = np.sum(wl * (fl - tmean) ** 2) / wlsum
 
-            ih = thisFluxRenorm <= thismean
-            wh = thisWeight[ih]
+            ih = tFluxRenorm <= tmean
+            wh = tWeight[ih]
             whsum = np.sum(wh)
-            fh = thisFluxRenorm[ih]
-            wh_weighted_std = np.sum(wh * (fh - thismean) ** 2) / whsum
+            fh = tFluxRenorm[ih]
+            wh_weighted_std = np.sum(wh * (fh - tmean) ** 2) / whsum
 
             hlratio[pb] = np.nan_to_num(np.sqrt(wl_weighted_std / wh_weighted_std))
         self.hlratio = hlratio
