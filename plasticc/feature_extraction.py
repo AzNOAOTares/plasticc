@@ -36,27 +36,6 @@ def renorm_flux_lightcurve(flux, fluxerr, mu):
     return fluxout, fluxerrout
 
 
-def remove_extinction(mwebv, lc):
-    passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
-    PB_WAVE = np.array([3569.5, 4766.5, 6214.5, 7544.5, 8707.5, 10039.5])
-
-    # Using negative a_v so that extinction.apply works in reverse and removes the extinction
-    extinctions = extinction.fitzpatrick99(wave=PB_WAVE, a_v=-3.1*mwebv, r_v=3.1, unit='aa')
-
-    for i, pb in enumerate(passbands):
-        flux = lc['flux'][lc['pb'] == pb]
-        fluxerr = lc['dflux'][lc['pb'] == pb]
-
-        extinction.apply(extinctions[i], flux)
-        newflux = extinction.apply(extinctions[i], flux, inplace=False)
-        newfluxerr = extinction.apply(extinctions[i], fluxerr, inplace=False)
-
-        lc['flux'][lc['pb'] == pb] = newflux
-        lc['dflux'][lc['pb'] == pb] = newfluxerr
-
-    return lc
-
-
 def save_antares_features(data_release, fname, field_in='%', model_in='%', batch_size=100, offset=0, sort=True, redo=False):
     """
     Get antares object features.
@@ -83,7 +62,6 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             else:
                 return float(func[p])
         except KeyError as err:
-            print(name, p, func)
             print('No {} for {} {}'.format(name, objid, p))
             return np.nan
 
@@ -94,7 +72,6 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     for head, phot in result:
         objid, ptrobs_min, ptrobs_max, peak_mjd, redshift, mwebv, dlmu = head
         lc = getter.convert_pandas_lc_to_recarray_lc(phot)
-        lc = remove_extinction(mwebv, lc)
 
         obsid = np.arange(len(lc))
         t = lc['mjd'] - peak_mjd  # subtract peakmjd from each mjd.
@@ -184,9 +161,9 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
     return fname
 
 
-def combine_hdf_files(save_dir, data_release, combine_savename):
+def combine_hdf_files(save_dir, data_release, combined_savename):
     fnames = os.listdir(save_dir)
-    fname_out = os.path.join(ROOT_DIR, 'plasticc', combine_savename)
+    fname_out = os.path.join(ROOT_DIR, 'plasticc', combined_savename)
     output_file = h5py.File(fname_out, 'w')
 
     # keep track of the total number of rows
@@ -220,7 +197,7 @@ def create_all_hdf_files(data_release, i, save_dir, field_in, model_in, batch_si
 
 
 def main():
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_all')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_DDF')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -267,7 +244,7 @@ def main():
         save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
                               batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
 
-    combine_hdf_files(save_dir, data_release, 'features_all.hdf5')
+    combine_hdf_files(save_dir, data_release, 'features_DDF.hdf5')
 
 
 if __name__ == '__main__':

@@ -325,14 +325,14 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
                 flux_out = extinction.apply(extinctions[i], flux_pb, inplace=False)
                 fluxerr_out = extinction.apply(extinctions[i], fluxerr_pb, inplace=False)
                 self.fluxUnred[mask] = flux_out
-                self.fluxErrUnred[mask] = fluxerr_pb
+                self.fluxErrUnred[mask] = fluxerr_out
                 
                 minfluxpb = flux_out.min()
                 maxfluxpb = flux_out.max()
                 norm = maxfluxpb - minfluxpb 
 
                 self.fluxRenorm[mask] = flux_out - minfluxpb 
-                self.fluxErrRenorm[mask] = fluxerr_pb
+                self.fluxErrRenorm[mask] = fluxerr_out
 
                 self.fluxRenorm[mask] /= norm 
                 self.fluxErrRenorm[mask] /= norm
@@ -341,7 +341,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
                 flux_out = extinction.apply(extinctions[i], flux_pb, inplace=False)
                 fluxerr_out = extinction.apply(extinctions[i], fluxerr_pb, inplace=False)
                 self.fluxUnred[mask] = flux_out
-                self.fluxErrUnred[mask] = fluxerr_pb
+                self.fluxErrUnred[mask] = fluxerr_out
 
                 norm = self.fluxUnred[mask]/0.5
                 self.fluxRenorm[mask] /= norm 
