@@ -272,7 +272,7 @@ class BaseMixin(object):
             tFluxRenorm    = tFluxRenorm[photmask]
             tFluxErrRenorm = tFluxErrRenorm[photmask] 
 
-            if len(tFluxRenorm) == 0:  # if t Flux is empty
+            if len(tFluxRenorm) <= 1:  # if t Flux is empty or has only one element
                 rms[pb] = 0.
                 continue
     
@@ -500,7 +500,7 @@ class BaseMixin(object):
             tmean = tstats[2]
 
             trms = outrms[pb]
-            if trms is None:
+            if trms is None or trms == 0.:
                 continue
 
             npb = len(tFluxRenorm)

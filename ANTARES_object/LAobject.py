@@ -376,15 +376,16 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         self.filters = set(use_filters)
         mask = np.array([True if x in self.filters else False for x in self.passband])
 
-        self.time      = self.time[mask]
-        self.flux      = self.flux[mask]
-        self.fluxErr   = self.fluxErr[mask]
-        self.obsId     = self.obsId[mask]
-        self.passband  = self.passband[mask]
-        self.zeropoint = self.zeropoint[mask]
-        for key in self._extra_cols:
-            val = getattr(self, key)
-            setattr(self, key, val[mask])
+        if mask.size:  # Not empty arrays
+            self.time      = self.time[mask]
+            self.flux      = self.flux[mask]
+            self.fluxErr   = self.fluxErr[mask]
+            self.obsId     = self.obsId[mask]
+            self.passband  = self.passband[mask]
+            self.zeropoint = self.zeropoint[mask]
+            for key in self._extra_cols:
+                val = getattr(self, key)
+                setattr(self, key, val[mask])
 
         self.nobs = len(self.time)
         if self.nobs == 0:
