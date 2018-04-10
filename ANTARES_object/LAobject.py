@@ -7,6 +7,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 import warnings
 import numpy as np
+from . import constants
 from .features.periodic import PeriodicMixin
 from .features.gp import GPMixin
 from .features.spline import SplineMixin
@@ -16,7 +17,6 @@ from astropy.stats import sigma_clip
 import extinction
 
 __all__ = ['LAobject']
-DEFAULT_ZEROPOINT = 27.5 
 
 class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
     """
@@ -41,10 +41,15 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         The calibrated flux uncertainty - e.g. totFluxErr of each DIASource
     obsId : array-like
         The list of IDS  corresponding to the observations - e.g. diaSourceId
+    photflag : array-like
+        Photometry flag corresponding to each DIASource 
+        The flag above which the photometry is asserted to be good is defined
+        in GOOD_PHOTFLAG is defined in `constants.py`
     passband : array-like
         The passband of each observation
     zeropoint : float or array-like
         The zeropoint of each observation - used to convert to Pogson magnitudes if possible
+        The default zeropoint DEFAULT_ZEROPOINT is defined in `constants.py`
     per : bool
         Boolean flag indicating if this object is considered a periodic variable or not
     best_period : float or None
@@ -79,7 +84,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         arrays with the same shape, and have at least one element
     """
 
-    def __init__(self, locusId, objectId, time, flux, fluxErr, obsId, passband, zeropoint=DEFAULT_ZEROPOINT, 
+    def __init__(self, locusId, objectId, time, flux, fluxErr, obsId, photflag, passband, zeropoint=constants.DEFAULT_ZEROPOINT, 
                  per=False, best_period=None, header=None, mag=False, preprocess=True, 
                  clean=False, renorm=False, ebv=0., mu=None, **kwargs):
 
@@ -111,6 +116,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
             self.fluxErr  = np.array(fluxErr).astype('f')
         self.obsId    = np.array(obsId)
         self.passband = passband
+        self.photflag = photflag
 
         # names of extra vectors
         self._extra_cols = []
@@ -122,6 +128,8 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         assert _tshape == self.fluxErr.shape
         assert _tshape == self.obsId.shape
         assert _tshape == self.passband.shape
+        assert _tshape == self.photflag.shape
+        assert _tshape == self.zeropoint.shape
 
         for key, val in kwargs.items():
             if np.isscalar(val):
@@ -171,17 +179,18 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
 
             # if any of the filtered points are flagged as good detections with
             # PHOTFLAG > 0, save them irrespective
-            if 'photflag' in self._extra_cols:
-                saveind = (self.photflag[mask] > 0)
-                mask[saveind] = True
+            saveind = (self.photflag[mask] >= constants.GOOD_PHOTFLAG)
+            mask[saveind] = True
 
             # apply the mask
             self.time      = self.time[mask]
             self.flux      = self.flux[mask]
             self.fluxErr   = self.fluxErr[mask]
             self.obsId     = self.obsId[mask]
+            self.photflag  = self.photflag[mask]
             self.passband  = self.passband[mask]
             self.zeropoint = self.zeropoint[mask]
+
             for key in self._extra_cols:
                 val = getattr(self, key)
                 setattr(self, key, val[mask])
@@ -201,6 +210,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
             self.flux      = self.flux[mask]
             self.fluxErr   = self.fluxErr[mask]
             self.obsId     = self.obsId[mask]
+            self.photflag  = self.photflag[mask]
             self.passband  = self.passband[mask]
             self.zeropoint = self.zeropoint[mask]
             for key in self._extra_cols:
@@ -213,6 +223,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
             zpt = None
             pbs = None
             oid = None
+            pf  = None
             filtered_extra_cols = {}
 
             # do some sigmaclipping to reject outliers
@@ -221,9 +232,8 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
                 filtered_err = sigma_clip(self.fluxErr[indf], sigma=3., iters=5, copy=True)
                 bad1 = filtered_err.mask
 
-                if 'photflag' in self._extra_cols:
-                    saveind = np.where(self.photflag[indf][bad1] > 0)
-                    bad1[saveind] = False
+                saveind = np.where(self.photflag[indf][bad1] >= constants.GOOD_PHOTFLAG)
+                bad1[saveind] = False
 
                 useind = ~bad1
 
@@ -257,6 +267,12 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
                 else:
                     oid = np.concatenate((oid, self.obsId[indf][useind]))
 
+                if pf is None:
+                    pf = self.photflag[indf][useind]
+                else:
+                    pf = np.concatenate((pf, self.photflag[indf][useind]))
+
+
                 for key in self._extra_cols:
                     orig = getattr(self, key)
                     val = filtered_extra_cols.get(key, None)
@@ -273,6 +289,8 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
             self.passband  = pbs
             self.zeropoint = zpt
             self.obsId     = oid
+            self.photflag  = photflag
+
             for key in self._extra_cols:
                 val = filtered_extra_cols.get(key)
                 setattr(self, key, val)
@@ -331,6 +349,8 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
             else:
                 pass
 
+        self._default_cols = ['time', 'flux', 'fluxErr', 'fluxUnred', 'fluxErrUnred',\
+                                'fluxRenorm', 'fluxErrRenorm', 'photflag', 'zeropoint', 'obsId']
         return
 
 
@@ -388,16 +408,3 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
         """
         for pb in self._good_filters:
             setattr(self, '{}_{}'.format(rootname, pb), values_dict.get(pb, default_value))
-
-
-def renorm_flux_lightcurve(flux, fluxerr, mu):
-    """ Normalise flux light curves with distance modulus."""
-    d = 10 ** (mu / 5 + 1)
-    dsquared = d ** 2
-
-    norm = 1e19
-
-    fluxout = flux * dsquared / norm
-    fluxerrout = fluxerr * dsquared / norm
-
-    return fluxout, fluxerrout
