@@ -73,9 +73,8 @@ def get_features_for_light_curve_batch(data_release, field_in='%', model_in='%',
         lc = getter.convert_pandas_lc_to_recarray_lc(phot)
         obsid = np.arange(len(lc))
 
-        kwargs = {'photflag':lc['photflag']} 
         laobj = ANTARES_object.LAobject(objid, objid, lc['mjd'], lc['flux'], lc['dflux'],\
-                                    obsid, lc['pb'], lc['zpt'], header=header, ebv=mwebv, per=False, mag=False, clean=True, **kwargs)
+                                    obsid, lc['photflag'], lc['pb'], lc['zpt'], header=header, ebv=mwebv, per=False, mag=False, clean=True)
         yield laobj
 
 
