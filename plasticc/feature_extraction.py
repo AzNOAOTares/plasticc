@@ -75,7 +75,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
 
         obsid = np.arange(len(lc))
         t = lc['mjd'] - peak_mjd  # subtract peakmjd from each mjd.
-        flux, fluxerr = renorm_flux_lightcurve(flux=lc['flux'], fluxerr=lc['dflux'], mu=dlmu)
+        flux, fluxerr = lc['flux'], lc['dflux']  # renorm_flux_lightcurve(flux=lc['flux'], fluxerr=lc['dflux'], mu=dlmu)
 
         t, flux, fluxerr, obsid, lc['pb'], lc['zpt'] = np.array(t), np.array(flux), np.array(fluxerr), np.array(obsid), np.array(lc['pb']), np.array(lc['zpt'])
         try:
@@ -111,7 +111,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             features['filt-kurtosis_%s' % p] = filt_stats.kurtosis
             shapiro, pvalue = _gf(laobject.get_ShapiroWilk(recompute=True), p, 'shapiro')
             features['shapiro_%s' % p] = shapiro
-            features['p-value'] = pvalue
+            features['p-value_%s' % p] = pvalue
             features['skew_%s' % p] = _gf(laobject.get_skew(recompute=True), p, 'skew')
             features['q31_%s' % p] = _gf(laobject.get_Q31(recompute=True), p, 'q31')
             features['stetsonk_%s' % p] = _gf(laobject.get_StetsonK(recompute=True), p, 'stetsonk')

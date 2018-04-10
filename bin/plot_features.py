@@ -4,7 +4,6 @@ import numpy as np
 import h5py
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy import stats
-from statsmodels import robust
 import pandas as pd
 import seaborn as sns
 import helpers
@@ -66,6 +65,7 @@ def convert_rescaled_flux_to_array(rescaled_flux_str_array):
         rescaled_flux_new += list(s)
     rescaled_flux_new = np.asarray(rescaled_flux_new)
     return rescaled_flux_new
+
 
 def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1'):
 
@@ -268,7 +268,6 @@ def main():
     plot_features_joy_plot(fpath, '20180316', feature_names, 'DDF', fig_dir, sntypes_map)
 
     plt.show()
-
 
 if __name__ == '__main__':
     main()

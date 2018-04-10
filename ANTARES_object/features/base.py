@@ -500,7 +500,10 @@ class BaseMixin(object):
             tmean = tstats[2]
 
             trms = outrms[pb]
-            if trms is None or trms == 0.:
+            if trms is None:
+                continue
+            if trms == 0.:
+                AcorrInt[pb] = 0.
                 continue
 
             npb = len(tFluxRenorm)
