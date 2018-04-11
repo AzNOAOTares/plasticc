@@ -265,7 +265,7 @@ def main():
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    plot_features_joy_plot(fpath, '20180316', feature_names, 'DDF', fig_dir, sntypes_map)
+    plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map)
 
     plt.show()
 

@@ -49,7 +49,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                            'shapiro_%s' % p, 'p-value_%s' % p, 'skew_%s' % p, 'q31_%s' % p,
                            'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
                            'amplitude_%s' % p, 'filt-amplitude_%s' % p,  'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
-                           'stetsonj_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p] for p in passbands], [])
+                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p] for p in passbands], [])
                         # 'entropy_%s' % p, 'nobs4096_%s' % p, 'rescaled-flux_%s' % p] for p in passbands], [])
 
     color_fields = []
@@ -140,6 +140,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             features['rms_%s' % p] = _gf(laobject.get_RMS(recompute=True), p, 'rms')
             features['mad_%s' % p] = _gf(laobject.get_MAD(recompute=True), p, 'mad')
             features['stetsonj_%s' % p] = _gf(laobject.get_StetsonJ(recompute=True), p, 'stetsonj')
+            features['stetsonl_%s' % p] = _gf(laobject.get_StetsonL(recompute=True), p, 'stetsonl')
             features['entropy_%s' % p] = _gf(laobject.get_ShannonEntropy(recompute=True), p, 'entropy')
             features['nobs4096_%s' % p] = len(flux_pb[lc['photflag'][lc['pb'] == p] >= 4096])/len(flux_pb)
 

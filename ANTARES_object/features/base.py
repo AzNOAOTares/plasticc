@@ -609,10 +609,9 @@ class BaseMixin(object):
             for j, pb2 in enumerate(passbands):
                 if i < j:
                     color = pb1 + '-' + pb2
-                    if pb1 not in tmean.keys():
-                        tmean[pb1] = 0.
-                    if pb2 not in tmean.keys():
-                        tmean[pb2] = 0.
+                    if pb1 not in tmean.keys() or pb2 not in tmean.keys():
+                        colorMean[color] = 0.
+                        continue
                     colorMean[color] = tmean[pb1] / tmean[pb2]
 
         self.colorMean = colorMean
