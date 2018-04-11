@@ -613,7 +613,7 @@ class BaseMixin(object):
                         tmean[pb1] = 0.
                     if pb2 not in tmean.keys():
                         tmean[pb2] = 0.
-                    colorMean[color] = tmean[pb1] - tmean[pb2]
+                    colorMean[color] = tmean[pb1] / tmean[pb2]
 
         self.colorMean = colorMean
         return colorMean

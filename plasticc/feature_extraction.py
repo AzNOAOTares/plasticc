@@ -109,7 +109,6 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
 
         coloramp = laobject.get_color_amplitudes(recompute=True)
         colormean = laobject.get_color_mean(recompute=True)
-        print('colors', list(coloramp.keys()))
         for color in colors:
             features['amp %s' % color] = coloramp[color]
             features['mean %s' % color] = colormean[color]
@@ -235,23 +234,23 @@ def main():
     sort = True
     redo = True
 
-    offset = 0
-    i = 0
-    while offset < 10:
-        fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
-        save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
-                              batch_size=batch_size, offset=offset, sort=sort, redo=redo)
-        offset += batch_size
-        i += 1
+    # offset = 0
+    # i = 0
+    # while offset < 10:
+    #     fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
+    #     save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
+    #                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)
+    #     offset += batch_size
+    #     i += 1
 
-    # # Multiprocessing
-    # i_list = np.arange(0, int(nobjects/batch_size) + 1)
-    # print(i_list)
-    # pool = mp.Pool()
-    # results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
-    # print(results)
-    # pool.close()
-    # pool.join()
+    # Multiprocessing
+    i_list = np.arange(0, int(nobjects/batch_size) + 1)
+    print(i_list)
+    pool = mp.Pool()
+    results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
+    print(results)
+    pool.close()
+    pool.join()
 
     # The last file with less than the batch_size number of objects isn't getting saved. If so, retry saving it here:
     fname_last = os.path.join(save_dir, 'features_{}.hdf5'.format(i_list[-1]))
