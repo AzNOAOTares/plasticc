@@ -61,7 +61,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                 colors += [color]
                 color_fields += ['amp %s' % color]
                 color_fields += ['mean %s' % color]
-    period_fields = ['period1', 'period_score1', 'period2', 'period_score2', 'period3', 'period_score3', 'period4', 'period_score4', 'period5','period_score5']
+    period_fields = ['period1', 'period_score1', 'period2', 'period_score2', 'period3', 'period_score3', 'period4', 'period_score4', 'period5', 'period_score5']
     mysql_fields = ['objid', 'redshift'] + period_fields + color_fields + feature_fields
 
     def _gf(func, p, name):

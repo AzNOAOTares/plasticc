@@ -78,7 +78,7 @@ def classify(X, y, models, sntypes_map, feature_names, fig_dir='.'):
         print("%d. %s (%f)" % (f + 1, feature_names[indices[f]], importances[indices[f]]))
 
     # Plot the feature importances of the forest
-    plt.figure()
+    plt.figure(figsize=(15, 8))
     plt.title("Feature importances")
     plt.bar(range(X.shape[1]), importances[indices], color="r", yerr=std[indices], align="center")
     plt.xticks(range(X.shape[1]), feature_names[indices], rotation='vertical')
@@ -122,7 +122,7 @@ def main():
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     data_release = '20180407'
@@ -138,7 +138,6 @@ def main():
                            'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
                            'amplitude_%s' % p, 'filt-amplitude_%s' % p,  'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
                            'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p] for p in passbands], [])
-
     color_fields = []
     for i, pb1 in enumerate(passbands):
         for j, pb2 in enumerate(passbands):
@@ -148,11 +147,16 @@ def main():
                 color_fields += ['mean %s' % color]
     feature_names += color_fields
 
+    period_fields = ['period1', 'period_score1', 'period2', 'period_score2', 'period3', 'period_score3', 'period4',
+                     'period_score4', 'period5', 'period_score5']
+    feature_names += period_fields
+
     feature_names = np.array(feature_names)
 
     X, y = get_labels_and_features(fpath, data_release, field, model, feature_names, passbands)
 
-    models = [3, 4, 41, 42, 45, 60, 61, 62, 63]
+    # models = [3, 4, 41, 42, 45, 60, 61, 62, 63]
+    models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
     classify(X, y, models, sntypes_map, feature_names, fig_dir)
 
     plt.show()

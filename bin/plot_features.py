@@ -67,11 +67,11 @@ def convert_rescaled_flux_to_array(rescaled_flux_str_array):
     return rescaled_flux_new
 
 
-def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', passbands=('r')):
+def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', passbands=None):
 
     features = get_features(fpath, data_release, field, model)
 
-    features_dict = {pb: {} for pb in passbands}
+    features_dict = {pb: {} for pb in passbands + ['general_features']}
     for feat in feature_names:
         if feat in ['objid', 'redshift']:
             continue
@@ -79,9 +79,9 @@ def get_features_dict(fpath, data_release, feature_names=('redshift',), field='D
             pb = feat[-1]
             features_dict[pb][feat] = features[feat]
         elif feat[-2] == '-':
-            for pb in passbands:
-                if pb in feat[-3:]:
-                    features_dict[pb][feat] = features[feat]
+            features_dict['general_features'][feat] = features[feat]
+        elif 'period' in feat:
+            features_dict['general_features'][feat] = features[feat]
         else:
             print("I've made a mistake, fix this...", feat)
 
@@ -159,11 +159,12 @@ def get_limits(y, feature=None):
     if feature is not None:
         if 'amp ' in feature:
             feature = 'amp'
-        minmax = {'kurtosis': (None, 6), 'amplitude': (None, None), 'skew': (None, None), 'somean': (-1, 2),
-                  'shapiro': (None, None), 'q31': (None, 1), 'rms': (None, None), 'mad': (None, None), 'stetsonj': (0, 400),
-                  'stetsonk': (None, None), 'acorr': (None, 6), 'hlratio': (None, 6), 'entropy': (None, 12),
+        minmax = {'kurtosis': (None, 5), 'amplitude': (-10, 10), 'skew': (None, None), 'somean': (-1, 2),
+                  'shapiro': (None, None), 'q31': (None, 1), 'rms': (None, None), 'mad': (None, None), 'stetsonj': (-10, 10),
+                  'stetsonk': (None, None), 'acorr': (-6, 6), 'hlratio': (None, 6), 'entropy': (None, 12),
                   'von-neumann': (None, None), 'variance': (None, None), 'rescaled-flux': (-2, 2), 'nobs4096': (None, None),
-                  'amp': (-8, 8) }
+                  'amp': (-8, 8), 'filt-kurtosis': (None, 5), 'filt-amplitude': (-10, 10), 'stetsonl': (-10, 10),
+                  }
         try:
             ymin, ymax = minmax[feature[:-2]]
         except KeyError:
@@ -187,12 +188,12 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
     features_by_model = features_by_model.transpose()  # DF structure eg: [Y: SNIbc: objid]
 
     # Convert to 3D DataFrame instead of 2D dataframe of dicts
-    for pb in passbands:
+    for pb in passbands + ['general_features']:
         for model_name in model_names:
             features_by_model[pb][model_name] = pd.DataFrame(features_by_model[pb][model_name])
 
     # Plotting joyplots for each feature and pb
-    for pb in passbands:
+    for pb in passbands + ['general_features']:
         with PdfPages(f'{fig_dir}/{pb}_{field}_{data_release}.pdf') as pdf:
             for feature in feature_names[2:]:
                 joyplot_data = {'g': [], 'x': []}
@@ -229,6 +230,7 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
                     ax = plt.gca()
                     ax.text(0, .2, label, fontweight="bold", color=color,
                             ha="left", va="center", transform=ax.transAxes)
+                    ax.text(0.9, 0.2, "nobs: {}".format(nobs[label]), fontsize=9, transform=ax.transAxes)
 
                 g.map(label, x='')
 
@@ -261,7 +263,7 @@ def main():
     fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF.hdf5')
     sntypes_map = helpers.get_sntypes()
 
-    passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
+    passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
 
     # feature_names = ('objid', 'redshift', 'skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
     #                  'rms', 'mad', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann', 'nobs4096')
@@ -279,6 +281,9 @@ def main():
                 color_fields += ['amp %s' % color]
                 color_fields += ['mean %s' % color]
     feature_names += color_fields
+    period_fields = ['period1', 'period_score1', 'period2', 'period_score2', 'period3', 'period_score3', 'period4',
+                     'period_score4', 'period5', 'period_score5']
+    feature_names += period_fields
 
     # for data_release in ['20180316']:
     #     for field in ['DDF']:
@@ -288,7 +293,7 @@ def main():
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    models = [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]  # [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
+    models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90] #[1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]  #
     plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models)
 
     plt.show()
