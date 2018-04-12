@@ -61,8 +61,8 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                 colors += [color]
                 color_fields += ['amp %s' % color]
                 color_fields += ['mean %s' % color]
-
-    mysql_fields = ['objid', 'redshift'] + color_fields + feature_fields
+    period_fields = ['period1', 'period_score1', 'period2', 'period_score2', 'period3', 'period_score3', 'period4', 'period_score4', 'period5','period_score5']
+    mysql_fields = ['objid', 'redshift'] + period_fields + color_fields + feature_fields
 
     def _gf(func, p, name):
         """ Try to get feature, otherwise return nan. """
@@ -107,6 +107,18 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
 
+        periods, period_scores = laobject.get_best_periods()
+        features['period1'] = periods[0]
+        features['period_score1'] = period_scores[0]
+        features['period2'] = periods[1]
+        features['period_score2'] = period_scores[1]
+        features['period3'] = periods[2]
+        features['period_score3'] = period_scores[2]
+        features['period4'] = periods[3]
+        features['period_score4'] = period_scores[3]
+        features['period5'] = periods[4]
+        features['period_score5'] = period_scores[4]
+
         coloramp = laobject.get_color_amplitudes(recompute=True)
         colormean = laobject.get_color_mean(recompute=True)
         for color in colors:
@@ -144,6 +156,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             features['entropy_%s' % p] = _gf(laobject.get_ShannonEntropy(recompute=True), p, 'entropy')
             features['nobs4096_%s' % p] = len(flux_pb[lc['photflag'][lc['pb'] == p] >= 4096])/len(flux_pb)
 
+
             # features['rescaled-flux_%s' % p] = str(rescaled_flux)
 
             # # photflag_new = lc['photflag'][lc['pb'] == p]
@@ -162,7 +175,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         features_out += [list(features.values())]
 
     # Set all columns to floats except set first column to string (objid)
-    dtypes = ['S24', np.float64] + [np.float64] * len(color_fields) + ([np.float64] * int(len(feature_fields) / len(passbands))) * len(passbands)
+    dtypes = ['S24', np.float64] + [np.float64] * len(period_fields) + [np.float64] * len(color_fields) + ([np.float64] * int(len(feature_fields) / len(passbands))) * len(passbands)
     # dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands))) * len(passbands)
     # dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands) - 1) + [bytes]) * len(passbands)
     print('AA', len(mysql_fields), len(dtypes))
@@ -214,7 +227,7 @@ def create_all_hdf_files(data_release, i, save_dir, field_in, model_in, batch_si
 
 
 def main():
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_DDF')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_test')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -237,7 +250,7 @@ def main():
 
     # offset = 0
     # i = 0
-    # while offset < 10:
+    # while offset < nobjects:
     #     fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
     #     save_antares_features(data_release=data_release, fname=fname, field_in=field, model_in=model,
     #                           batch_size=batch_size, offset=offset, sort=sort, redo=redo)
@@ -261,7 +274,7 @@ def main():
         save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
                               batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
 
-    combine_hdf_files(save_dir, data_release, 'features_DDF.hdf5')
+    combine_hdf_files(save_dir, data_release, 'features_test.hdf5')
 
 
 if __name__ == '__main__':

@@ -24,8 +24,8 @@ class PeriodicMixin(object):
         if nobs == 0:
             return None, None, None
 
-        if self.time.max() - self.time.min() < max_p:
-            return None, None, None
+        # if self.time.max() - self.time.min() < max_p:
+        #     return None, None, None
 
 
         optimizer_kwds = {'quiet':True}
@@ -106,3 +106,12 @@ class PeriodicMixin(object):
                 phase_offset = 0.
             phase = self.time - phase_offset
         return phase
+
+
+    def get_best_periods(self):
+        model, periods, P_multi = self.periodscan(0.1, 100.)
+        periods, scores = model.find_best_periods(5, return_scores=True)
+
+        return periods, scores
+
+

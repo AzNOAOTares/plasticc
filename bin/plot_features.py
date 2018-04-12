@@ -67,27 +67,31 @@ def convert_rescaled_flux_to_array(rescaled_flux_str_array):
     return rescaled_flux_new
 
 
-def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1'):
+def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', passbands=('r')):
 
     features = get_features(fpath, data_release, field, model)
 
-    features_dict = {'u': {}, 'g': {}, 'r': {}, 'i': {}, 'z': {}, 'Y': {}}
-    for pb in features_dict.keys():
-        for f in feature_names:
-            if f in ['objid', 'redshift']:
-                feat_name = "%s" % f
-            else:
-                feat_name = "%s_%s" % (f, pb)
-            features_dict[pb][f] = features[feat_name]
+    features_dict = {pb: {} for pb in passbands}
+    for feat in feature_names:
+        if feat in ['objid', 'redshift']:
+            continue
+        elif feat[-2] == '_':
+            pb = feat[-1]
+            features_dict[pb][feat] = features[feat]
+        elif feat[-2] == '-':
+            for pb in passbands:
+                if pb in feat[-3:]:
+                    features_dict[pb][feat] = features[feat]
+        else:
+            print("I've made a mistake, fix this...", feat)
 
     return features_dict
 
 
-def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', fig_dir='.', sntypes_map=None):
+def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', fig_dir='.', sntypes_map=None, passbands=('r',)):
 
     model_name = sntypes_map[int(model)]
-    passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
-    features_dict = get_features_dict(fpath, data_release, feature_names, field, model)
+    features_dict = get_features_dict(fpath, data_release, feature_names, field, model, passbands)
 
     xlabel = 'redshift'
     with PdfPages(f'{fig_dir}/{model_name}_{data_release}_{field}.pdf') as pdf:
@@ -153,26 +157,30 @@ def get_limits(y, feature=None):
     # ymin, ymax = min(y), max(y)
     #
     if feature is not None:
+        if 'amp ' in feature:
+            feature = 'amp'
         minmax = {'kurtosis': (None, 6), 'amplitude': (None, None), 'skew': (None, None), 'somean': (-1, 2),
                   'shapiro': (None, None), 'q31': (None, 1), 'rms': (None, None), 'mad': (None, None), 'stetsonj': (0, 400),
                   'stetsonk': (None, None), 'acorr': (None, 6), 'hlratio': (None, 6), 'entropy': (None, 12),
-                  'von-neumann': (None, None), 'variance': (None, None), 'rescaled-flux': (-2, 2), 'nobs4096': (None, None)}
-
-        ymin, ymax = minmax[feature]
+                  'von-neumann': (None, None), 'variance': (None, None), 'rescaled-flux': (-2, 2), 'nobs4096': (None, None),
+                  'amp': (-8, 8) }
+        try:
+            ymin, ymax = minmax[feature[:-2]]
+        except KeyError:
+            ymin, ymax = (None, None)
     # ymin, ymax = np.percentile(y, 0), np.percentile(y, 99)
 
     return ymin, ymax
 
 
-def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), field='DDF', fig_dir='.', sntypes_map=None):
+def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), field='DDF', fig_dir='.', sntypes_map=None, passbands=('r',), models=(1,)):
     sns.set(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
-    passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     model_names = []
     features_by_model = {}
-    for model in [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]: #[1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
+    for model in models:
         model_name = sntypes_map[int(model)]
         model_names.append(model_name)
-        features_by_pb = get_features_dict(fpath, data_release, feature_names, field, model)
+        features_by_pb = get_features_dict(fpath, data_release, feature_names, field, model, passbands)
         features_by_model[model_name] = features_by_pb
 
     features_by_model = pd.DataFrame(features_by_model)  # DF structure eg: [SNIbc: Y: objid]
@@ -241,7 +249,7 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
                     g.set(xlim=(xmin, xmax))
 
                 # Save figures
-                g.fig.suptitle("{} {}".format(feature, pb))
+                g.fig.suptitle("{}".format(feature))
                 # g.fig.savefig("{0}/{1} {2}".format(fig_dir, feature, pb))
                 pdf.savefig(g.fig)
 
@@ -253,19 +261,35 @@ def main():
     fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF.hdf5')
     sntypes_map = helpers.get_sntypes()
 
-    # feature_names = ('objid', 'redshift', 'stetsonj')
-    feature_names = ('objid', 'redshift', 'skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
-                     'rms', 'mad', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann', 'nobs4096')
+    passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
+
+    # feature_names = ('objid', 'redshift', 'skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
+    #                  'rms', 'mad', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann', 'nobs4096')
+    feature_names = ['objid', 'redshift']
+    feature_names += sum([['variance_%s' % p, 'kurtosis_%s' % p, 'filt-variance_%s' % p, 'filt-kurtosis_%s' % p,
+                           'shapiro_%s' % p, 'p-value_%s' % p, 'skew_%s' % p, 'q31_%s' % p,
+                           'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
+                           'amplitude_%s' % p, 'filt-amplitude_%s' % p,  'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
+                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p] for p in passbands], [])
+    color_fields = []
+    for i, pb1 in enumerate(passbands):
+        for j, pb2 in enumerate(passbands):
+            if i < j:
+                color = pb1 + '-' + pb2
+                color_fields += ['amp %s' % color]
+                color_fields += ['mean %s' % color]
+    feature_names += color_fields
 
     # for data_release in ['20180316']:
     #     for field in ['DDF']:
     #         for model in [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
-    #             plot_features(fpath, data_release, feature_names, field, model, fig_dir, sntypes_map)
+    #             plot_features(fpath, data_release, feature_names, field, model, fig_dir, sntypes_map, passbands)
 
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map)
+    models = [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]  # [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
+    plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models)
 
     plt.show()
 

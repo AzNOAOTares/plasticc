@@ -8,7 +8,7 @@ from plot_features import get_features
 import helpers
 from chainconsumer import ChainConsumer
 
-ROOT_DIR = os.getenv('PLASTICC_DIR')
+ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
 
 
 def get_labels_and_features(fpath, data_release, field, model, feature_names, passbands):
@@ -137,7 +137,7 @@ def main():
                            'shapiro_%s' % p, 'p-value_%s' % p, 'skew_%s' % p, 'q31_%s' % p,
                            'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
                            'amplitude_%s' % p, 'filt-amplitude_%s' % p,  'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
-                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p] for p in passbands], [])
+                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p] for p in passbands], [])
 
     color_fields = []
     for i, pb1 in enumerate(passbands):
@@ -148,16 +148,12 @@ def main():
                 color_fields += ['mean %s' % color]
     feature_names += color_fields
 
-    feature_names_pb = []
-    for f in feature_names:
-        for pb in passbands:
-            feature_names_pb.append(f + '_' + pb)
-    feature_names_pb = np.array(feature_names_pb)
+    feature_names = np.array(feature_names)
 
     X, y = get_labels_and_features(fpath, data_release, field, model, feature_names, passbands)
 
     models = [3, 4, 41, 42, 45, 60, 61, 62, 63]
-    classify(X, y, models, sntypes_map, feature_names_pb, fig_dir)
+    classify(X, y, models, sntypes_map, feature_names, fig_dir)
 
     plt.show()
 
