@@ -3,10 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
 
 from plot_features import get_features
 import helpers
-from chainconsumer import ChainConsumer
+from classifier_metrics import plot_features_space, plot_feature_importance, plot_confusion_matrix
 
 ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
 
@@ -52,70 +53,39 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, pa
 
 
 def classify(X, y, models, sntypes_map, feature_names, fig_dir='.'):
+    num_features = X.shape[1]
+
     # Remove models before training:
-    mask = np.where(y != 1)[0]
-    X = X[mask]
-    y = y[mask]
-    mask = np.where(y != 2)[0]
-    X = X[mask]
-    y = y[mask]
+    remove_models = [1, 2]
+    for m in remove_models:
+        mask = np.where(y != m)[0]
+        X = X[mask]
+        y = y[mask]
+        models.remove(m)
 
     # Split into train/test
-    XTrain, XTest, yTrain, yTest = train_test_split(X, y, train_size=0.75, shuffle=True)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.75, shuffle=True)
 
     # Train model
-    model_ml = RandomForestClassifier(n_estimators=200)
-    model_ml.fit(XTrain, yTrain)
+    ml_model = RandomForestClassifier(n_estimators=200)
+    ml_model.fit(X_train, y_train)
 
-    importances = model_ml.feature_importances_
-    std = np.std([tree.feature_importances_ for tree in model_ml.estimators_], axis=0)
-    indices = np.argsort(importances)[::-1]
+    # Get Accuracy
+    y_pred = ml_model.predict(X_test)
+    accuracy = len(np.where(y_pred == y_test)[0])
+    print("Accuracy is: {}/{} = {}".format(accuracy, len(y_pred), accuracy/len(y_pred)))
 
-
-    # Print the feature ranking
-    print("Feature ranking:")
-    for f in range(X.shape[1]):
-        print("%d. %s (%f)" % (f + 1, feature_names[indices[f]], importances[indices[f]]))
-
-    # Plot the feature importances of the forest
-    plt.figure(figsize=(15, 8))
-    plt.title("Feature importances")
-    plt.bar(range(X.shape[1]), importances[indices], color="r", yerr=std[indices], align="center")
-    plt.xticks(range(X.shape[1]), feature_names[indices], rotation='vertical')
-    plt.xlim([-1, X.shape[1]])
-    plt.tight_layout()
-    plt.savefig(os.path.join(fig_dir, 'feature_importance'))
-    plt.show()
+    # Compute confusion matrix
+    cnf_matrix = confusion_matrix(y_test, y_pred)
+    np.set_printoptions(precision=2)
 
     # visualize test performance
-    yPred = model_ml.predict(XTest)
+    plot_feature_importance(ml_model, feature_names, num_features, fig_dir)
+    plot_confusion_matrix(cnf_matrix, classes=models, normalize=True, title='Normalized confusion matrix')
+    # plot_features_space(models, sntypes_map, X_train, y_train, feature_names, fig_dir)
 
-    accuracy = len(np.where(yPred==yTest)[0])
-    print("Accuracy is: {}/{} = {}".format(accuracy, len(yPred), accuracy/len(yPred)))
+    return y_pred
 
-    # colors = ('#e6194b', '#0082c8', '#3cb44b', '#f032e6', '#46f0f0', '#ffe119', '#f58231', '#911eb4', '#d2f53c', '#008080', '#fabebe', '#e6beff', '#aa6e28', '#000080', '#000000')
-    # fig, ax = plt.subplots(nrows=len(feature_names), ncols=len(feature_names), sharex='col', sharey='row', figsize=(18,15))
-    # fig.subplots_adjust(wspace=0, hspace=0)
-    # for i, feat1 in enumerate(feature_names):
-    #     for j, feat2 in enumerate(feature_names):
-    #         for model, color in zip(models, colors):
-    #             model_name = sntypes_map[model]
-    #             ax[i, j].scatter(XTrain[:, j][yTrain == model], XTrain[:, i][yTrain == model], color=color, marker='.', alpha=0.3, label="Train_%s" % model_name)
-    #             ax[i, j].scatter(XTest[:, j][yTest == model], XTest[:, i][yTest == model], color=color, marker='.', label="Test_%s" % model_name)
-    #             if i == len(feature_names) - 1:
-    #                 ax[i, j].set_xlabel(feat2)
-    #             if j == 0:
-    #                 ax[i, j].set_ylabel(feat1)
-    # ax[0, j].legend(loc='upper left', bbox_to_anchor=(1,1))
-    # fig.savefig(os.path.join(fig_dir, 'feature_space'))
-
-    c = ChainConsumer()
-    for model in models[::-1]:
-        model_name = sntypes_map[model]
-        c.add_chain(XTrain[yTrain == model], parameters=feature_names, name=model_name)
-    c.configure()
-    fig = c.plotter.plot()
-    fig.savefig(filename=os.path.join(fig_dir, 'feature_space_contours'), transparent=False)
 
 
 def main():
@@ -128,9 +98,7 @@ def main():
     data_release = '20180407'
     field = 'DDF'
     model = '%'
-    #
-    # feature_names = ('skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
-    #                  'rms', 'mad', 'amplitude', 'q31', 'entropy', 'von-neumann')
+
     passbands = ('r', 'i', 'z', 'Y')
 
     feature_names = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'filt-variance_%s' % p, 'filt-kurtosis_%s' % p,
@@ -156,7 +124,7 @@ def main():
     X, y = get_labels_and_features(fpath, data_release, field, model, feature_names, passbands)
 
     # models = [3, 4, 41, 42, 45, 60, 61, 62, 63]
-    models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
+    models = [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63, 80, 81, 90]
     classify(X, y, models, sntypes_map, feature_names, fig_dir)
 
     plt.show()

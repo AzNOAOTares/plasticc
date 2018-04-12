@@ -158,13 +158,15 @@ def get_limits(y, feature=None):
     #
     if feature is not None:
         if 'amp ' in feature:
-            feature = 'amp'
+            feature = 'amp__'
+        if feature in ['period1', 'period2', 'period3', 'period4', 'period5']:
+            feature = 'period__'
         minmax = {'kurtosis': (None, 5), 'amplitude': (-10, 10), 'skew': (None, None), 'somean': (-1, 2),
                   'shapiro': (None, None), 'q31': (None, 1), 'rms': (None, None), 'mad': (None, None), 'stetsonj': (-10, 10),
                   'stetsonk': (None, None), 'acorr': (-6, 6), 'hlratio': (None, 6), 'entropy': (None, 12),
                   'von-neumann': (None, None), 'variance': (None, None), 'rescaled-flux': (-2, 2), 'nobs4096': (None, None),
                   'amp': (-8, 8), 'filt-kurtosis': (None, 5), 'filt-amplitude': (-10, 10), 'stetsonl': (-10, 10),
-                  }
+                  'period': (-1, 3)}
         try:
             ymin, ymax = minmax[feature[:-2]]
         except KeyError:
@@ -257,10 +259,10 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
@@ -290,7 +292,7 @@ def main():
     #         for model in [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
     #             plot_features(fpath, data_release, feature_names, field, model, fig_dir, sntypes_map, passbands)
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90] #[1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]  #
