@@ -23,7 +23,7 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     plt.title(title)
     plt.colorbar()
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45)
+    plt.xticks(tick_marks, classes, rotation=90)
     plt.yticks(tick_marks, classes)
 
     fmt = '.2f' if normalize else 'd'
@@ -50,10 +50,10 @@ def plot_feature_importance(model_ml, feature_names, num_features, fig_dir):
         print("%d. %s (%f)" % (f + 1, feature_names[indices[f]], importances[indices[f]]))
 
     # Plot the feature importances of the forest
-    fig = plt.figure(figsize=(15, 8))
+    fig = plt.figure(figsize=(20, 10))
     plt.title("Feature importances")
     plt.bar(range(num_features), importances[indices], color="r", yerr=std[indices], align="center")
-    plt.xticks(range(num_features), feature_names[indices], rotation='vertical')
+    plt.xticks(range(num_features), feature_names[indices], rotation=90)
     plt.xlim([-1, num_features])
     plt.tight_layout()
     plt.savefig(os.path.join(fig_dir, 'feature_importance'))

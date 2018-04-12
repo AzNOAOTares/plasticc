@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
+from imblearn import over_sampling
 
 from plot_features import get_features
 import helpers
@@ -59,15 +60,27 @@ def classify(X, y, models, sntypes_map, feature_names, fig_dir='.'):
     num_features = X.shape[1]
 
     # Remove models before training:
-    remove_models = [1, 2]
+    remove_models = []
+    # Remove models with fewer than 5 objects (as SMOTE can't work with that few objects)
+    for m in models:
+        nobs = len(X[y == m])
+        print(m, nobs)
+        if nobs <= 5:
+            print("Removing model {}, because it only has {} objects.".format(m, nobs))
+            remove_models.append(m)
     for m in remove_models:
         mask = np.where(y != m)[0]
         X = X[mask]
         y = y[mask]
         models.remove(m)
+    model_names = [sntypes_map[model] for model in models]
 
     # Split into train/test
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.75, shuffle=True)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.80, shuffle=True)
+
+    # SMOTE to correct for imbalanced data on training set only
+    sm = over_sampling.SMOTE(random_state=42)
+    X_train, y_train = sm.fit_sample(X_train, y_train)
 
     # Train model
     ml_model = RandomForestClassifier(n_estimators=200)
@@ -84,9 +97,8 @@ def classify(X, y, models, sntypes_map, feature_names, fig_dir='.'):
 
     # visualize test performance
     plot_feature_importance(ml_model, feature_names, num_features, fig_dir)
-    plot_confusion_matrix(cnf_matrix, classes=models, normalize=True, title='Normalized confusion matrix',
-                          fig_dir=fig_dir)
-    # plot_features_space(models, sntypes_map, X_train, y_train, feature_names, fig_dir)
+    plot_confusion_matrix(cnf_matrix, classes=model_names, normalize=True, title='Normalized confusion matrix', fig_dir=fig_dir)
+    plot_features_space(models, sntypes_map, X_train, y_train, feature_names, fig_dir)
 
     return y_pred
 
@@ -104,7 +116,7 @@ def main():
 
     passbands = ('r', 'i', 'z', 'Y')
 
-    feature_names = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'filt-variance_%s' % p, 'filt-kurtosis_%s' % p,
+    feature_names = sum([['variance_%s' % p, 'kurtosis_%s' % p, 'filt-kurtosis_%s' % p,
                           'shapiro_%s' % p, 'p-value_%s' % p, 'skew_%s' % p, 'q31_%s' % p,
                           'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
                           'amplitude_%s' % p, 'filt-amplitude_%s' % p, 'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
@@ -126,7 +138,7 @@ def main():
 
     X, y = get_labels_and_features(fpath, data_release, field, model, feature_names, passbands)
 
-    models = [1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63, 80, 81, 90]
+    models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90]
     classify(X, y, models, sntypes_map, feature_names, fig_dir)
 
     plt.show()
