@@ -50,6 +50,7 @@ def get_features(fpath, data_release, field_in='%', model_in='%'):
 
     return features
 
+
 def convert_rescaled_flux_to_array(rescaled_flux_str_array):
     rescaled_flux_new = []
     for s in rescaled_flux_str_array:
@@ -58,7 +59,7 @@ def convert_rescaled_flux_to_array(rescaled_flux_str_array):
         s = s.replace('\\n', '')
         try:
             s = np.array(s.split()).astype(float)
-        except Exception as err: # Weird value error due to trailing '-' in array
+        except Exception as err:  # Weird value error due to trailing '-' in array
             print(s, err)
             continue
         # rescaled_flux_new.append(s)
@@ -68,7 +69,6 @@ def convert_rescaled_flux_to_array(rescaled_flux_str_array):
 
 
 def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', passbands=None):
-
     features = get_features(fpath, data_release, field, model)
 
     features_dict = {pb: {} for pb in passbands + ['general_features']}
@@ -88,8 +88,8 @@ def get_features_dict(fpath, data_release, feature_names=('redshift',), field='D
     return features_dict
 
 
-def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', fig_dir='.', sntypes_map=None, passbands=('r',)):
-
+def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', fig_dir='.',
+                  sntypes_map=None, passbands=('r',)):
     model_name = sntypes_map[int(model)]
     features_dict = get_features_dict(fpath, data_release, feature_names, field, model, passbands)
 
@@ -162,9 +162,11 @@ def get_limits(y, feature=None):
         if feature in ['period1', 'period2', 'period3', 'period4', 'period5']:
             feature = 'period__'
         minmax = {'kurtosis': (None, 5), 'amplitude': (-10, 10), 'skew': (None, None), 'somean': (-1, 2),
-                  'shapiro': (None, None), 'q31': (None, 1), 'rms': (None, None), 'mad': (None, None), 'stetsonj': (-10, 10),
+                  'shapiro': (None, None), 'q31': (None, 1), 'rms': (None, None), 'mad': (None, None),
+                  'stetsonj': (-10, 10),
                   'stetsonk': (None, None), 'acorr': (-6, 6), 'hlratio': (None, 6), 'entropy': (None, 12),
-                  'von-neumann': (None, None), 'variance': (None, None), 'rescaled-flux': (-2, 2), 'nobs4096': (None, None),
+                  'von-neumann': (None, None), 'variance': (None, None), 'rescaled-flux': (-2, 2),
+                  'nobs4096': (None, None),
                   'amp': (-8, 8), 'filt-kurtosis': (None, 5), 'filt-amplitude': (-10, 10), 'stetsonl': (-10, 10),
                   'period': (-1, 3)}
         try:
@@ -176,7 +178,8 @@ def get_limits(y, feature=None):
     return ymin, ymax
 
 
-def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), field='DDF', fig_dir='.', sntypes_map=None, passbands=('r',), models=(1,)):
+def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), field='DDF', fig_dir='.', sntypes_map=None,
+                           passbands=('r',), models=(1,)):
     sns.set(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
     model_names = []
     features_by_model = {}
@@ -267,14 +270,13 @@ def main():
 
     passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
 
-    # feature_names = ('objid', 'redshift', 'skew', 'kurtosis', 'stetsonk', 'shapiro', 'acorr', 'hlratio',
-    #                  'rms', 'mad', 'somean', 'amplitude', 'q31', 'entropy', 'von-neumann', 'nobs4096')
     feature_names = ['objid', 'redshift']
     feature_names += sum([['variance_%s' % p, 'kurtosis_%s' % p, 'filt-variance_%s' % p, 'filt-kurtosis_%s' % p,
                            'shapiro_%s' % p, 'p-value_%s' % p, 'skew_%s' % p, 'q31_%s' % p,
                            'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
-                           'amplitude_%s' % p, 'filt-amplitude_%s' % p,  'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
-                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p] for p in passbands], [])
+                           'amplitude_%s' % p, 'filt-amplitude_%s' % p, 'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
+                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p] for p in
+                          passbands], [])
     color_fields = []
     for i, pb1 in enumerate(passbands):
         for j, pb2 in enumerate(passbands):
@@ -287,18 +289,15 @@ def main():
                      'period_score4', 'period5', 'period_score5']
     feature_names += period_fields
 
-    # for data_release in ['20180316']:
-    #     for field in ['DDF']:
-    #         for model in [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82, 90, 91]:
-    #             plot_features(fpath, data_release, feature_names, field, model, fig_dir, sntypes_map, passbands)
-
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90] #[1, 2, 3, 4, 5, 41, 42, 45, 60, 61, 62, 63]  #
+    models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
     plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models)
 
+    sns.reset_orig()
     plt.show()
+
 
 if __name__ == '__main__':
     main()
