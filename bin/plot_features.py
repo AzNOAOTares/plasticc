@@ -11,19 +11,28 @@ import helpers
 ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
 
 
-def get_features(fpath, data_release, field_in='%', model_in='%'):
+def get_features(fpath, data_release, field_in='%', model_in='%', aggregate_classes=False):
     """ Get features from hdf5 files. """
     hdffile = h5py.File(fpath, 'r')
     features = np.array(hdffile[data_release])
     hdffile.close()
+    if aggregate_classes:
+        agg_map = helpers.aggregate_sntypes(reverse=True)
 
     indexes = []
     modelList = []
     for i, objid in enumerate(features['objid']):
         field, model, base, snid = objid.astype(str).split('_')
         modelList.append(model)
-        if (field == field_in or field_in == '%') and (model_in == '%' or int(model) == int(model_in)):
-            indexes.append(i)
+
+        if aggregate_classes is True:
+            submodels = agg_map[int(model_in)]
+            for m in submodels:
+                if (field == field_in or field_in == '%') and (model_in == '%' or int(model) == int(m)):
+                    indexes.append(i)
+        else:
+            if (field == field_in or field_in == '%') and (model_in == '%' or int(model) == int(model_in)):
+                indexes.append(i)
 
     features = features[indexes]
 
@@ -68,19 +77,19 @@ def convert_rescaled_flux_to_array(rescaled_flux_str_array):
     return rescaled_flux_new
 
 
-def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', passbands=None):
-    features = get_features(fpath, data_release, field, model)
+def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', passbands=None, aggregate_classes=False):
+    features = get_features(fpath, data_release, field, model, aggregate_classes=aggregate_classes)
 
     features_dict = {pb: {} for pb in passbands + ['general_features']}
     for feat in feature_names:
-        if feat in ['objid', 'redshift']:
+        if feat in ['objid']:
             continue
         elif feat[-2] == '_':
             pb = feat[-1]
             features_dict[pb][feat] = features[feat]
         elif feat[-2] == '-':
             features_dict['general_features'][feat] = features[feat]
-        elif 'period' in feat:
+        elif 'period' in feat or feat == 'redshift':
             features_dict['general_features'][feat] = features[feat]
         else:
             print("I've made a mistake, fix this...", feat)
@@ -89,9 +98,9 @@ def get_features_dict(fpath, data_release, feature_names=('redshift',), field='D
 
 
 def plot_features(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', fig_dir='.',
-                  sntypes_map=None, passbands=('r',)):
+                  sntypes_map=None, passbands=('r',), aggregate_classes=False):
     model_name = sntypes_map[int(model)]
-    features_dict = get_features_dict(fpath, data_release, feature_names, field, model, passbands)
+    features_dict = get_features_dict(fpath, data_release, feature_names, field, model, passbands, aggregate_classes)
 
     xlabel = 'redshift'
     with PdfPages(f'{fig_dir}/{model_name}_{data_release}_{field}.pdf') as pdf:
@@ -179,14 +188,14 @@ def get_limits(y, feature=None):
 
 
 def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), field='DDF', fig_dir='.', sntypes_map=None,
-                           passbands=('r',), models=(1,)):
+                           passbands=('r',), models=(1,), aggregate_classes=False):
     sns.set(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
     model_names = []
     features_by_model = {}
     for model in models:
         model_name = sntypes_map[int(model)]
         model_names.append(model_name)
-        features_by_pb = get_features_dict(fpath, data_release, feature_names, field, model, passbands)
+        features_by_pb = get_features_dict(fpath, data_release, feature_names, field, model, passbands, aggregate_classes)
         features_by_model[model_name] = features_by_pb
 
     features_by_model = pd.DataFrame(features_by_model)  # DF structure eg: [SNIbc: Y: objid]
@@ -200,7 +209,7 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
     # Plotting joyplots for each feature and pb
     for pb in passbands + ['general_features']:
         with PdfPages(f'{fig_dir}/{pb}_{field}_{data_release}.pdf') as pdf:
-            for feature in feature_names[2:]:
+            for feature in feature_names[1:]:
                 joyplot_data = {'g': [], 'x': []}
                 for model_name in model_names:
                     if feature not in features_by_model[pb][model_name].keys():
@@ -268,7 +277,7 @@ def main():
     fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
     sntypes_map = helpers.get_sntypes()
 
-    passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
+    passbands = ['r', 'i', 'z', 'Y']
 
     feature_names = ['objid', 'redshift']
     feature_names += sum([['variance_%s' % p, 'kurtosis_%s' % p, 'filt-variance_%s' % p, 'filt-kurtosis_%s' % p,
@@ -289,15 +298,16 @@ def main():
                      'period_score4', 'period5', 'period_score5']
     feature_names += period_fields
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF_aggregate')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
-    plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models)
-
-    sns.reset_orig()
-    plt.show()
+    # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
+    models = [1, 2, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90]
+    plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models, aggregate_classes=True)
 
 
 if __name__ == '__main__':
     main()
+    sns.reset_orig()
+    # plt.show()
+

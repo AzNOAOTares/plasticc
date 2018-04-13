@@ -5,7 +5,7 @@ import itertools
 from chainconsumer import ChainConsumer
 
 
-def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues, fig_dir='.'):
+def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix', cmap=plt.cm.RdBu, fig_dir='.'):
     """
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
@@ -17,8 +17,12 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
         print('Confusion matrix, without normalization')
 
     print(cm)
+    # Multiply off diagonal by -1
+    off_diag = ~np.eye(cm.shape[0], dtype=bool)
+    cm[off_diag] *= -1
+    print(cm)
 
-    fig = plt.figure(figsize=(13, 10))
+    fig = plt.figure(figsize=(15, 12))
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title(title)
     plt.colorbar()
@@ -39,9 +43,9 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     plt.savefig(os.path.join(fig_dir, 'confusion_matrix'))
 
 
-def plot_feature_importance(model_ml, feature_names, num_features, fig_dir):
-    importances = model_ml.feature_importances_
-    std = np.std([tree.feature_importances_ for tree in model_ml.estimators_], axis=0)
+def plot_feature_importance(classifier, feature_names, num_features, fig_dir):
+    importances = classifier.feature_importances_
+    std = np.std([tree.feature_importances_ for tree in classifier.estimators_], axis=0)
     indices = np.argsort(importances)[::-1]
 
     # Print the feature ranking
@@ -52,8 +56,9 @@ def plot_feature_importance(model_ml, feature_names, num_features, fig_dir):
     # Plot the feature importances of the forest
     fig = plt.figure(figsize=(20, 10))
     plt.title("Feature importances")
-    plt.bar(range(num_features), importances[indices], color="r", yerr=std[indices], align="center")
+    plt.bar(range(num_features), importances[indices], color='#2ca02c', yerr=std[indices], align="center")
     plt.xticks(range(num_features), feature_names[indices], rotation=90)
+    plt.tick_params(axis='both', labelsize=11)
     plt.xlim([-1, num_features])
     plt.tight_layout()
     plt.savefig(os.path.join(fig_dir, 'feature_importance'))
