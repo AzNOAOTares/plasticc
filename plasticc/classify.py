@@ -121,7 +121,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
 
 
 def get_feature_names(passbands):
-    feature_names = []
+    feature_names = ['redshift']
     feature_names += sum([['variance_%s' % p, 'kurtosis_%s' % p, 'filt-kurtosis_%s' % p,
                           'shapiro_%s' % p, 'p-value_%s' % p, 'skew_%s' % p, 'q31_%s' % p,
                           'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
@@ -157,7 +157,7 @@ def main():
     # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
     models = [1, 2, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
     # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
-    remove_models = [64]
+    remove_models = []
     feature_names = get_feature_names(passbands)
     X, y = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True)
 

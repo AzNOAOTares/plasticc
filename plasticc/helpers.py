@@ -1,8 +1,8 @@
 
 
 def get_sntypes():
-    sntypes_map = {1: 'SN1a', 2: 'CC', 3: 'SNIbc', 4: 'IIn', 5: 'New_CC', 41: 'Ia-91bg', 42: 'Ia-91bg-Jones',
-                   45: 'pointIa', 50: 'Kilonova', 60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 64: '64',
+    sntypes_map = {1: 'SN1a', 2: 'CC', 3: 'SNIbc', 4: 'IIpca', 5: 'New_CC', 41: 'Ia-91bg', 42: 'Ia-91bg-Jones',
+                   45: 'pointIa', 50: 'Kilonova', 60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 64: 'TDE',
                    80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira', 90: 'BSR', 91: 'String',
                    102: 'CC', 141: 'Ia-91bg', 200: 'Other'}
     return sntypes_map
