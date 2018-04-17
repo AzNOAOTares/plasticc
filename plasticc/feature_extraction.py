@@ -219,7 +219,8 @@ def combine_hdf_files(save_dir, data_release, combined_savename):
     output_file.close()
 
 
-def create_all_hdf_files(data_release, i, save_dir, field_in, model_in, batch_size, sort, redo):
+def create_all_hdf_files(args):
+    data_release, i, save_dir, field_in, model_in, batch_size, sort, redo = args
     offset = batch_size * i
     fname = os.path.join(save_dir, 'features_{}.hdf5'.format(i))
     save_antares_features(data_release=data_release, fname=fname, field_in=field_in, model_in=model_in,
@@ -227,18 +228,13 @@ def create_all_hdf_files(data_release, i, save_dir, field_in, model_in, batch_si
 
 
 def main():
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_test')
+    machine = 1  # selecting machines 1 through 10
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_machine_{}'.format(machine))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    # data_dir = os.path.join(ROOT_DIR, 'plasticc_data')
-    # for data_release in next(os.walk(data_dir))[DIRNAMES]:
-    #     if data_release == 'src':
-    #         continue
-    #     save_antares_features(data_release, redo=True)
-
     data_release = '20180407'
-    field = 'DDF'
+    field = '%'
     model = '%'
     getter = GetData(data_release)
     nobjects = next(getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True, big=False))
@@ -257,24 +253,30 @@ def main():
     #     offset += batch_size
     #     i += 1
 
+    offset = machine * 300
+    offset_next = offset + offset if machine != 10 else int(nobjects/batch_size) + 1
+
     # Multiprocessing
-    i_list = np.arange(0, int(nobjects/batch_size) + 1)
+    i_list = np.arange(offset, offset_next)
     print(i_list)
+    args_list = []
+    for i in i_list:
+        args_list.append((data_release, i, save_dir, field, model, batch_size, sort, redo))
+
     pool = mp.Pool()
-    results = [pool.apply_async(create_all_hdf_files, args=(data_release, i, save_dir, field, model, batch_size, sort, redo)) for i in i_list]
-    print(results)
+    pool.map_async(create_all_hdf_files, args_list)
     pool.close()
     pool.join()
 
-    # The last file with less than the batch_size number of objects isn't getting saved. If so, retry saving it here:
-    fname_last = os.path.join(save_dir, 'features_{}.hdf5'.format(i_list[-1]))
-    print(fname_last)
-    if not os.path.isfile(fname_last):
-        print("Last file not saved. Retrying...")
-        save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
-                              batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
-
-    combine_hdf_files(save_dir, data_release, 'features_test.hdf5')
+    # # The last file with less than the batch_size number of objects isn't getting saved. If so, retry saving it here:
+    # fname_last = os.path.join(save_dir, 'features_{}.hdf5'.format(i_list[-1]))
+    # print(fname_last)
+    # if not os.path.isfile(fname_last):
+    #     print("Last file not saved. Retrying...")
+    #     save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
+    #                           batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
+    #
+    # combine_hdf_files(save_dir, data_release, 'features_test.hdf5')
 
 
 if __name__ == '__main__':
