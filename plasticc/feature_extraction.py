@@ -254,7 +254,7 @@ def main():
     #     i += 1
 
     offset = (machine-1) * 300
-    offset_next = 2*offset if machine != 10 else int(nobjects/batch_size) + 1
+    offset_next = offset + machine * 300 if machine != 10 else int(nobjects/batch_size) + 1
 
     # Multiprocessing
     i_list = np.arange(offset, offset_next)
