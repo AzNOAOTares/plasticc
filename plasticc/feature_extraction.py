@@ -229,7 +229,7 @@ def create_all_hdf_files(args):
 
 def main():
     machine = 1  # selecting machines 1 through 10
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_machine_{}'.format(machine))
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'features_server_outputs', 'hdf_features_machine_{}'.format(machine))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
