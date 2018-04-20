@@ -23,7 +23,7 @@ import seaborn as sns
 
 sns.reset_orig()
 
-ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
+ROOT_DIR = os.getenv('PLASTICC_DIR')
 
 
 def get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=False, pca=False):
@@ -33,7 +33,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
 
     features = get_features(fpath, data_release, field, model, aggregate_classes=False)
     if pca:
-        features = get_pca_features(features, n_comps=20, feature_names=feature_names)
+        features = get_pca_features(features, n_comps=70, feature_names=feature_names)
         feature_names = np.array(features.dtype.names[1:])
 
     for i, objid in enumerate(features['objid']):
@@ -120,15 +120,16 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     if hasattr(classifier, "feature_importances_"):
         plot_feature_importance(classifier, feature_names, num_features, fig_dir)
     plot_confusion_matrix(cnf_matrix, classes=model_names, normalize=True, title='Normalized confusion matrix', fig_dir=fig_dir)
+    plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir, add_save_name='')
 
     return classifier, X_train, y_train, X_test, y_test, score, y_pred
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify_pca')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     data_release = '20180407'
@@ -140,9 +141,9 @@ def main():
     # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
     remove_models = []
     feature_names = get_feature_names(passbands, ignore=('objid',))
-    X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=True)
+    X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False)
 
-    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=10)),
+    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50)),
                    ('KNeighbors', KNeighborsClassifier(5)),
                    ('Linear SVM', SVC(kernel="linear", C=0.025)),
                    ('RBF SVM', SVC(gamma=2, C=1)),
