@@ -64,11 +64,11 @@ def plot_feature_importance(classifier, feature_names, num_features, fig_dir):
     plt.savefig(os.path.join(fig_dir, 'feature_importance'))
 
 
-def plot_features_space(models, sntypes_map, XTrain, yTrain, feature_names, fig_dir):
+def plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir):
     c = ChainConsumer()
     for model in models[::-1]:
         model_name = sntypes_map[model]
-        c.add_chain(XTrain[yTrain == model], parameters=feature_names, name=model_name)
+        c.add_chain(X[y == model], parameters=list(feature_names), name=model_name)
     c.configure()
     fig = c.plotter.plot()
-    fig.savefig(filename=os.path.join(fig_dir, 'feature_space_contours'), transparent=False)
+    fig.savefig(fname=os.path.join(fig_dir, 'feature_space_contours'), transparent=False)

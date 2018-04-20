@@ -1,9 +1,6 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from imblearn import over_sampling
@@ -18,9 +15,10 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 
-from plot_features import get_features
+from read_features import get_features, get_feature_names
 import helpers
-from classifier_metrics import plot_features_space, plot_feature_importance, plot_confusion_matrix
+from classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
+from pca_components import get_pca_features
 import seaborn as sns
 
 sns.reset_orig()
@@ -28,12 +26,16 @@ sns.reset_orig()
 ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
 
 
-def get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=False):
+def get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=False, pca=False):
     X = []  # features
     y = []  # labels
     agg_map = helpers.aggregate_sntypes()
 
     features = get_features(fpath, data_release, field, model, aggregate_classes=False)
+    if pca:
+        features = get_pca_features(features, n_comps=20, feature_names=feature_names)
+        feature_names = np.array(features.dtype.names[1:])
+
     for i, objid in enumerate(features['objid']):
         field, model, base, snid = objid.astype(str).split('_')
         if aggregate_classes:
@@ -68,7 +70,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
             X = X[mask]
             y = y[mask]
 
-    return X, y
+    return X, y, feature_names
 
 
 def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=None):
@@ -86,6 +88,9 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
         X = X[mask]
         y = y[mask]
         models.remove(m)
+
+    # Plot feature space before oversampling
+    plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir)
 
     # Split into train/test
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.80, shuffle=True)
@@ -115,36 +120,12 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     if hasattr(classifier, "feature_importances_"):
         plot_feature_importance(classifier, feature_names, num_features, fig_dir)
     plot_confusion_matrix(cnf_matrix, classes=model_names, normalize=True, title='Normalized confusion matrix', fig_dir=fig_dir)
-    # plot_features_space(models, sntypes_map, X_train, y_train, feature_names, fig_dir)
 
     return classifier, X_train, y_train, X_test, y_test, score, y_pred
 
 
-def get_feature_names(passbands):
-    feature_names = ['redshift']
-    feature_names += sum([['variance_%s' % p, 'kurtosis_%s' % p, 'filt-kurtosis_%s' % p,
-                          'shapiro_%s' % p, 'p-value_%s' % p, 'skew_%s' % p, 'q31_%s' % p,
-                          'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
-                          'amplitude_%s' % p, 'filt-amplitude_%s' % p, 'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
-                          'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p] for p in passbands], [])
-    color_fields = []
-    for i, pb1 in enumerate(passbands):
-        for j, pb2 in enumerate(passbands):
-            if i < j:
-                color = pb1 + '-' + pb2
-                color_fields += ['amp %s' % color]
-                color_fields += ['mean %s' % color]
-    feature_names += color_fields
-    period_fields = ['period1', 'period_score1', 'period2', 'period_score2', 'period3', 'period_score3', 'period4',
-                     'period_score4', 'period5', 'period_score5']
-    feature_names += period_fields
-    feature_names = np.array(feature_names)
-
-    return feature_names
-
-
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify_pca')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
@@ -158,10 +139,10 @@ def main():
     models = [1, 2, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
     # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
     remove_models = []
-    feature_names = get_feature_names(passbands)
-    X, y = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True)
+    feature_names = get_feature_names(passbands, ignore=('objid',))
+    X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=True)
 
-    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50)),
+    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=10)),
                    ('KNeighbors', KNeighborsClassifier(5)),
                    ('Linear SVM', SVC(kernel="linear", C=0.025)),
                    ('RBF SVM', SVC(gamma=2, C=1)),
