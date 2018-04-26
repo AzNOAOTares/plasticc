@@ -1,11 +1,11 @@
 import sys
 import matplotlib.pyplot as plt
-import plasticc
+import plasticc.get_data
 
 
-def plot_light_curve(data_release='20180407', object_id):
+def plot_light_curve(objid, data_release='20180407'):
     getter = plasticc.get_data.GetData(data_release)
-    field, model, base, snid = objid.astype(str).split('_')
+    field, model, base, snid = objid.split('_')
     result = getter.get_lcs_data(field=field, snid=snid, model=model, base=base)
     head, phot = next(result)
     lc = getter.convert_pandas_lc_to_recarray_lc(phot)
@@ -19,12 +19,12 @@ def main():
     """ Input `python plot_light_curve.py objid data_release` """
 
     objid = str(sys.argv[1])
-    if len(sys.argv > 2):
+    if len(sys.argv) > 2:
         data_release = str(sys.argv[2])
     else:
         data_release = '20180407'
 
-    plot_light_curve(data_release, objid)
+    plot_light_curve(objid, data_release)
 
 
 if __name__ == '__main__':
