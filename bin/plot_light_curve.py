@@ -25,6 +25,8 @@ def main():
         data_release = '20180407'
 
     plot_light_curve(objid, data_release)
+    plt.savefig('temp_light_curve')
+    plt.show()
 
 
 if __name__ == '__main__':
