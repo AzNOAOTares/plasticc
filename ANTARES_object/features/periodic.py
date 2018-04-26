@@ -27,12 +27,12 @@ class PeriodicMixin(object):
         # if self.time.max() - self.time.min() < max_p:
         #     return None, None, None
 
-
         optimizer_kwds = {'quiet':True}
         try:
-            if nobs <= 50:
+            if nobs <= 1000:
                 model = periodic.LombScargleMultiband(fit_period=True, optimizer_kwds=optimizer_kwds)
             else:
+                print('nobs', nobs, self.objectId)
                 model = periodic.LombScargleMultibandFast(fit_period=True, optimizer_kwds=optimizer_kwds)
             model.optimizer.period_range = (min_p, max_p)
             model.fit(self.time, self.flux, self.fluxErr, self.passband)

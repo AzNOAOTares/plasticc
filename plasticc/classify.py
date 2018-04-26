@@ -11,7 +11,7 @@ from sklearn.svm import SVC
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import RBF
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, VotingClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 
@@ -23,7 +23,7 @@ import seaborn as sns
 
 sns.reset_orig()
 
-ROOT_DIR = os.getenv('PLASTICC_DIR')
+ROOT_DIR = '..'# os.getenv('PLASTICC_DIR')
 
 
 def get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=False, pca=False):
@@ -33,13 +33,15 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
 
     features = get_features(fpath, data_release, field, model, aggregate_classes=False)
     if pca:
-        features = get_pca_features(features, n_comps=70, feature_names=feature_names)
+        features = get_pca_features(features, n_comps=50, feature_names=feature_names)
         feature_names = np.array(features.dtype.names[1:])
 
     for i, objid in enumerate(features['objid']):
         field, model, base, snid = objid.astype(str).split('_')
         if aggregate_classes:
             model = agg_map[int(model)]
+        if model == 'ignore':
+            continue
         y.append(int(model))
         x = []
         # for f in feature_names:
@@ -73,7 +75,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     return X, y, feature_names
 
 
-def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=None):
+def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=()):
     num_features = X.shape[1]
 
     # Remove models with fewer than 5 objects (as SMOTE can't work with that few objects)
@@ -89,11 +91,11 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
         y = y[mask]
         models.remove(m)
 
-    # Plot feature space before oversampling
-    plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir)
+    # # Plot feature space before oversampling
+    # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir)
 
     # Split into train/test
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.80, shuffle=True)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.60, shuffle=True)
     model_names = [sntypes_map[model] for model in models]
 
     # SMOTE to correct for imbalanced data on training set only
@@ -102,6 +104,13 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     for m in models:
         nobs = len(X_train[y_train == m])
         print(m, nobs)
+
+    # for n in [5, 10, 25, 50, 100, 500, 1000]:
+    # classifier = KNeighborsClassifier(n)
+    # clf1 = RandomForestClassifier(n_estimators=50, random_state=42)
+    # for n in [3, 5, 10, 25, 50, 100, 500, 1000]:
+    #     clf2 = KNeighborsClassifier(n_neighbors=n)
+    #     classifier = VotingClassifier(estimators=[('RF', clf1), ('KNN', clf2)], voting='hard')
 
     # Train model
     classifier.fit(X_train, y_train)
@@ -120,7 +129,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     if hasattr(classifier, "feature_importances_"):
         plot_feature_importance(classifier, feature_names, num_features, fig_dir)
     plot_confusion_matrix(cnf_matrix, classes=model_names, normalize=True, title='Normalized confusion matrix', fig_dir=fig_dir)
-    plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir, add_save_name='')
+    # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir, add_save_name='')
 
     return classifier, X_train, y_train, X_test, y_test, score, y_pred
 
@@ -129,7 +138,7 @@ def main():
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     data_release = '20180407'
@@ -144,7 +153,7 @@ def main():
     X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False)
 
     classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50)),
-                   ('KNeighbors', KNeighborsClassifier(5)),
+                   ('KNeighbors', KNeighborsClassifier(3)),
                    ('Linear SVM', SVC(kernel="linear", C=0.025)),
                    ('RBF SVM', SVC(gamma=2, C=1)),
                    ('GaussianProcesses', GaussianProcessClassifier(1.0 * RBF(1.0))),
@@ -154,7 +163,7 @@ def main():
                    ('NaiveBayes', GaussianNB()),
                    ('QDA', QuadraticDiscriminantAnalysis())]
 
-    for name, classifier in classifiers[:1]:
+    for name, classifier in classifiers[0:1]:
         fig_dir_classifier = os.path.join(fig_dir, name)
         if not os.path.exists(fig_dir_classifier):
             os.makedirs(fig_dir_classifier)

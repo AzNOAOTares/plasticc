@@ -24,8 +24,8 @@ def aggregate_sntypes(reverse=False):
     #                  }
 
     if reverse:
-        aggregate_map = {2: (2, 3, 4, 5),
-                         41: (41, 42),
+        aggregate_map = {2: (3, 4, 5),
+                         41: (41),
                          1: (1,),
                          45: (45,),
                          50: (50,),
@@ -41,8 +41,8 @@ def aggregate_sntypes(reverse=False):
                          91: (91,),
                          }
     else:
-        aggregate_map = {2: 2, 3: 2, 4: 2, 5: 2,
-                         41: 41, 42: 41,
+        aggregate_map = {2: 'ignore', 3: 2, 4: 2, 5: 2,
+                         41: 41, 42: 'ignore',
                          1: 1,
                          45: 45,
                          50: 50,

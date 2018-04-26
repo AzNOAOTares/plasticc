@@ -195,27 +195,22 @@ def combine_hdf_files(save_dir, data_release, combined_savename):
     fnames = os.listdir(save_dir)
     fname_out = os.path.join(ROOT_DIR, 'plasticc', combined_savename)
     output_file = h5py.File(fname_out, 'w')
-
     # keep track of the total number of rows
     total_rows = 0
-
     for n, f in enumerate(fnames):
         f_hdf = h5py.File(os.path.join(save_dir, f), 'r')
         data = f_hdf[data_release]
         total_rows = total_rows + data.shape[0]
-
         if n == 0:
             # first file; fill the first section of the dataset; create with no max shape
-            create_dataset = output_file.create_dataset(data_release, data=data, chunks=True, maxshape=(None,))
+            create_dataset = output_file.create_dataset(data_release, data=data, chunks=True, maxshape=(None,), compression='gzip')
             where_to_start_appending = total_rows
         else:
             # resize the dataset to accomodate the new data
             create_dataset.resize(total_rows, axis=0)
             create_dataset[where_to_start_appending:total_rows] = data
             where_to_start_appending = total_rows
-
         f_hdf.close()
-
     output_file.close()
 
 
@@ -228,7 +223,7 @@ def create_all_hdf_files(args):
 
 
 def main():
-    machine = 1  # selecting machines 1 through 10
+    machine = 6  # selecting machines 1 through 10
     save_dir = os.path.join(ROOT_DIR, 'plasticc', 'features_server_outputs', 'hdf_features_machine_{}'.format(machine))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -253,15 +248,18 @@ def main():
     #     offset += batch_size
     #     i += 1
 
-    offset = (machine-1) * 300
-    offset_next = offset + machine * 300 if machine != 10 else int(nobjects/batch_size) + 1
+    offset = 2400
+    offset_next = 2850
 
     # Multiprocessing
     i_list = np.arange(offset, offset_next)
     print(i_list)
     args_list = []
+    file_list = os.listdir(save_dir)
     for i in i_list:
-        args_list.append((data_release, i, save_dir, field, model, batch_size, sort, redo))
+        if 'features_{}.hdf5'.format(i) not in file_list:
+            print(os.path.join(save_dir, 'features_{}.hdf5'.format(i)))
+            args_list.append((data_release, i, save_dir, field, model, batch_size, sort, redo))
 
     pool = mp.Pool()
     pool.map_async(create_all_hdf_files, args_list)
