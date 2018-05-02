@@ -646,7 +646,7 @@ class BaseMixin(object):
                                 'flux_percentile_ratio_mid65',
                                 'flux_percentile_ratio_mid80',
                                 'max_slope',
-                                'maximum'
+                                'maximum',
                                 'median',
                                 'median_absolute_deviation',
                                 'percent_amplitude',
