@@ -99,7 +99,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     model_names = [sntypes_map[model] for model in models]
 
     # SMOTE to correct for imbalanced data on training set only
-    sm = over_sampling.SMOTE(random_state=42)
+    sm = over_sampling.SMOTE(random_state=42, n_jobs=20)
     X_train, y_train = sm.fit_sample(X_train, y_train)
     for m in models:
         nobs = len(X_train[y_train == m])
@@ -152,7 +152,7 @@ def main():
     feature_names = get_feature_names(passbands, ignore=('objid',))
     X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False)
 
-    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50)),
+    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50, n_jobs=-1)),
                    ('KNeighbors', KNeighborsClassifier(3)),
                    ('Linear SVM', SVC(kernel="linear", C=0.025)),
                    ('RBF SVM', SVC(gamma=2, C=1)),

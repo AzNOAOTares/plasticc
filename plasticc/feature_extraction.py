@@ -9,8 +9,7 @@ from plasticc.get_data import GetData
 from ANTARES_object.LAobject import LAobject
 import h5py
 import multiprocessing as mp
-import extinction
-import matplotlib.pyplot as plt
+import math
 
 DIRNAMES = 1
 
@@ -49,8 +48,10 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                            'shapiro_%s' % p, 'p-value_%s' % p, 'skew_%s' % p, 'q31_%s' % p,
                            'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
                            'amplitude_%s' % p, 'filt-amplitude_%s' % p,  'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
-                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p] for p in passbands], [])
-                        # 'entropy_%s' % p, 'nobs4096_%s' % p, 'rescaled-flux_%s' % p] for p in passbands], [])
+                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p,
+                           'risetime_%s' % p, 'riserate_%s' % p] for p in passbands], [])
+
+    cesium_fields = sum([['cesium_amplitude_%s' % p, 'cesium_flux_percentile_ratio_mid20_%s' % p, 'cesium_flux_percentile_ratio_mid35_%s' % p, 'cesium_flux_percentile_ratio_mid50_%s' % p, 'cesium_flux_percentile_ratio_mid65_%s' % p, 'cesium_flux_percentile_ratio_mid80_%s' % p, 'cesium_max_slope_%s' % p, 'cesium_maximum_%s' % p, 'cesium_median_%s' % p, 'cesium_median_absolute_deviation_%s' % p, 'cesium_minimum_%s' % p, 'cesium_percent_amplitude_%s' % p, 'cesium_percent_beyond_1_std_%s' % p, 'cesium_percent_close_to_median_%s' % p, 'cesium_percent_difference_flux_percentile_%s' % p, 'cesium_period_fast_%s' % p, 'cesium_qso_log_chi2_qsonu_%s' % p, 'cesium_qso_log_chi2nuNULL_chi2nu_%s' % p, 'cesium_skew_%s' % p, 'cesium_std_%s' % p, 'cesium_stetson_j_%s' % p, 'cesium_stetson_k_%s' % p, 'cesium_weighted_average_%s' % p, 'cesium_fold2P_slope_10percentile_%s' % p, 'cesium_fold2P_slope_90percentile_%s' % p, 'cesium_freq1_amplitude1_%s' % p, 'cesium_freq1_amplitude2_%s' % p, 'cesium_freq1_amplitude3_%s' % p, 'cesium_freq1_amplitude4_%s' % p, 'cesium_freq1_freq_%s' % p, 'cesium_freq1_lambda_%s' % p, 'cesium_freq1_rel_phase2_%s' % p, 'cesium_freq1_rel_phase3_%s' % p, 'cesium_freq1_rel_phase4_%s' % p, 'cesium_freq1_signif_%s' % p, 'cesium_freq2_amplitude1_%s' % p, 'cesium_freq2_amplitude2_%s' % p, 'cesium_freq2_amplitude3_%s' % p, 'cesium_freq2_amplitude4_%s' % p, 'cesium_freq2_freq_%s' % p, 'cesium_freq2_rel_phase2_%s' % p, 'cesium_freq2_rel_phase3_%s' % p, 'cesium_freq2_rel_phase4_%s' % p, 'cesium_freq3_amplitude1_%s' % p, 'cesium_freq3_amplitude2_%s' % p, 'cesium_freq3_amplitude3_%s' % p, 'cesium_freq3_amplitude4_%s' % p, 'cesium_freq3_freq_%s' % p, 'cesium_freq3_rel_phase2_%s' % p, 'cesium_freq3_rel_phase3_%s' % p, 'cesium_freq3_rel_phase4_%s' % p, 'cesium_freq_amplitude_ratio_21_%s' % p, 'cesium_freq_amplitude_ratio_31_%s' % p, 'cesium_freq_frequency_ratio_21_%s' % p, 'cesium_freq_frequency_ratio_31_%s' % p, 'cesium_freq_model_max_delta_mags_%s' % p, 'cesium_freq_model_min_delta_mags_%s' % p, 'cesium_freq_model_phi1_phi2_%s' % p, 'cesium_freq_n_alias_%s' % p, 'cesium_freq_signif_ratio_21_%s' % p, 'cesium_freq_signif_ratio_31_%s' % p, 'cesium_freq_varrat_%s' % p, 'cesium_freq_y_offset_%s' % p, 'cesium_linear_trend_%s' % p, 'cesium_medperc90_2p_p_%s' % p, 'cesium_p2p_scatter_2praw_%s' % p, 'cesium_p2p_scatter_over_mad_%s' % p, 'cesium_p2p_scatter_pfold_over_mad_%s' % p, 'cesium_p2p_ssqr_diff_over_var_%s' % p, 'cesium_scatter_res_raw_%s' % p] for p in passbands], [])
 
     color_fields = []
     colors = []
@@ -62,7 +63,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                 color_fields += ['amp %s' % color]
                 color_fields += ['mean %s' % color]
     period_fields = ['period1', 'period_score1', 'period2', 'period_score2', 'period3', 'period_score3', 'period4', 'period_score4', 'period5', 'period_score5']
-    mysql_fields = ['objid', 'redshift'] + period_fields + color_fields + feature_fields
+    mysql_fields = ['objid', 'redshift'] + period_fields + color_fields + feature_fields + cesium_fields
 
     def _gf(func, p, name):
         """ Try to get feature, otherwise return nan. """
@@ -86,27 +87,17 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         obsid = np.arange(len(lc))
         t = lc['mjd'] - peak_mjd  # subtract peakmjd from each mjd.
         flux, fluxerr = lc['flux'], lc['dflux']  # renorm_flux_lightcurve(flux=lc['flux'], fluxerr=lc['dflux'], mu=dlmu)
-
         t, flux, fluxerr, obsid, lc['pb'], lc['zpt'] = np.array(t), np.array(flux), np.array(fluxerr), np.array(obsid), np.array(lc['pb']), np.array(lc['zpt'])
         try:
             laobject = LAobject(locusId=objid, objectId=objid, time=t, flux=flux, fluxErr=fluxerr,
                                 obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, photflag=lc['photflag'])
-
-            rescaled_flux = (flux - min(flux))/(max(flux)-min(flux))
-            rescaled_fluxerr = fluxerr/(max(flux)-min(flux))
-            # laobject_rescaled = LAobject(locusId=objid, objectId=objid, time=t, flux=rescaled_flux, fluxErr=rescaled_fluxerr,
-            #                     obsId=obsid, passband=lc['pb'], zeropoint=lc['zpt'], per=False, mag=False, photflag=lc['photflag'])
-
-            # photmask = lc['photflag'] >= 4096
-            # laobject2 = LAobject(locusId=objid, objectId=objid, time=t[photmask], flux=flux[photmask], fluxErr=fluxerr[photmask],
-            #                      obsId=obsid[photmask], passband=lc['pb'][photmask], zeropoint=lc['zpt'][photmask], per=False, mag=False, photflag=None)
         except ValueError as err:
             print(err)
             continue
         features = OrderedDict()
         features['objid'] = objid.encode('utf8')
         features['redshift'] = redshift
-
+        print('before period', objid)
         periods, period_scores = laobject.get_best_periods()
         features['period1'] = periods[0]
         features['period_score1'] = period_scores[0]
@@ -119,19 +110,24 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
         features['period5'] = periods[4]
         features['period_score5'] = period_scores[4]
 
+        print('before color', objid)
         coloramp = laobject.get_color_amplitudes(recompute=True)
         colormean = laobject.get_color_mean(recompute=True)
         for color in colors:
             features['amp %s' % color] = coloramp[color]
             features['mean %s' % color] = colormean[color]
 
+        print('before get_cesium', objid)
+        cesium_feature_vals = laobject.get_cesium_features(recompute=True)
+        print('after get cesium', objid)
         for p in passbands:
+            print("Doing feature for p:", p, objid)
             flux_pb = flux[lc['pb'] == p]
 
             stats = _gf(laobject.get_stats(recompute=True), p, 'stats')
             filt_stats = _gf(laobject.get_filtered_stats(recompute=True), p, 'filt-stats')
             if not isinstance(stats, scipy.stats.stats.DescribeResult) or stats.nobs <= 3:  # Don't store features of light curves with less than 3 points
-                features = set_keys_to_nan(feature_fields, p, features)
+                features = set_keys_to_nan(feature_fields+cesium_fields, p, features)
                 continue
             features['variance_%s' % p] = stats.variance
             features['kurtosis_%s' % p] = stats.kurtosis
@@ -155,13 +151,81 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             features['stetsonl_%s' % p] = _gf(laobject.get_StetsonL(recompute=True), p, 'stetsonl')
             features['entropy_%s' % p] = _gf(laobject.get_ShannonEntropy(recompute=True), p, 'entropy')
             features['nobs4096_%s' % p] = len(flux_pb[lc['photflag'][lc['pb'] == p] >= 4096])/len(flux_pb)
+            features['risetime_%s' % p] = _gf(laobject.get_rise_time(recompute=True), p, 'risetime')
+            features['riserate_%s' % p] = _gf(laobject.get_rise_time(recompute=True), p, 'riserate')
 
-
-            # features['rescaled-flux_%s' % p] = str(rescaled_flux)
-
-            # # photflag_new = lc['photflag'][lc['pb'] == p]
-            # # zeros = np.where(photflag_new==0)[0]
-            # # flux_new[zeros] = 0
+            features['cesium_amplitude_%s' % p] = cesium_feature_vals[p]['amplitude'].values[0]
+            features['cesium_flux_percentile_ratio_mid20_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid20'].values[0]
+            features['cesium_flux_percentile_ratio_mid35_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid35'].values[0]
+            features['cesium_flux_percentile_ratio_mid50_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid50'].values[0]
+            features['cesium_flux_percentile_ratio_mid65_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid65'].values[0]
+            features['cesium_flux_percentile_ratio_mid80_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid80'].values[0]
+            features['cesium_max_slope_%s' % p] = cesium_feature_vals[p]['max_slope'].values[0]
+            features['cesium_maximum_%s' % p] = cesium_feature_vals[p]['maximum'].values[0]
+            features['cesium_median_%s' % p] = cesium_feature_vals[p]['median'].values[0]
+            features['cesium_median_absolute_deviation_%s' % p] = cesium_feature_vals[p]['median_absolute_deviation'].values[0]
+            features['cesium_minimum_%s' % p] = cesium_feature_vals[p]['minimum'].values[0]
+            features['cesium_percent_amplitude_%s' % p] = cesium_feature_vals[p]['percent_amplitude'].values[0]
+            features['cesium_percent_beyond_1_std_%s' % p] = cesium_feature_vals[p]['percent_beyond_1_std'].values[0]
+            features['cesium_percent_close_to_median_%s' % p] = cesium_feature_vals[p]['percent_close_to_median'].values[0]
+            features['cesium_percent_difference_flux_percentile_%s' % p] = cesium_feature_vals[p]['percent_difference_flux_percentile'].values[0]
+            features['cesium_period_fast_%s' % p] = cesium_feature_vals[p]['period_fast'].values[0]
+            features['cesium_qso_log_chi2_qsonu_%s' % p] = cesium_feature_vals[p]['qso_log_chi2_qsonu'].values[0]
+            features['cesium_qso_log_chi2nuNULL_chi2nu_%s' % p] = cesium_feature_vals[p]['qso_log_chi2nuNULL_chi2nu'].values[0]
+            features['cesium_skew_%s' % p] = cesium_feature_vals[p]['skew'].values[0]
+            features['cesium_std_%s' % p] = cesium_feature_vals[p]['std'].values[0]
+            features['cesium_stetson_j_%s' % p] = cesium_feature_vals[p]['stetson_j'].values[0]
+            features['cesium_stetson_k_%s' % p] = cesium_feature_vals[p]['stetson_k'].values[0]
+            features['cesium_weighted_average_%s' % p] = cesium_feature_vals[p]['weighted_average'].values[0]
+            features['cesium_fold2P_slope_10percentile_%s' % p] = cesium_feature_vals[p]['fold2P_slope_10percentile'].values[0]
+            features['cesium_fold2P_slope_90percentile_%s' % p] = cesium_feature_vals[p]['fold2P_slope_90percentile'].values[0]
+            features['cesium_freq1_amplitude1_%s' % p] = cesium_feature_vals[p]['freq1_amplitude1'].values[0]
+            features['cesium_freq1_amplitude2_%s' % p] = cesium_feature_vals[p]['freq1_amplitude2'].values[0]
+            features['cesium_freq1_amplitude3_%s' % p] = cesium_feature_vals[p]['freq1_amplitude3'].values[0]
+            features['cesium_freq1_amplitude4_%s' % p] = cesium_feature_vals[p]['freq1_amplitude4'].values[0]
+            features['cesium_freq1_freq_%s' % p] = cesium_feature_vals[p]['freq1_freq'].values[0]
+            features['cesium_freq1_lambda_%s' % p] = cesium_feature_vals[p]['freq1_lambda'].values[0]
+            features['cesium_freq1_rel_phase2_%s' % p] = cesium_feature_vals[p]['freq1_rel_phase2'].values[0]
+            features['cesium_freq1_rel_phase3_%s' % p] = cesium_feature_vals[p]['freq1_rel_phase3'].values[0]
+            features['cesium_freq1_rel_phase4_%s' % p] = cesium_feature_vals[p]['freq1_rel_phase4'].values[0]
+            features['cesium_freq1_signif_%s' % p] = cesium_feature_vals[p]['freq1_signif'].values[0]
+            features['cesium_freq2_amplitude1_%s' % p] = cesium_feature_vals[p]['freq2_amplitude1'].values[0]
+            features['cesium_freq2_amplitude2_%s' % p] = cesium_feature_vals[p]['freq2_amplitude2'].values[0]
+            features['cesium_freq2_amplitude3_%s' % p] = cesium_feature_vals[p]['freq2_amplitude3'].values[0]
+            features['cesium_freq2_amplitude4_%s' % p] = cesium_feature_vals[p]['freq2_amplitude4'].values[0]
+            features['cesium_freq2_freq_%s' % p] = cesium_feature_vals[p]['freq2_freq'].values[0]
+            features['cesium_freq2_rel_phase2_%s' % p] = cesium_feature_vals[p]['freq2_rel_phase2'].values[0]
+            features['cesium_freq2_rel_phase3_%s' % p] = cesium_feature_vals[p]['freq2_rel_phase3'].values[0]
+            features['cesium_freq2_rel_phase4_%s' % p] = cesium_feature_vals[p]['freq2_rel_phase4'].values[0]
+            features['cesium_freq3_amplitude1_%s' % p] = cesium_feature_vals[p]['freq3_amplitude1'].values[0]
+            features['cesium_freq3_amplitude2_%s' % p] = cesium_feature_vals[p]['freq3_amplitude2'].values[0]
+            features['cesium_freq3_amplitude3_%s' % p] = cesium_feature_vals[p]['freq3_amplitude3'].values[0]
+            features['cesium_freq3_amplitude4_%s' % p] = cesium_feature_vals[p]['freq3_amplitude4'].values[0]
+            features['cesium_freq3_freq_%s' % p] = cesium_feature_vals[p]['freq3_freq'].values[0]
+            features['cesium_freq3_rel_phase2_%s' % p] = cesium_feature_vals[p]['freq3_rel_phase2'].values[0]
+            features['cesium_freq3_rel_phase3_%s' % p] = cesium_feature_vals[p]['freq3_rel_phase3'].values[0]
+            features['cesium_freq3_rel_phase4_%s' % p] = cesium_feature_vals[p]['freq3_rel_phase4'].values[0]
+            features['cesium_freq_amplitude_ratio_21_%s' % p] = cesium_feature_vals[p]['freq_amplitude_ratio_21'].values[0]
+            features['cesium_freq_amplitude_ratio_31_%s' % p] = cesium_feature_vals[p]['freq_amplitude_ratio_31'].values[0]
+            features['cesium_freq_frequency_ratio_21_%s' % p] = cesium_feature_vals[p]['freq_frequency_ratio_21'].values[0]
+            features['cesium_freq_frequency_ratio_31_%s' % p] = cesium_feature_vals[p]['freq_frequency_ratio_31'].values[0]
+            features['cesium_freq_model_max_delta_mags_%s' % p] = cesium_feature_vals[p]['freq_model_max_delta_mags'].values[0]
+            features['cesium_freq_model_min_delta_mags_%s' % p] = cesium_feature_vals[p]['freq_model_min_delta_mags'].values[0]
+            features['cesium_freq_model_phi1_phi2_%s' % p] = cesium_feature_vals[p]['freq_model_phi1_phi2'].values[0]
+            features['cesium_freq_n_alias_%s' % p] = cesium_feature_vals[p]['freq_n_alias'].values[0]
+            features['cesium_freq_signif_ratio_21_%s' % p] = cesium_feature_vals[p]['freq_signif_ratio_21'].values[0]
+            features['cesium_freq_signif_ratio_31_%s' % p] = cesium_feature_vals[p]['freq_signif_ratio_31'].values[0]
+            features['cesium_freq_varrat_%s' % p] = cesium_feature_vals[p]['freq_varrat'].values[0]
+            features['cesium_freq_y_offset_%s' % p] = cesium_feature_vals[p]['freq_y_offset'].values[0]
+            features['cesium_linear_trend_%s' % p] = cesium_feature_vals[p]['linear_trend'].values[0]
+            features['cesium_medperc90_2p_p_%s' % p] = cesium_feature_vals[p]['medperc90_2p_p'].values[0]
+            features['cesium_p2p_scatter_2praw_%s' % p] = cesium_feature_vals[p]['p2p_scatter_2praw'].values[0]
+            features['cesium_p2p_scatter_over_mad_%s' % p] = cesium_feature_vals[p]['p2p_scatter_over_mad'].values[0]
+            features['cesium_p2p_scatter_pfold_over_mad_%s' % p] = cesium_feature_vals[p]['p2p_scatter_pfold_over_mad'].values[0]
+            features['cesium_p2p_ssqr_diff_over_var_%s' % p] = cesium_feature_vals[p]['p2p_ssqr_diff_over_var'].values[0]
+            features['cesium_scatter_res_raw_%s' % p] = cesium_feature_vals[p]['scatter_res_raw'].values[0]
+            print("Finished feature for p:", p, objid)
+            print('len', objid, p, len(features.values()))
 
             # print('amplitude', objid, features['amplitude_r'], 'dlmu', dlmu, 'mwebv', mwebv)
             # print(list(zip(t[lc['pb'] == 'r'], flux[lc['pb'] == 'r'], lc['photflag'][lc['pb'] == 'r'])))
@@ -171,11 +235,13 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             # plt.show()
 
         count += 1
-        print(objid.encode('utf8'), offset, count, os.path.basename(fname))
+        print(objid.encode('utf8'), offset, count, os.path.basename(fname), len(features.values()))
         features_out += [list(features.values())]
+        if len(features.values()) != 600:
+            print("###############\n\n\n\n\n\n######################")
 
     # Set all columns to floats except set first column to string (objid)
-    dtypes = ['S24', np.float64] + [np.float64] * len(period_fields) + [np.float64] * len(color_fields) + ([np.float64] * int(len(feature_fields) / len(passbands))) * len(passbands)
+    dtypes = ['S24', np.float64] + [np.float64] * len(period_fields) + [np.float64] * len(color_fields) + ([np.float64] * int((len(feature_fields) + len(cesium_fields)) / len(passbands))) * len(passbands)
     # dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands))) * len(passbands)
     # dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands) - 1) + [bytes]) * len(passbands)
     print('AA', len(mysql_fields), len(dtypes))
@@ -229,7 +295,7 @@ def main():
         os.makedirs(save_dir)
 
     data_release = '20180407'
-    field = '%'
+    field = 'DDF'
     model = '%'
     getter = GetData(data_release)
     nobjects = next(getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True, big=False))
@@ -248,8 +314,9 @@ def main():
     #     offset += batch_size
     #     i += 1
 
-    offset = 2400
-    offset_next = 2850
+    offset = 0
+    offset_next = 50
+    print(offset_next)
 
     # Multiprocessing
     i_list = np.arange(offset, offset_next)

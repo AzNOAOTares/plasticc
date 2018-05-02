@@ -222,22 +222,22 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_ddf_few')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_ddf_few.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     passbands = ['r', 'i', 'z', 'Y']
 
     feature_names = get_feature_names(passbands, ignore=())
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF_aggregate')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_ddf_few')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
     models = [1, 2, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90]
-    plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models, aggregate_classes=True)
+    plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models, aggregate_classes=False)
 
 
 if __name__ == '__main__':
