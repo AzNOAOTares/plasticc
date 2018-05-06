@@ -16,7 +16,7 @@ DIRNAMES = 1
 
 def set_keys_to_nan(feature_fields, p, features):
     for key in feature_fields:
-        if '_%s' % p in key:
+        if key.endswith('_%s' % p):
             features[key] = np.nan
     return features
 
@@ -51,7 +51,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
                            'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p,
                            'risetime_%s' % p, 'riserate_%s' % p] for p in passbands], [])
 
-    cesium_fields = sum([['cesium_flux_percentile_ratio_mid20_%s' % p, 'cesium_flux_percentile_ratio_mid50_%s' % p, 'cesium_flux_percentile_ratio_mid65_%s' % p, 'cesium_flux_percentile_ratio_mid80_%s' % p, 'cesium_max_slope_%s' % p, 'cesium_maximu_%s' % p, 'cesium_median_%s' % p, 'cesium_median_absolute_deviation_%s' % p, 'cesium_percent_amplitude_%s' % p, 'cesium_period_fast_%s' % p, 'cesium_qso_log_chi2_qsonu_%s' % p, 'cesium_qso_log_chi2nuNULL_chi2nu_%s' % p, 'cesium_fold2P_slope_90percentile_%s' % p, 'cesium_freq1_amplitude1_%s' % p, 'cesium_freq1_amplitude2_%s' % p, 'cesium_freq1_amplitude3_%s' % p, 'cesium_freq1_amplitude4_%s' % p, 'cesium_freq1_freq_%s' % p, 'cesium_freq1_lambda_%s' % p, 'cesium_freq1_rel_phase2_%s' % p, 'cesium_freq1_rel_phase3_%s' % p, 'cesium_freq1_rel_phase4_%s' % p, 'cesium_freq1_signif_%s' % p, 'cesium_freq2_amplitude1_%s' % p, 'cesium_freq2_amplitude2_%s' % p, 'cesium_freq2_amplitude3_%s' % p, 'cesium_freq2_amplitude4_%s' % p, 'cesium_freq2_rel_phase2_%s' % p, 'cesium_freq2_rel_phase3_%s' % p, 'cesium_freq2_rel_phase4_%s' % p, 'cesium_freq3_amplitude1_%s' % p, 'cesium_freq3_amplitude2_%s' % p, 'cesium_freq3_amplitude3_%s' % p, 'cesium_freq3_amplitude4_%s' % p, 'cesium_freq3_rel_phase2_%s' % p, 'cesium_freq3_rel_phase3_%s' % p, 'cesium_freq3_rel_phase4_%s' % p, 'cesium_freq_amplitude_ratio_21_%s' % p, 'cesium_freq_amplitude_ratio_31_%s' % p, 'cesium_freq_n_alias_%s' % p, 'cesium_freq_signif_ratio_21_%s' % p, 'cesium_freq_signif_ratio_31_%s' % p, 'cesium_freq_varrat_%s' % p, 'cesium_freq_y_offset_%s' % p, 'cesium_medperc90_2p_p_%s' % p, 'cesium_p2p_scatter_pfold_over_mad_%s' % p, 'cesium_p2p_ssqr_diff_over_var_%s' % p, 'cesium_scatter_res_ra_%s' % p] for p in passbands], [])
+    cesium_fields = sum([['cesium_flux_percentile_ratio_mid20_%s' % p, 'cesium_flux_percentile_ratio_mid50_%s' % p, 'cesium_flux_percentile_ratio_mid65_%s' % p, 'cesium_flux_percentile_ratio_mid80_%s' % p, 'cesium_max_slope_%s' % p, 'cesium_maximum_%s' % p, 'cesium_median_%s' % p, 'cesium_median_absolute_deviation_%s' % p, 'cesium_percent_amplitude_%s' % p, 'cesium_period_fast_%s' % p, 'cesium_qso_log_chi2_qsonu_%s' % p, 'cesium_qso_log_chi2nuNULL_chi2nu_%s' % p, 'cesium_fold2P_slope_90percentile_%s' % p, 'cesium_freq1_amplitude1_%s' % p, 'cesium_freq1_amplitude2_%s' % p, 'cesium_freq1_amplitude3_%s' % p, 'cesium_freq1_amplitude4_%s' % p, 'cesium_freq1_freq_%s' % p, 'cesium_freq1_lambda_%s' % p, 'cesium_freq1_rel_phase2_%s' % p, 'cesium_freq1_rel_phase3_%s' % p, 'cesium_freq1_rel_phase4_%s' % p, 'cesium_freq1_signif_%s' % p, 'cesium_freq2_amplitude1_%s' % p, 'cesium_freq2_amplitude2_%s' % p, 'cesium_freq2_amplitude3_%s' % p, 'cesium_freq2_amplitude4_%s' % p, 'cesium_freq2_rel_phase2_%s' % p, 'cesium_freq2_rel_phase3_%s' % p, 'cesium_freq2_rel_phase4_%s' % p, 'cesium_freq3_amplitude1_%s' % p, 'cesium_freq3_amplitude2_%s' % p, 'cesium_freq3_amplitude3_%s' % p, 'cesium_freq3_amplitude4_%s' % p, 'cesium_freq3_rel_phase2_%s' % p, 'cesium_freq3_rel_phase3_%s' % p, 'cesium_freq3_rel_phase4_%s' % p, 'cesium_freq_amplitude_ratio_21_%s' % p, 'cesium_freq_amplitude_ratio_31_%s' % p, 'cesium_freq_n_alias_%s' % p, 'cesium_freq_signif_ratio_21_%s' % p, 'cesium_freq_signif_ratio_31_%s' % p, 'cesium_freq_varrat_%s' % p, 'cesium_freq_y_offset_%s' % p, 'cesium_medperc90_2p_p_%s' % p, 'cesium_p2p_scatter_pfold_over_mad_%s' % p, 'cesium_p2p_ssqr_diff_over_var_%s' % p, 'cesium_scatter_res_raw_%s' % p] for p in passbands], [])
 
     color_fields = []
     colors = []
@@ -268,7 +268,7 @@ def create_all_hdf_files(args):
 
 def main():
     machine = 6  # selecting machines 1 through 10
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_DDF_with_cesium')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'features_all_servers')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -292,8 +292,8 @@ def main():
     #     offset += batch_size
     #     i += 1
 
-    offset = 180
-    offset_next = 210
+    offset = 120
+    offset_next = 180
     print(offset_next)
 
     # Multiprocessing
