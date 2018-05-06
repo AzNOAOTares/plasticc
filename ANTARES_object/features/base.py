@@ -691,7 +691,7 @@ class BaseMixin(object):
                                 'scatter_res_raw']
 
             if len(tFluxRenorm) <= 1:  # if t Flux is empty
-                fset_cesium = pd.DataFrame(0, index=np.arange(1), columns=features_general)
+                fset_cesium = pd.DataFrame({f: {'channel': {0: 0}} for f in features_general})
             else:
                 fset_cesium = featurize.featurize_time_series(times=ttime,
                                                               values=tFluxRenorm,

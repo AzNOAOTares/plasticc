@@ -20,6 +20,7 @@ import helpers
 from classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
 from pca_components import get_pca_features
 import seaborn as sns
+import pandas as pd
 
 sns.reset_orig()
 
@@ -32,6 +33,14 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     agg_map = helpers.aggregate_sntypes()
 
     features = get_features(fpath, data_release, field, model, aggregate_classes=False)
+
+    # Remove features that contain more have more than 5000 objects with NaNs
+    for name, nan_count in pd.DataFrame(features).isnull().sum().iteritems():
+        if nan_count > 5000:
+            print("Removing feature", name, "because it has", nan_count, "nan value objects", "out of", len(features))
+            features = helpers.remove_field_name(features, name)
+            feature_names = np.delete(feature_names, np.argwhere(feature_names == name))
+
     if pca:
         features = get_pca_features(features, n_comps=50, feature_names=feature_names)
         feature_names = np.array(features.dtype.names[1:])
@@ -61,6 +70,12 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     y = y[mask]
     print("Num objects after removing objects where any features are NaN: ", len(X))
 
+    # Remove rows that contain are too big or too small
+    mask = ~np.logical_or(X < -1e30, X > 1e30).any(axis=1)
+    X = X[mask]
+    y = y[mask]
+    print("Num objects after removing objects where any features are greater than 1e99: ", len(X))
+
     # Remove extreme values over 20 standard deviations from the median 1 times iteratively
     for ii in range(1):
         for f in range(X.shape[1]):
@@ -82,7 +97,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     for m in models:
         nobs = len(X[y == m])
         print(m, nobs)
-        if nobs <= 5:
+        if nobs <= 9:
             print("Removing model {}, because it only has {} objects.".format(m, nobs))
             remove_models.append(m)
     for m in remove_models:
@@ -135,10 +150,10 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify', 'ddf_with_cesium')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_ddf_with_cesium.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     data_release = '20180407'

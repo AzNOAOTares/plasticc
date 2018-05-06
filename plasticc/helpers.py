@@ -60,3 +60,11 @@ def aggregate_sntypes(reverse=False):
         # Other is BSR (Binary Star remnant), ILOT, PISN
 
     return aggregate_map
+
+
+def remove_field_name(a, name):
+    names = list(a.dtype.names)
+    if name in names:
+        names.remove(name)
+    b = a[names]
+    return b

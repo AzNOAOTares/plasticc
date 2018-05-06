@@ -154,54 +154,54 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             features['risetime_%s' % p] = _gf(laobject.get_rise_time(recompute=True), p, 'risetime')
             features['riserate_%s' % p] = _gf(laobject.get_rise_time(recompute=True), p, 'riserate')
 
-            features['cesium_flux_percentile_ratio_mid20_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid20'].values[0]
-            features['cesium_flux_percentile_ratio_mid50_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid50'].values[0]
-            features['cesium_flux_percentile_ratio_mid65_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid65'].values[0]
-            features['cesium_flux_percentile_ratio_mid80_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid80'].values[0]
-            features['cesium_max_slope_%s' % p] = cesium_feature_vals[p]['max_slope'].values[0]
-            features['cesium_maximum_%s' % p] = cesium_feature_vals[p]['maximum'].values[0]
-            features['cesium_median_%s' % p] = cesium_feature_vals[p]['median'].values[0]
-            features['cesium_median_absolute_deviation_%s' % p] = cesium_feature_vals[p]['median_absolute_deviation'].values[0]
-            features['cesium_percent_amplitude_%s' % p] = cesium_feature_vals[p]['percent_amplitude'].values[0]
-            features['cesium_period_fast_%s' % p] = cesium_feature_vals[p]['period_fast'].values[0]
-            features['cesium_qso_log_chi2_qsonu_%s' % p] = cesium_feature_vals[p]['qso_log_chi2_qsonu'].values[0]
-            features['cesium_qso_log_chi2nuNULL_chi2nu_%s' % p] = cesium_feature_vals[p]['qso_log_chi2nuNULL_chi2nu'].values[0]
-            features['cesium_fold2P_slope_90percentile_%s' % p] = cesium_feature_vals[p]['fold2P_slope_90percentile'].values[0]
-            features['cesium_freq1_amplitude1_%s' % p] = cesium_feature_vals[p]['freq1_amplitude1'].values[0]
-            features['cesium_freq1_amplitude2_%s' % p] = cesium_feature_vals[p]['freq1_amplitude2'].values[0]
-            features['cesium_freq1_amplitude3_%s' % p] = cesium_feature_vals[p]['freq1_amplitude3'].values[0]
-            features['cesium_freq1_amplitude4_%s' % p] = cesium_feature_vals[p]['freq1_amplitude4'].values[0]
-            features['cesium_freq1_freq_%s' % p] = cesium_feature_vals[p]['freq1_freq'].values[0]
-            features['cesium_freq1_lambda_%s' % p] = cesium_feature_vals[p]['freq1_lambda'].values[0]
-            features['cesium_freq1_rel_phase2_%s' % p] = cesium_feature_vals[p]['freq1_rel_phase2'].values[0]
-            features['cesium_freq1_rel_phase3_%s' % p] = cesium_feature_vals[p]['freq1_rel_phase3'].values[0]
-            features['cesium_freq1_rel_phase4_%s' % p] = cesium_feature_vals[p]['freq1_rel_phase4'].values[0]
-            features['cesium_freq1_signif_%s' % p] = cesium_feature_vals[p]['freq1_signif'].values[0]
-            features['cesium_freq2_amplitude1_%s' % p] = cesium_feature_vals[p]['freq2_amplitude1'].values[0]
-            features['cesium_freq2_amplitude2_%s' % p] = cesium_feature_vals[p]['freq2_amplitude2'].values[0]
-            features['cesium_freq2_amplitude3_%s' % p] = cesium_feature_vals[p]['freq2_amplitude3'].values[0]
-            features['cesium_freq2_amplitude4_%s' % p] = cesium_feature_vals[p]['freq2_amplitude4'].values[0]
-            features['cesium_freq2_rel_phase2_%s' % p] = cesium_feature_vals[p]['freq2_rel_phase2'].values[0]
-            features['cesium_freq2_rel_phase3_%s' % p] = cesium_feature_vals[p]['freq2_rel_phase3'].values[0]
-            features['cesium_freq2_rel_phase4_%s' % p] = cesium_feature_vals[p]['freq2_rel_phase4'].values[0]
-            features['cesium_freq3_amplitude1_%s' % p] = cesium_feature_vals[p]['freq3_amplitude1'].values[0]
-            features['cesium_freq3_amplitude2_%s' % p] = cesium_feature_vals[p]['freq3_amplitude2'].values[0]
-            features['cesium_freq3_amplitude3_%s' % p] = cesium_feature_vals[p]['freq3_amplitude3'].values[0]
-            features['cesium_freq3_amplitude4_%s' % p] = cesium_feature_vals[p]['freq3_amplitude4'].values[0]
-            features['cesium_freq3_rel_phase2_%s' % p] = cesium_feature_vals[p]['freq3_rel_phase2'].values[0]
-            features['cesium_freq3_rel_phase3_%s' % p] = cesium_feature_vals[p]['freq3_rel_phase3'].values[0]
-            features['cesium_freq3_rel_phase4_%s' % p] = cesium_feature_vals[p]['freq3_rel_phase4'].values[0]
-            features['cesium_freq_amplitude_ratio_21_%s' % p] = cesium_feature_vals[p]['freq_amplitude_ratio_21'].values[0]
-            features['cesium_freq_amplitude_ratio_31_%s' % p] = cesium_feature_vals[p]['freq_amplitude_ratio_31'].values[0]
-            features['cesium_freq_n_alias_%s' % p] = cesium_feature_vals[p]['freq_n_alias'].values[0]
-            features['cesium_freq_signif_ratio_21_%s' % p] = cesium_feature_vals[p]['freq_signif_ratio_21'].values[0]
-            features['cesium_freq_signif_ratio_31_%s' % p] = cesium_feature_vals[p]['freq_signif_ratio_31'].values[0]
-            features['cesium_freq_varrat_%s' % p] = cesium_feature_vals[p]['freq_varrat'].values[0]
-            features['cesium_freq_y_offset_%s' % p] = cesium_feature_vals[p]['freq_y_offset'].values[0]
-            features['cesium_medperc90_2p_p_%s' % p] = cesium_feature_vals[p]['medperc90_2p_p'].values[0]
-            features['cesium_p2p_scatter_pfold_over_mad_%s' % p] = cesium_feature_vals[p]['p2p_scatter_pfold_over_mad'].values[0]
-            features['cesium_p2p_ssqr_diff_over_var_%s' % p] = cesium_feature_vals[p]['p2p_ssqr_diff_over_var'].values[0]
-            features['cesium_scatter_res_raw_%s' % p] = cesium_feature_vals[p]['scatter_res_raw'].values[0]
+            features['cesium_flux_percentile_ratio_mid20_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid20'].values[0][0]
+            features['cesium_flux_percentile_ratio_mid50_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid50'].values[0][0]
+            features['cesium_flux_percentile_ratio_mid65_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid65'].values[0][0]
+            features['cesium_flux_percentile_ratio_mid80_%s' % p] = cesium_feature_vals[p]['flux_percentile_ratio_mid80'].values[0][0]
+            features['cesium_max_slope_%s' % p] = cesium_feature_vals[p]['max_slope'].values[0][0]
+            features['cesium_maximum_%s' % p] = cesium_feature_vals[p]['maximum'].values[0][0]
+            features['cesium_median_%s' % p] = cesium_feature_vals[p]['median'].values[0][0]
+            features['cesium_median_absolute_deviation_%s' % p] = cesium_feature_vals[p]['median_absolute_deviation'].values[0][0]
+            features['cesium_percent_amplitude_%s' % p] = cesium_feature_vals[p]['percent_amplitude'].values[0][0]
+            features['cesium_period_fast_%s' % p] = cesium_feature_vals[p]['period_fast'].values[0][0]
+            features['cesium_qso_log_chi2_qsonu_%s' % p] = cesium_feature_vals[p]['qso_log_chi2_qsonu'].values[0][0]
+            features['cesium_qso_log_chi2nuNULL_chi2nu_%s' % p] = cesium_feature_vals[p]['qso_log_chi2nuNULL_chi2nu'].values[0][0]
+            features['cesium_fold2P_slope_90percentile_%s' % p] = cesium_feature_vals[p]['fold2P_slope_90percentile'].values[0][0]
+            features['cesium_freq1_amplitude1_%s' % p] = cesium_feature_vals[p]['freq1_amplitude1'].values[0][0]
+            features['cesium_freq1_amplitude2_%s' % p] = cesium_feature_vals[p]['freq1_amplitude2'].values[0][0]
+            features['cesium_freq1_amplitude3_%s' % p] = cesium_feature_vals[p]['freq1_amplitude3'].values[0][0]
+            features['cesium_freq1_amplitude4_%s' % p] = cesium_feature_vals[p]['freq1_amplitude4'].values[0][0]
+            features['cesium_freq1_freq_%s' % p] = cesium_feature_vals[p]['freq1_freq'].values[0][0]
+            features['cesium_freq1_lambda_%s' % p] = cesium_feature_vals[p]['freq1_lambda'].values[0][0]
+            features['cesium_freq1_rel_phase2_%s' % p] = cesium_feature_vals[p]['freq1_rel_phase2'].values[0][0]
+            features['cesium_freq1_rel_phase3_%s' % p] = cesium_feature_vals[p]['freq1_rel_phase3'].values[0][0]
+            features['cesium_freq1_rel_phase4_%s' % p] = cesium_feature_vals[p]['freq1_rel_phase4'].values[0][0]
+            features['cesium_freq1_signif_%s' % p] = cesium_feature_vals[p]['freq1_signif'].values[0][0]
+            features['cesium_freq2_amplitude1_%s' % p] = cesium_feature_vals[p]['freq2_amplitude1'].values[0][0]
+            features['cesium_freq2_amplitude2_%s' % p] = cesium_feature_vals[p]['freq2_amplitude2'].values[0][0]
+            features['cesium_freq2_amplitude3_%s' % p] = cesium_feature_vals[p]['freq2_amplitude3'].values[0][0]
+            features['cesium_freq2_amplitude4_%s' % p] = cesium_feature_vals[p]['freq2_amplitude4'].values[0][0]
+            features['cesium_freq2_rel_phase2_%s' % p] = cesium_feature_vals[p]['freq2_rel_phase2'].values[0][0]
+            features['cesium_freq2_rel_phase3_%s' % p] = cesium_feature_vals[p]['freq2_rel_phase3'].values[0][0]
+            features['cesium_freq2_rel_phase4_%s' % p] = cesium_feature_vals[p]['freq2_rel_phase4'].values[0][0]
+            features['cesium_freq3_amplitude1_%s' % p] = cesium_feature_vals[p]['freq3_amplitude1'].values[0][0]
+            features['cesium_freq3_amplitude2_%s' % p] = cesium_feature_vals[p]['freq3_amplitude2'].values[0][0]
+            features['cesium_freq3_amplitude3_%s' % p] = cesium_feature_vals[p]['freq3_amplitude3'].values[0][0]
+            features['cesium_freq3_amplitude4_%s' % p] = cesium_feature_vals[p]['freq3_amplitude4'].values[0][0]
+            features['cesium_freq3_rel_phase2_%s' % p] = cesium_feature_vals[p]['freq3_rel_phase2'].values[0][0]
+            features['cesium_freq3_rel_phase3_%s' % p] = cesium_feature_vals[p]['freq3_rel_phase3'].values[0][0]
+            features['cesium_freq3_rel_phase4_%s' % p] = cesium_feature_vals[p]['freq3_rel_phase4'].values[0][0]
+            features['cesium_freq_amplitude_ratio_21_%s' % p] = cesium_feature_vals[p]['freq_amplitude_ratio_21'].values[0][0]
+            features['cesium_freq_amplitude_ratio_31_%s' % p] = cesium_feature_vals[p]['freq_amplitude_ratio_31'].values[0][0]
+            features['cesium_freq_n_alias_%s' % p] = cesium_feature_vals[p]['freq_n_alias'].values[0][0]
+            features['cesium_freq_signif_ratio_21_%s' % p] = cesium_feature_vals[p]['freq_signif_ratio_21'].values[0][0]
+            features['cesium_freq_signif_ratio_31_%s' % p] = cesium_feature_vals[p]['freq_signif_ratio_31'].values[0][0]
+            features['cesium_freq_varrat_%s' % p] = cesium_feature_vals[p]['freq_varrat'].values[0][0]
+            features['cesium_freq_y_offset_%s' % p] = cesium_feature_vals[p]['freq_y_offset'].values[0][0]
+            features['cesium_medperc90_2p_p_%s' % p] = cesium_feature_vals[p]['medperc90_2p_p'].values[0][0]
+            features['cesium_p2p_scatter_pfold_over_mad_%s' % p] = cesium_feature_vals[p]['p2p_scatter_pfold_over_mad'].values[0][0]
+            features['cesium_p2p_ssqr_diff_over_var_%s' % p] = cesium_feature_vals[p]['p2p_ssqr_diff_over_var'].values[0][0]
+            features['cesium_scatter_res_raw_%s' % p] = cesium_feature_vals[p]['scatter_res_raw'].values[0][0]
             print("Finished feature for p:", p, objid)
             print('len', objid, p, len(features.values()))
 
@@ -268,7 +268,7 @@ def create_all_hdf_files(args):
 
 def main():
     machine = 6  # selecting machines 1 through 10
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'features_all_servers')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_DDF_with_cesium2')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -292,8 +292,8 @@ def main():
     #     offset += batch_size
     #     i += 1
 
-    offset = 120
-    offset_next = 180
+    offset = 0
+    offset_next = 20
     print(offset_next)
 
     # Multiprocessing
@@ -319,7 +319,7 @@ def main():
     #     save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
     #                           batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
     #
-    # combine_hdf_files(save_dir, data_release, 'features_test.hdf5')
+    combine_hdf_files(save_dir, data_release, 'features_ddf_withcesium.hdf5')
 
 
 if __name__ == '__main__':

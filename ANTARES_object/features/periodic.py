@@ -29,7 +29,7 @@ class PeriodicMixin(object):
 
         optimizer_kwds = {'quiet':True}
         try:
-            if nobs <= 1000:
+            if nobs <= 100:
                 model = periodic.LombScargleMultiband(fit_period=True, optimizer_kwds=optimizer_kwds)
             else:
                 print('nobs', nobs, self.objectId)

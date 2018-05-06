@@ -14,7 +14,7 @@ def get_feature_names(passbands, ignore=()):
                            'risetime_%s' % p, 'riserate_%s' % p] for p in passbands], [])
     cesium_fields = sum([['cesium_flux_percentile_ratio_mid20_%s' % p, 'cesium_flux_percentile_ratio_mid50_%s' % p,
                           'cesium_flux_percentile_ratio_mid65_%s' % p, 'cesium_flux_percentile_ratio_mid80_%s' % p,
-                          'cesium_max_slope_%s' % p, 'cesium_maximu_%s' % p, 'cesium_median_%s' % p,
+                          'cesium_max_slope_%s' % p, 'cesium_maximum_%s' % p, 'cesium_median_%s' % p,
                           'cesium_median_absolute_deviation_%s' % p, 'cesium_percent_amplitude_%s' % p,
                           'cesium_period_fast_%s' % p, 'cesium_qso_log_chi2_qsonu_%s' % p,
                           'cesium_qso_log_chi2nuNULL_chi2nu_%s' % p, 'cesium_fold2P_slope_90percentile_%s' % p,
@@ -34,7 +34,7 @@ def get_feature_names(passbands, ignore=()):
                           'cesium_freq_signif_ratio_21_%s' % p, 'cesium_freq_signif_ratio_31_%s' % p,
                           'cesium_freq_varrat_%s' % p, 'cesium_freq_y_offset_%s' % p, 'cesium_medperc90_2p_p_%s' % p,
                           'cesium_p2p_scatter_pfold_over_mad_%s' % p, 'cesium_p2p_ssqr_diff_over_var_%s' % p,
-                          'cesium_scatter_res_ra_%s' % p] for p in passbands])
+                          'cesium_scatter_res_raw_%s' % p] for p in passbands], [])
 
     feature_names += cesium_fields
 
