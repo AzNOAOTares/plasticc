@@ -1,10 +1,9 @@
 
 
 def get_sntypes():
-    sntypes_map = {1: 'SN1a', 2: 'CC', 3: 'SNIbc', 4: 'IIn', 5: 'IIpca', 41: 'Ia-91bg', 42: 'Ia-91bg-Jones',
+    sntypes_map = {1: 'SN1a', 6: 'SNII', 3: 'SNIbc', 4: 'IIn', 5: 'IIpca', 41: 'Ia-91bg', 42: 'Ia-91bg-Jones',
                    45: 'pointIa', 50: 'Kilonova', 60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 64: 'TDE',
-                   80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira', 90: 'BSR', 91: 'String',
-                   102: 'CC', 141: 'Ia-91bg', 200: 'Other'}
+                   80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira', 90: 'BSR', 91: 'String'}
     return sntypes_map
 
 
@@ -24,8 +23,9 @@ def aggregate_sntypes(reverse=False):
     #                  }
 
     if reverse:
-        aggregate_map = {2: (3, 4, 5),
-                         41: (41),
+        aggregate_map = {6: (4, 5),
+                         3: (3,),
+                         41: (41,),
                          1: (1,),
                          45: (45,),
                          50: (50,),
@@ -41,7 +41,8 @@ def aggregate_sntypes(reverse=False):
                          91: (91,),
                          }
     else:
-        aggregate_map = {2: 'ignore', 3: 2, 4: 2, 5: 2,
+        aggregate_map = {2: 'ignore', 3: 3,
+                         4: 6, 5: 6,
                          41: 41, 42: 'ignore',
                          1: 1,
                          45: 45,

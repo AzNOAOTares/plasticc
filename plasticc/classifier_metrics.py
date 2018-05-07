@@ -5,7 +5,7 @@ import itertools
 from chainconsumer import ChainConsumer
 
 
-def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix', cmap=plt.cm.RdBu, fig_dir='.'):
+def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix', cmap=plt.cm.RdBu, fig_dir='.', name=''):
     """
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
@@ -20,6 +20,7 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     # Multiply off diagonal by -1
     off_diag = ~np.eye(cm.shape[0], dtype=bool)
     cm[off_diag] *= -1
+    np.savetxt(os.path.join(fig_dir, 'confusion_matrix_%s.csv' % name), cm)
     print(cm)
 
     fig = plt.figure(figsize=(15, 12))
@@ -40,7 +41,7 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
     plt.tight_layout()
-    plt.savefig(os.path.join(fig_dir, 'confusion_matrix'))
+    plt.savefig(os.path.join(fig_dir, 'confusion_matrix_%s' % name))
 
 
 def plot_feature_importance(classifier, feature_names, num_features, fig_dir):

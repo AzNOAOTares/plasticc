@@ -90,17 +90,18 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     return X, y, feature_names
 
 
-def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=()):
+def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=(), name=''):
     num_features = X.shape[1]
 
     # Remove models with fewer than 5 objects (as SMOTE can't work with that few objects)
     for m in models:
         nobs = len(X[y == m])
         print(m, nobs)
-        if nobs <= 9:
+        if nobs <= 6:
             print("Removing model {}, because it only has {} objects.".format(m, nobs))
             remove_models.append(m)
     for m in remove_models:
+        print(m, remove_models)
         mask = np.where(y != m)[0]
         X = X[mask]
         y = y[mask]
@@ -110,7 +111,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir)
 
     # Split into train/test
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.60, shuffle=True)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.60, shuffle=True, random_state=42)
     model_names = [sntypes_map[model] for model in models]
 
     # SMOTE to correct for imbalanced data on training set only
@@ -120,12 +121,12 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
         nobs = len(X_train[y_train == m])
         print(m, nobs)
 
-    # for n in [5, 10, 25, 50, 100, 500, 1000]:
-    # classifier = KNeighborsClassifier(n)
-    # clf1 = RandomForestClassifier(n_estimators=50, random_state=42)
-    # for n in [3, 5, 10, 25, 50, 100, 500, 1000]:
-    #     clf2 = KNeighborsClassifier(n_neighbors=n)
-    #     classifier = VotingClassifier(estimators=[('RF', clf1), ('KNN', clf2)], voting='hard')
+    if classifier == 'voting':
+        clf1 = RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)
+        clf2 = MLPClassifier()
+        clf3 = GaussianNB()
+        clf4 = KNeighborsClassifier(3)
+        classifier = VotingClassifier(estimators=[('RF', clf1), ('MLP', clf2), ('KNN', clf4)], voting='soft')
 
     # Train model
     classifier.fit(X_train, y_train)
@@ -140,20 +141,28 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     cnf_matrix = confusion_matrix(y_test, y_pred)
     np.set_printoptions(precision=2)
 
+    # Save probability arrays
+    pred_proba = classifier.predict_proba(X_test)
+    truth_table = np.zeros(pred_proba.shape)
+    for i, m in enumerate(y_test):
+        truth_table[i][models.index(m)] = 1
+    np.savetxt(os.path.join(fig_dir, 'predicted_prob_%s.csv' % name), pred_proba)
+    np.savetxt(os.path.join(fig_dir, 'truth_table_%s.csv' % name), truth_table)
+
     # visualize test performance
     if hasattr(classifier, "feature_importances_"):
         plot_feature_importance(classifier, feature_names, num_features, fig_dir)
-    plot_confusion_matrix(cnf_matrix, classes=model_names, normalize=True, title='Normalized confusion matrix', fig_dir=fig_dir)
+    plot_confusion_matrix(cnf_matrix, classes=model_names, normalize=True, title='Normalized confusion matrix_%s' % name, fig_dir=fig_dir, name=name)
     # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir, add_save_name='')
 
     return classifier, X_train, y_train, X_test, y_test, score, y_pred
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify', 'ddf_with_cesium')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_ddf_with_cesium.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     data_release = '20180407'
@@ -161,28 +170,30 @@ def main():
     model = '%'
     passbands = ('r', 'i', 'z', 'Y')
     # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
-    models = [1, 2, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
+    models = [1, 3, 6, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
     # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
     remove_models = []
     feature_names = get_feature_names(passbands, ignore=('objid',))
     X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False)
 
-    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50, n_jobs=-1)),
+    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)),
                    ('KNeighbors', KNeighborsClassifier(3)),
+                   ('MLPNeuralNet', MLPClassifier()),
+                   ('NaiveBayes', GaussianNB()),
+                   ('QDA', QuadraticDiscriminantAnalysis()),
+                   ('GaussianProcesses', GaussianProcessClassifier(1.0 * RBF(1.0))),
+                   ('AdaBoost', AdaBoostClassifier()),
                    ('Linear SVM', SVC(kernel="linear", C=0.025)),
                    ('RBF SVM', SVC(gamma=2, C=1)),
-                   ('GaussianProcesses', GaussianProcessClassifier(1.0 * RBF(1.0))),
                    ('DecisionTree', DecisionTreeClassifier(max_depth=5)),
-                   ('NeuralNet', MLPClassifier(alpha=1)),
-                   ('AdaBoost', AdaBoostClassifier()),
-                   ('NaiveBayes', GaussianNB()),
-                   ('QDA', QuadraticDiscriminantAnalysis())]
+                   ('voting', 'voting')]
 
-    for name, classifier in classifiers[0:1]:
+    for name, classifier in classifiers[-1:]:
+        print(name)
         fig_dir_classifier = os.path.join(fig_dir, name)
         if not os.path.exists(fig_dir_classifier):
             os.makedirs(fig_dir_classifier)
-        classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir_classifier, remove_models)
+        classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir_classifier, remove_models, name)
 
 
 if __name__ == '__main__':
