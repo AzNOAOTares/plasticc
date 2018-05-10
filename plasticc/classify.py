@@ -14,11 +14,12 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, VotingClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from mlxtend.classifier import EnsembleVoteClassifier
 
-from read_features import get_features, get_feature_names
-import helpers
-from classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
-from pca_components import get_pca_features
+from plasticc.read_features import get_features, get_feature_names
+from plasticc import helpers
+from plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
+from plasticc.pca_components import get_pca_features
 import seaborn as sns
 import pandas as pd
 
@@ -27,26 +28,39 @@ sns.reset_orig()
 ROOT_DIR = '..'# os.getenv('PLASTICC_DIR')
 
 
-def get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=False, pca=False):
+def get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=False, pca=False)\
+        :
     X = []  # features
     y = []  # labels
     agg_map = helpers.aggregate_sntypes()
 
     features = get_features(fpath, data_release, field, model, aggregate_classes=False)
 
-    # Remove features that contain more have more than 5000 objects with NaNs
-    for name, nan_count in pd.DataFrame(features).isnull().sum().iteritems():
-        if nan_count > 5000:
-            print("Removing feature", name, "because it has", nan_count, "nan value objects", "out of", len(features))
-            features = helpers.remove_field_name(features, name)
-            feature_names = np.delete(feature_names, np.argwhere(feature_names == name))
+    # # Remove features that contain more have more than 5000 objects with NaNs
+    # for name, nan_count in pd.DataFrame(features).isnull().sum().iteritems():
+    #     if nan_count > 5000:
+    #         print("Removing feature", name, "because it has", nan_count, "nan value objects", "out of", len(features))
+    #         features = helpers.remove_field_name(features, name)
+    #         feature_names = np.delete(feature_names, np.argwhere(feature_names == name))
 
     if pca:
         features = get_pca_features(features, n_comps=50, feature_names=feature_names)
         feature_names = np.array(features.dtype.names[1:])
 
+    snids, modelIndexes = read_model2_seperations()
+
     for i, objid in enumerate(features['objid']):
         field, model, base, snid = objid.astype(str).split('_')
+
+        if int(snid) in snids:
+            idx = np.where(snids == int(snid))[0][0]
+            if 20 <= modelIndexes[idx] < 29:
+                model = 102
+            elif 30 <= modelIndexes[idx] < 39:
+                model = 103
+            else:
+                print("$$#$BADR#$$#$")
+
         if aggregate_classes:
             model = agg_map[int(model)]
         if model == 'ignore':
@@ -62,6 +76,8 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
 
     X = np.array(X)
     y = np.array(y)
+
+    X = np.nan_to_num(X)
 
     print("Num objects before removing objects where any features are NaN: ", len(X))
     # Remove rows that contain any NaNs in them
@@ -89,6 +105,12 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
 
     return X, y, feature_names
 
+def read_model2_seperations(fpath='/Users/danmuth/PycharmProjects/plasticc/model02ids.txt'):
+    arr = np.loadtxt(fpath)
+    snid = arr[:,0]
+    modelIndex = arr[:,1]
+
+    return snid, modelIndex
 
 def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=(), name=''):
     num_features = X.shape[1]
@@ -97,15 +119,21 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     for m in models:
         nobs = len(X[y == m])
         print(m, nobs)
-        if nobs <= 6:
+        if nobs <= 10:
             print("Removing model {}, because it only has {} objects.".format(m, nobs))
+            remove_models.append(m)
+    # Remove models in X,y that are not in models
+    for m in set(y):
+        if m not in models:
+            print("Not including model {} in classifier, even though it's in the features table".format(m))
             remove_models.append(m)
     for m in remove_models:
         print(m, remove_models)
         mask = np.where(y != m)[0]
         X = X[mask]
         y = y[mask]
-        models.remove(m)
+        if m in models:
+            models.remove(m)
 
     # # Plot feature space before oversampling
     # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir)
@@ -115,8 +143,8 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     model_names = [sntypes_map[model] for model in models]
 
     # SMOTE to correct for imbalanced data on training set only
-    sm = over_sampling.SMOTE(random_state=42, n_jobs=20)
-    X_train, y_train = sm.fit_sample(X_train, y_train)
+    # sm = over_sampling.SMOTE(random_state=42, n_jobs=20)
+    # X_train, y_train = sm.fit_sample(X_train, y_train)
     for m in models:
         nobs = len(X_train[y_train == m])
         print(m, nobs)
@@ -125,8 +153,9 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
         clf1 = RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)
         clf2 = MLPClassifier()
         clf3 = GaussianNB()
-        clf4 = KNeighborsClassifier(3)
+        clf4 = KNeighborsClassifier(3, n_jobs=-1)
         classifier = VotingClassifier(estimators=[('RF', clf1), ('MLP', clf2), ('KNN', clf4)], voting='soft')
+
 
     # Train model
     classifier.fit(X_train, y_train)
@@ -142,12 +171,12 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     np.set_printoptions(precision=2)
 
     # Save probability arrays
-    pred_proba = classifier.predict_proba(X_test)
-    truth_table = np.zeros(pred_proba.shape)
-    for i, m in enumerate(y_test):
-        truth_table[i][models.index(m)] = 1
-    np.savetxt(os.path.join(fig_dir, 'predicted_prob_%s.csv' % name), pred_proba)
-    np.savetxt(os.path.join(fig_dir, 'truth_table_%s.csv' % name), truth_table)
+    # pred_proba = classifier.predict_proba(X_test)
+    # truth_table = np.zeros(pred_proba.shape)
+    # for i, m in enumerate(y_test):
+    #     truth_table[i][models.index(m)] = 1
+    # np.savetxt(os.path.join(fig_dir, 'predicted_prob_%s.csv' % name), pred_proba)
+    # np.savetxt(os.path.join(fig_dir, 'truth_table_%s.csv' % name), truth_table)
 
     # visualize test performance
     if hasattr(classifier, "feature_importances_"):
@@ -162,22 +191,23 @@ def main():
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_ddf_20180407_withcesium.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     data_release = '20180407'
     field = 'DDF'
     model = '%'
-    passbands = ('r', 'i', 'z', 'Y')
+    passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
-    models = [1, 3, 6, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
+    models = [1, 3, 6, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91, 102, 103]
+    # models = [3, 103, 6, 102]
     # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
     remove_models = []
-    feature_names = get_feature_names(passbands, ignore=('objid',))
+    feature_names = get_feature_names(passbands, ignore=('objid','redshift'))
     X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False)
 
-    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)),
-                   ('KNeighbors', KNeighborsClassifier(3)),
+    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=42)),
+                   ('KNeighbors_10', KNeighborsClassifier(10)),
                    ('MLPNeuralNet', MLPClassifier()),
                    ('NaiveBayes', GaussianNB()),
                    ('QDA', QuadraticDiscriminantAnalysis()),
@@ -188,7 +218,7 @@ def main():
                    ('DecisionTree', DecisionTreeClassifier(max_depth=5)),
                    ('voting', 'voting')]
 
-    for name, classifier in classifiers[-1:]:
+    for name, classifier in classifiers[0:1]:
         print(name)
         fig_dir_classifier = os.path.join(fig_dir, name)
         if not os.path.exists(fig_dir_classifier):

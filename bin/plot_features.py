@@ -6,7 +6,7 @@ from scipy import stats
 import pandas as pd
 import seaborn as sns
 import helpers
-from read_features import get_features, get_feature_names
+from plasticc.read_features import get_features, get_feature_names
 
 ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
 
