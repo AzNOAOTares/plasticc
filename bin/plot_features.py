@@ -241,7 +241,7 @@ def main():
     fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
     sntypes_map = helpers.get_sntypes()
 
-    passbands = ['r', 'i', 'z', 'Y']
+    passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
 
     feature_names = get_feature_names(passbands, ignore=())
 

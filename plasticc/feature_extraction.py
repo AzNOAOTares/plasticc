@@ -218,7 +218,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             print("###############\n\n\n\n\n\n######################")
 
     # Set all columns to floats except set first column to string (objid)
-    dtypes = ['S24', np.float64] + [np.float64] * len(period_fields) + [np.float64] * len(color_fields) + ([np.float64] * int((len(feature_fields)) / len(passbands))) * len(passbands)
+    dtypes = ['S26', np.float64] + [np.float64] * len(period_fields) + [np.float64] * len(color_fields) + ([np.float64] * int((len(feature_fields)) / len(passbands))) * len(passbands)
     # dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands))) * len(passbands)
     # dtypes = ['S24', np.float64] + ([np.float64] * int(len(feature_fields)/len(passbands) - 1) + [bytes]) * len(passbands)
     print('AA', len(mysql_fields), len(dtypes))
@@ -267,11 +267,11 @@ def create_all_hdf_files(args):
 
 def main():
     machine = 6  # selecting machines 1 through 10
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_DDF_with_cesium2')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_DDF_20180501')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    data_release = '20180407'
+    data_release = '20180501'
     field = 'DDF'
     model = '%'
     getter = GetData(data_release)
@@ -292,7 +292,7 @@ def main():
     #     i += 1
 
     offset = 0
-    offset_next = 20
+    offset_next = 200
     print(offset_next)
 
     # Multiprocessing
@@ -305,7 +305,7 @@ def main():
             print(os.path.join(save_dir, 'features_{}.hdf5'.format(i)))
             args_list.append((data_release, i, save_dir, field, model, batch_size, sort, redo))
 
-    pool = mp.Pool()
+    pool = mp.Pool(processes=20)
     pool.map_async(create_all_hdf_files, args_list)
     pool.close()
     pool.join()
@@ -318,7 +318,7 @@ def main():
     #     save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
     #                           batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
     #
-    combine_hdf_files(save_dir, data_release, 'features_ddf_withcesium.hdf5')
+    combine_hdf_files(save_dir, data_release, 'features_ddf_20180501_withcesium.hdf5')
 
 
 if __name__ == '__main__':
