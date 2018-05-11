@@ -12,13 +12,14 @@ from .features.periodic import PeriodicMixin
 from .features.gp import GPMixin
 from .features.spline import SplineMixin
 from .features.base import BaseMixin
+from .features.early import EarlyMixin
 from .features.plasticc import PlasticcMixin
 from astropy.stats import sigma_clip
 import extinction
 
 __all__ = ['LAobject']
 
-class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin):
+class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin, EarlyMixin):
     """
     ANTARES object - locus aggregated alert lightcurve and feature encapsulator
 

@@ -1,7 +1,7 @@
 import h5py
 import numpy as np
 
-from plasticc import helpers
+from . import helpers
 
 
 def get_feature_names(passbands, ignore=()):
