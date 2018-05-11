@@ -170,7 +170,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin, Ea
             mask = np.logical_and((self.fluxErr > 1E-8), np.isfinite(self.fluxErr))
             mask = np.logical_and(mask, np.isfinite(self.flux))
             mask = np.logical_and(mask, np.isfinite(self.zeropoint))
-            mask = np.logical_and(mask, self.photflag == constants.BAD_PHOTFLAG)
+            # mask = np.logical_and(mask, self.photflag == constants.BAD_PHOTFLAG)
 
             # these cuts are only applied if the light curve is provided in magnitudes
             # they handle annoying dummy values and very low S/N points
