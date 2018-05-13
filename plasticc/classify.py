@@ -47,19 +47,8 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
         features = get_pca_features(features, n_comps=50, feature_names=feature_names)
         feature_names = np.array(features.dtype.names[1:])
 
-    snids, modelIndexes = read_model2_seperations()
-
     for i, objid in enumerate(features['objid']):
         field, model, base, snid = objid.astype(str).split('_')
-
-        if int(snid) in snids:
-            idx = np.where(snids == int(snid))[0][0]
-            if 20 <= modelIndexes[idx] < 29:
-                model = 102
-            elif 30 <= modelIndexes[idx] < 39:
-                model = 103
-            else:
-                print("$$#$BADR#$$#$")
 
         if aggregate_classes:
             model = agg_map[int(model)]
@@ -200,7 +189,6 @@ def main():
     passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
     models = [1, 3, 6, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91, 102, 103]
-    # models = [3, 103, 6, 102]
     # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
     remove_models = []
     feature_names = get_feature_names(passbands, ignore=('objid','redshift'))

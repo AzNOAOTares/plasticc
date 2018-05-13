@@ -1,7 +1,7 @@
 import h5py
 import numpy as np
 
-from . import helpers
+import helpers
 
 
 def get_feature_names(passbands, ignore=()):
@@ -41,25 +41,12 @@ def get_features(fpath, data_release, field_in='%', model_in='%', aggregate_clas
     hdffile.close()
     # features = features[np.random.randint(features.shape[0], size=100000)]
 
-    # #SEPERATE MODEL02
-    snids, modelIndexes = read_model2_seperations()
     if aggregate_classes:
         agg_map = helpers.aggregate_sntypes(reverse=True)
 
     indexes = []
-    modelList = []
     for i, objid in enumerate(features['objid']):
         field, model, base, snid = objid.astype(str).split('_')
-        if int(snid) in snids:
-            idx = np.where(snids==int(snid))[0][0]
-            if 20 <= modelIndexes[idx] < 29:
-                model = 102
-            elif 30 <= modelIndexes[idx] < 39:
-                model = 103
-            else:
-                print("$$#$BADR#$$#$")
-            modelList.append(model)
-
 
         if aggregate_classes is True:
             submodels = agg_map[int(model_in)]
@@ -73,11 +60,3 @@ def get_features(fpath, data_release, field_in='%', model_in='%', aggregate_clas
     features = features[indexes]
 
     return features
-
-
-def read_model2_seperations(fpath='/Users/danmuth/PycharmProjects/plasticc/model02ids.txt'):
-    arr = np.loadtxt(fpath)
-    snid = arr[:,0]
-    modelIndex = arr[:,1]
-
-    return snid, modelIndex

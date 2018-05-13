@@ -3,7 +3,7 @@
 def get_sntypes():
     sntypes_map = {1: 'SN1a', 2: 'CC', 6: 'SNII', 3: 'SNIbc', 4: 'IIn', 5: 'IIpca', 41: 'Ia-91bg', 42: 'Ia-91bg-Jones',
                    45: 'pointIa', 50: 'Kilonova', 60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 64: 'TDE',
-                   80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira', 90: 'BSR', 91: 'String', 102: 'CC_II', 103: 'CCIbc'}
+                   80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira', 90: 'BSR', 91: 'String'}
     return sntypes_map
 
 
@@ -39,8 +39,6 @@ def aggregate_sntypes(reverse=False):
                          82: (82,),
                          90: (90,),
                          91: (91,),
-                         102: (102,),
-                         103: (103,)
                          }
     else:
         aggregate_map = {2: 'ignore', 3: 3,
@@ -59,8 +57,6 @@ def aggregate_sntypes(reverse=False):
                          82: 82,
                          90: 90,
                          91: 91,
-                         102: 102,
-                         103: 103
                          }
         # Other is BSR (Binary Star remnant), ILOT, PISN
 
