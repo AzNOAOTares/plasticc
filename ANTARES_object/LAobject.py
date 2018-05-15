@@ -19,7 +19,7 @@ import extinction
 
 __all__ = ['LAobject']
 
-class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin, EarlyMixin):
+class LAobject(PlasticcMixin, PeriodicMixin, ParametricMixin, BaseMixin, EarlyMixin):
     """
     ANTARES object - locus aggregated alert lightcurve and feature encapsulator
 
@@ -154,6 +154,8 @@ class LAobject(PlasticcMixin, PeriodicMixin, GPMixin, SplineMixin, BaseMixin, Ea
             self.best_period = None
             self.lcPeriodic = None
             self.lcNonPeriodic = np.nan
+
+        self.triggger_time = self.time[self.photflag == constants.TRIGGER_PHOTFLAG][0]
 
         if header is None:
             header = {}
