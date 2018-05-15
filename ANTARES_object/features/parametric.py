@@ -6,16 +6,12 @@ Functions for parametric representations of LAobjects
 
 from __future__ import absolute_import
 from __future__ import unicode_literals
-cimport cython
 import numpy as np
-cimport numpy as np
 from .. import constants
 from iminuit import Minuit
 
 
 class ParametricMixin(object):
-
-    @staticmethod
 
     def bazin_fit(self, minpbobs=6, recompute=False):
         """
@@ -75,8 +71,7 @@ class ParametricMixin(object):
             limit_tfall = (1., 50.)
 
             # define functions to get flux and return likelihood
-            @cython.embedsignature(True)
-            def _bazin_model(double A, double B, double t0, double trise, double tfall):
+            def _bazin_model(A, B, t0, trise, tfall):
                 """
                 Simple parametric model from Bazin et al '09
                 https://www.aanda.org/articles/aa/pdf/2009/21/aa11847-09.pdf
@@ -85,8 +80,7 @@ class ParametricMixin(object):
                 f = A*(np.exp(-(x-t0)/tfall)/(1.+np.exp((x-t0)/trise))) + B
                 return f
 
-            @cython.embedsignature(True)
-            def _bazin_likelihood(double A, double B, double t0, double trise, double tfall):
+            def _bazin_likelihood(A, B, t0, trise, tfall):
                 f = _bazin_model(A, B, t0, trise, tfall)
                 chisq = np.sum(((y - f)**2.)/dy**2.)
                 return chisq
