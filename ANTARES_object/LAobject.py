@@ -9,8 +9,7 @@ import warnings
 import numpy as np
 from . import constants
 from .features.periodic import PeriodicMixin
-from .features.gp import GPMixin
-from .features.spline import SplineMixin
+from .features.parametric import ParametricMixin 
 from .features.base import BaseMixin
 from .features.early import EarlyMixin
 from .features.plasticc import PlasticcMixin
@@ -155,7 +154,7 @@ class LAobject(PlasticcMixin, PeriodicMixin, ParametricMixin, BaseMixin, EarlyMi
             self.lcPeriodic = None
             self.lcNonPeriodic = np.nan
 
-        self.triggger_time = self.time[self.photflag == constants.TRIGGER_PHOTFLAG][0]
+        self.trigger_time = self.time[self.photflag == constants.TRIGGER_PHOTFLAG][0]
 
         if header is None:
             header = {}
