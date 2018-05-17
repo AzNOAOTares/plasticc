@@ -81,7 +81,7 @@ def get_features_for_light_curve_batch(data_release, field_in='%', model_in='%',
 
 
 def main():
-    get_features_for_light_curve_batch('20180407', field_in='DDF', model_in=1, batch_size=10)
+    get_features_for_light_curve_batch('20180511', field_in='WFD', model_in=1, batch_size=10)
 
 
 if __name__=='__main__':

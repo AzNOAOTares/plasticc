@@ -10,9 +10,9 @@ def plot_light_curve(objid, data_release='20180407'):
     head, phot = next(result)
     objid, ptrobs_min, ptrobs_max = head
     lc = getter.convert_pandas_lc_to_recarray_lc(phot)
-
+    col = {'u': 'b', 'g': 'g', 'r': 'r', 'i': 'm', 'z': 'k', 'Y': 'y'}
     for pb in phot.keys():
-        plt.errorbar(phot[pb]['MJD'], phot[pb]['FLUXCAL'], yerr=phot[pb]['FLUXCALERR'], fmt='.', label=pb)
+        plt.errorbar(phot[pb]['MJD'], phot[pb]['FLUXCAL'], yerr=phot[pb]['FLUXCALERR'], fmt='.', label=pb, color=col[pb])
     plt.legend()
 
     plt.title(objid)

@@ -94,12 +94,6 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
 
     return X, y, feature_names
 
-def read_model2_seperations(fpath='/Users/danmuth/PycharmProjects/plasticc/model02ids.txt'):
-    arr = np.loadtxt(fpath)
-    snid = arr[:,0]
-    modelIndex = arr[:,1]
-
-    return snid, modelIndex
 
 def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=(), name=''):
     num_features = X.shape[1]
@@ -132,8 +126,8 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     model_names = [sntypes_map[model] for model in models]
 
     # SMOTE to correct for imbalanced data on training set only
-    # sm = over_sampling.SMOTE(random_state=42, n_jobs=20)
-    # X_train, y_train = sm.fit_sample(X_train, y_train)
+    sm = over_sampling.SMOTE(random_state=42, n_jobs=20)
+    X_train, y_train = sm.fit_sample(X_train, y_train)
     for m in models:
         nobs = len(X_train[y_train == m])
         print(m, nobs)
