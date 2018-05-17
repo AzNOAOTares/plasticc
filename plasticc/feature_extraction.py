@@ -76,7 +76,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             return np.nan
 
     getter = GetData(data_release)
-    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'sim_redshift_host', 'mwebv', 'sim_dlmu'], field=field_in,
+    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'hostgal_specz', 'mwebv', 'sim_dlmu'], field=field_in,
                                   model=model_in, snid='%', limit=batch_size, offset=offset, shuffle=False, sort=sort)
     count = 0
     for head, phot in result:
