@@ -58,7 +58,7 @@ class EarlyMixin(object):
             fluxerrs[pb] = tFluxErr
 
         x0 = [-7]
-        bounds = [(-15, 0)]
+        bounds = [(-20, 0)]
         for pb in fluxes:
             x0 += [np.mean(fluxes[pb]), np.median(fluxes[pb])]
             bounds += [(0, max(fluxes[pb])), (min(fluxes[pb]), max(fluxes[pb]))]
@@ -85,14 +85,22 @@ class EarlyMixin(object):
         """
 
         earlyriserate = getattr(self, 'earlyriserate', None)
+        a_fit = getattr(self, 'a_fit', None)
+        c_fit = getattr(self, 'c_fit', None)
         if earlyriserate is not None:
             if not recompute:
-                return earlyriserate
+                return earlyriserate, a_fit, c_fit
 
         earlyriserate = {}
+        a_fit = {}
+        c_fit = {}
         outlc = self.get_lc(recompute=recompute)
 
-        fit_func, parameters = self._fit_early_lightcurve(outlc)
+        fit_func = getattr(self, 'early_fit_func', None)
+        parameters = getattr(self, 'early_parameters', None)
+        if fit_func is None or parameters is None:
+            fit_func, parameters = self._fit_early_lightcurve(outlc)
+            self.early_fit_func, self.early_parameters = fit_func, parameters
 
         col = {'u': 'b', 'g': 'g', 'r': 'r', 'i': 'm', 'z': 'k', 'Y': 'y'}
         for i, pb in enumerate(outlc):
@@ -125,13 +133,21 @@ class EarlyMixin(object):
             tearlyriserate = (f1/f0) / ((t1 - t0)/(1 + self.z))
 
             earlyriserate[pb] = tearlyriserate
+            a_fit[pb] = parameters[pb][0]
+            c_fit[pb] = parameters[pb][1]
+
         plt.title(self.objectId)
-        plt.xlim(-40, 15)
+        # plt.xlim(-40, 15)
         plt.legend()
-        plt.show()
+        try:
+            plt.show()
+        except AttributeError:
+            import pdb; pdb.set_trace()
 
         self.earlyriserate = earlyriserate
-        return earlyriserate
+        self.a_fit = a_fit
+        self.c_fit = c_fit
+        return earlyriserate, a_fit, c_fit
 
     def get_color_at_n_days(self, n, recompute=True):
         """
@@ -146,8 +162,13 @@ class EarlyMixin(object):
         color_slope = {}
         outlc = self.get_lc(recompute=recompute)
 
-        fit_func, parameters = self._fit_early_lightcurve(outlc)
+        fit_func = getattr(self, 'early_fit_func', None)
+        parameters = getattr(self, 'early_parameters', None)
+        if fit_func is None or parameters is None:
+            fit_func, parameters = self._fit_early_lightcurve(outlc)
+            self.early_fit_func, self.early_parameters = fit_func, parameters
 
+        ignorepb = []
         tflux_ndays = {}
         for i, pb in enumerate(outlc):
             tlc = outlc.get(pb)
@@ -157,28 +178,38 @@ class EarlyMixin(object):
                 tflux_ndays[pb] = 0
                 continue
 
-            tFlux = tFlux - np.median(tFlux[ttime < 0])
+            # Check if there is data after t0 trigger for this passband
+            a, c, t0 = parameters[pb]
+            if max(ttime) < t0:
+                print('No data for', pb, ttime)
+                ignorepb.append(pb)
+            else:
+                print("time", pb, ttime)
 
             tflux_ndays[pb] = fit_func(n, *parameters[pb])
-
+        plt.figure()
         passbands = ('u', 'g', 'r', 'i', 'z', 'Y')  # order of filters matters as it must be 'u-g' rather than 'g-u'
         for i, pb1 in enumerate(passbands):
             for j, pb2 in enumerate(passbands):
                 if i < j:
                     c = pb1 + '-' + pb2
-                    if pb1 not in tflux_ndays.keys() or pb2 not in tflux_ndays.keys() or tflux_ndays[pb2] == 0:
+                    if pb1 not in tflux_ndays.keys() or pb2 not in tflux_ndays.keys() or tflux_ndays[pb2] == 0 or (pb1 in ignorepb or pb2 in ignorepb):
                         color[c] = 0.
                         color_slope[c] = 0.
+                        print("Not plotting", c)
                         continue
                     color[c] = tflux_ndays[pb1] / tflux_ndays[pb2]
                     color_slope[c] = color[c] / n
-        #             plt.plot(ttime, color[c], label=pb)
-        #
-        # plt.show()
+                    fit_t = np.arange(-30, 15, 0.2)
+                    plt.plot(fit_t, fit_func(fit_t, *parameters[pb1])/fit_func(fit_t, *parameters[pb2]), label=c)
+
+        plt.title(self.objectId)
+        # plt.xlim(-40, 15)
+        plt.legend()
+        plt.show()
         self.color = color
         self.color_slope = color_slope
         return color, color_slope
-
 
 
 def lnlike(params, times, fluxes, fluxerrs):
@@ -189,14 +220,13 @@ def lnlike(params, times, fluxes, fluxerrs):
         chi2 = 0
         for i, pb in enumerate(times):
             a, c = pars[i * 2:i * 2 + 2]
-            print('a', pb, a, c)
 
             model = np.heaviside((times[pb] - t0), 1) * (a * (times[pb] - t0) ** 2) + c
-            if pb == 'r':
-                print('model', model, fluxes[pb], a, c, t0)
             chi2 += sum((fluxes[pb] - model) ** 2 / fluxerrs[pb] ** 2)
 
-        print('chi2', chi2)
+            print(pb, a, c)
+
+        print('chi2', chi2, params)
         return -chi2
 
 
@@ -205,7 +235,7 @@ def lnprior(params):
     t0 = params[0]
     pars = params[1:]
 
-    if -15 < t0 < 0:
+    if -20 < t0 < 0:
         return 0.0
     return -np.inf
 
@@ -219,10 +249,11 @@ def lnprob(params, t, flux, fluxerr):
 
 def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=None):
 
-    nwalkers = 50
+    nwalkers = 100
+    nsteps = 3000
+    burn = 1000
     pos = np.array([x0 + 3*np.random.randn(ndim) for i in range(nwalkers)])
     print(pos[:,0])
-
 
     # Ensure intial params within parameter bounds
     params = OrderedDict()
@@ -230,9 +261,8 @@ def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=
     i = 0
     for pb in times.keys():
         for name in ['a', 'c']:
-            params[name + '_' + pb] = {'bounds': bounds[i], 'value': x0[i], 'scale': 3}
+            params[pb + ': ' + name] = {'bounds': bounds[i], 'value': x0[i], 'scale': 3}
             i += 1
-
     for i, name in enumerate(params.keys()):
         # import pdb; pdb.set_trace()
         lb, ub = params[name]['bounds']
@@ -248,23 +278,53 @@ def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=
     print('new', np.array(pos)[:,0])
     print(pos)
 
-
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(times, fluxes, fluxerrs))
-    sampler.run_mcmc(pos, 300)
-    samples = sampler.chain[:, 50:, :].reshape((-1, ndim))
-    # for i in range(ndim):
-    #     pylab.figure()
-    #     pylab.plot(samples[:, i])
-    # plt.show()
 
-    samples[:, 2] = np.exp(samples[:, 2])
-    bestpars = list(map(lambda v: (v[0]), zip(*np.percentile(samples, [50], axis=0))))
+    # FInd parameters of lowest chi2
+    pos, prob, state = sampler.run_mcmc(pos, 1)
+    opos, oprob, orstate = [], [], []
+    for pos, prob, rstate in sampler.sample(pos, prob, state, iterations=nsteps):
+        opos.append(pos.copy())
+        oprob.append(prob.copy())
+    pos = np.array(opos)
+    prob = np.array(oprob)
+    nstep, nwalk = np.unravel_index(prob.argmax(), prob.shape)
+    bestpars = pos[nstep, nwalk]
+    posterior=prob
+
+    print("best", bestpars)
+    import pylab
+    for j in range(nwalkers):
+        pylab.plot(posterior[:, j])
+    for i in range(len(params)):
+        pylab.figure()
+        pylab.title(list(params.keys())[i])
+        for j in range(nwalkers):
+            pylab.plot(pos[:, j, i])
+
+    samples = sampler.chain[:, burn:, :].reshape((-1, ndim))
+    # samples[:, 2] = np.exp(samples[:, 2])
+    # bestpars2 = list(map(lambda v: (v[0]), zip(*np.percentile(samples, [50], axis=0))))
+    # print('b2', bestpars2)
+
     print(bestpars)
     t0 = bestpars[0]
     bestpars = bestpars[1:]
     best = {pb: np.append(bestpars[i * 2:i * 2 + 2], t0) for i, pb in enumerate(times)}
 
-    import corner
-    fig = corner.corner(samples, labels=list(params.keys()))
+    to_delete = []
+    for i, name in enumerate(params):
+        if not np.any(samples[:, i]):  # all zeros for parameter then delete column
+            to_delete.append((i, name))
+    for i, name in to_delete:
+        samples = np.delete(samples, i, axis=1)
+        del params[name]
+
+    from chainconsumer import ChainConsumer
+    c = ChainConsumer()
+    c.add_chain(samples, parameters=list(params.keys()))
+    c.configure(summary=True, cloud=True)
+    c.plotter.plot()
+    c.plotter.plot_walks(convolve=100)
 
     return best
