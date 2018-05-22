@@ -16,10 +16,10 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from mlxtend.classifier import EnsembleVoteClassifier
 
-from plasticc.read_features import get_features, get_feature_names
-from plasticc import helpers
-from plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
-from plasticc.pca_components import get_pca_features
+from plasticc.plasticc.read_features import get_features, get_feature_names
+from plasticc.plasticc import helpers
+from plasticc.plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
+# from plasticc.pca_components import get_pca_features
 import seaborn as sns
 import pandas as pd
 
@@ -125,12 +125,12 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     model_names = [sntypes_map[model] for model in models]
 
     # Count number in each model
-    nobs_train, nobs_test = [], []
+    nobs_train, nobs_test, model_labels = [], [], []
     for m in models:
         nobs_train.append(len(X_train[y_train == m]))
         nobs_test.append(len(X_test[y_test == m]))
     for i, m in enumerate(models):
-        model_labels = "{} \n train:{} \n test:{}".format(model_names[i], nobs_train[i], nobs_test[i])
+        model_labels.append("{}\ntrain: {}\ntest: {}".format(model_names[i], nobs_train[i], nobs_test[i]))
 
     # SMOTE to correct for imbalanced data on training set only
     sm = over_sampling.SMOTE(random_state=42, n_jobs=20)
@@ -145,7 +145,6 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
         clf3 = GaussianNB()
         clf4 = KNeighborsClassifier(3, n_jobs=-1)
         classifier = VotingClassifier(estimators=[('RF', clf1), ('MLP', clf2), ('KNN', clf4)], voting='soft')
-
 
     # Train model
     classifier.fit(X_train, y_train)
