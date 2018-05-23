@@ -8,6 +8,7 @@ import numpy as np
 import warnings
 import argparse
 import pandas as pd
+import astropy.table as at
 import astropy.io.fits as afits
 from collections import OrderedDict
 from . import database
@@ -201,6 +202,44 @@ class GetData(object):
         phot_HDU.close()
         del phot_HDU[1].data
         return phot_out
+
+    def get_light_curve_array(self, objid, ptrobs_min, ptrobs_max, standard_zpt=27.5):
+        """ Get lightcurve from fits file as an array - avoid some Pandas overhead
+
+        Parameters
+        ----------
+        objid : str
+            The object ID. E.g. objid='DDF_04_NONIa-0004_87287'
+        ptrobs_min : int
+            Min index of object in _PHOT.FITS.
+        ptrobs_max : int
+            Max index of object in _PHOT.FITS.
+
+        Return
+        -------
+        phot_out: pandas DataFrame
+            A DataFrame containing the MJD, FLT, FLUXCAL, FLUXCALERR, ZEROPT seperated by each filter.
+            E.g. Access the magnitude in the z filter with phot_out['z']['MAG'].
+        """
+        field, model, base, snid = objid.split('_')
+        if field == 'IDEAL':
+            filename = "{0}_MODEL{1}/{0}_{2}_PHOT.FITS".format(field, model, base)
+        else:
+            filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
+        phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
+        if not os.path.exists(phot_file):
+            phot_file = phot_file + '.gz'
+
+        try:
+            phot_HDU = afits.open(phot_file, memmap=True)
+        except Exception as e:
+            message = f'Could not open photometry file {phot_file}'
+            raise RuntimeError(message)
+
+        phot_data = phot_HDU[1].data[ptrobs_min - 1:ptrobs_max]
+        phot_data = at.Table(phot_data)
+        return phot_data
+
 
     @staticmethod
     def convert_pandas_lc_to_recarray_lc(phot):
