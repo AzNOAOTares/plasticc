@@ -99,6 +99,9 @@ def main():
 
     kwargs['model'] = '%'
     kwargs['field'] = '%'
+    kwargs['sort']  = True
+    kwargs['shuffle'] = False
+    limit = kwargs.pop('limit')
 
     getter = plasticc.get_data.GetData(data_release)
 
@@ -113,7 +116,10 @@ def main():
     if dummy == 'training':
         pass
     else:
-        random.shuffle(head)
+        if limit is not None:
+            head = random.sample(head, limit)
+        else:
+            random.shuffle(head)
 
     out = at.Table(rows=head, names=kwargs['columns'])
     out.remove_columns(['ptrobs_min', 'ptrobs_max'])
