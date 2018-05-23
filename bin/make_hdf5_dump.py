@@ -56,6 +56,13 @@ def get_light_curve_array(objid, ptrobs_min, ptrobs_max):
     return phot_data
 
 def task(entry):
+    """
+    Worker function to process a single light curve from a file
+    Accepts a tuple `entry` with object ID (GNDM format) and ptrobs_min,
+    ptrobs_max for the original FITS file
+    Loads the light curve, rectifies types and formatting inconsistencies and
+    returns short object ID (without the model name) and light curve
+    """
     objid, ptrobs_min, ptrobs_max = entry[0:3]
     lc = get_light_curve_array(objid, ptrobs_min, ptrobs_max)
     objid_comp = objid.split('_')
@@ -71,32 +78,43 @@ def task(entry):
 
 
 def main():
+    # setup paths for output 
     dump_dir = os.path.join(WORK_DIR, 'hdf5_dump')
     if not os.path.exists(dump_dir):
         os.makedirs(dump_dir)
 
+    # get the options for the code and set the data_release globally (ugly) to
+    # allow MultiPool to work
     kwargs = plasticc.get_data.parse_getdata_options()
     global data_release 
     data_release = kwargs.pop('data_release')
 
+    # we can use model as a dummy string to indicate if we are generating
+    # training or test data
     dummy = kwargs.pop('model')
-
     if dummy == 'training':
         outfile = os.path.join(dump_dir, 'training_set.hdf5')
     else:
         outfile = os.path.join(dump_dir, 'test_set.hdf5')
 
+    # make sure we remove any lingering files 
     if os.path.exists(outfile):
         os.remove(outfile)
 
     _ = kwargs.get('field')
+
+    # set the header keywords for training and testing
+    # same except for sntype will be removed from test and hostgal_specz isn't
+    # provided
     if dummy == 'training':
         kwargs['columns']=['objid','ptrobs_min','ptrobs_max','ra','decl', 'mwebv', 'mwebv_err',\
                         'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'sntype']
     else:
         kwargs['columns']=['objid','ptrobs_min','ptrobs_max','ra','decl', 'mwebv', 'mwebv_err',\
-                        'hostgal_photoz', 'hostgal_photoz_err',]
+                        'hostgal_photoz', 'hostgal_photoz_err', 'sntype']
 
+    # set up options for data retrieval ignoring many of the command-line
+    # options
     kwargs['model'] = '%'
     kwargs['field'] = '%'
     kwargs['sort']  = True
@@ -105,6 +123,8 @@ def main():
 
     getter = plasticc.get_data.GetData(data_release)
 
+    # set an extrasql query to get just the DDF and WFD objects
+    # sntype for testing = true sntype + 100 
     if dummy == 'training':
         extrasql = "AND sntype < 100 AND ((objid LIKE 'WFD%') OR (objid LIKE 'DDF%'))"
     else:
@@ -112,29 +132,56 @@ def main():
 
     kwargs['extrasql'] = extrasql
     head = getter.get_lcs_headers(**kwargs)
+
+    # make a big list of the header - NOTE THAT WE ALWAYS RETRIEVE ALL OBJECTS
     head = list(head)
     if dummy == 'training':
         pass
     else:
+        # if we're generating test data, if we set a limit, just draw a random
+        # sample else shuffle the full list
         if limit is not None:
             head = random.sample(head, limit)
         else:
             random.shuffle(head)
 
+    # convert the selected header entries to a table and remove uncessary columns    
     out = at.Table(rows=head, names=kwargs['columns'])
     out.remove_columns(['ptrobs_min', 'ptrobs_max'])
 
+    # galactic objects have -9 as redshift - change to 0
     dummy_val = np.repeat(-9, len(out))
     ind = np.isclose(out['hostgal_photoz'], dummy_val)
     out['hostgal_photoz'][ind] = 0.
     out['hostgal_photoz_err'][ind] = 0.
-    new_name = [ '{}{}'.format(x.split('_')[0], x.split('_')[-1]) for x in out['objid']]
+
+    # the object names have the model name in them, so we need to edit them
+    # new name = <FIELD><SNID>
+    orig_name = out['objid']
+    new_name = [ '{}{}'.format(x.split('_')[0], x.split('_')[-1]) for x in orig_name]
     new_name = np.array(new_name)
     new_name = new_name.astype('bytes')
     out['objid'] = new_name 
+
+    # if we are generating test data, save a truth table
+    if dummy == 'training':
+        pass 
+    else: 
+        sntype = out['sntype']
+        # remove the model type from the output header that goes with the test data
+        out.remove_column('sntype')
+        truth_file = outfile.replace('_set.hdf5', '_truthtable.hdf5')
+        if os.path.exists(truth_file):
+            os.remove(truth_file)
+        # ... saving it in the truth table only
+        truth_table = at.Table([orig_name, new_name, sntype], names=['objid','shortid','sntype'])
+        truth_table.write(truth_file, compression=True, path='truth_table', serialize_meta=False, append=True)
+
+    # write out the header
     out.write(outfile, compression=True, path='header', serialize_meta=False, append=True)
     nmc = len(out)
 
+    # use a multiprocessing pool to load each light curve and dump to HDF5
     with MultiPool() as pool:
         with tqdm(total=nmc) as pbar:
             for result in pool.imap(task, head):
