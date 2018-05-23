@@ -16,10 +16,10 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from mlxtend.classifier import EnsembleVoteClassifier
 
-from plasticc.read_features import get_features, get_feature_names
-from plasticc import helpers
-from plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
-from plasticc.pca_components import get_pca_features
+from plasticc.plasticc.read_features import get_features, get_feature_names
+from plasticc.plasticc import helpers
+from plasticc.plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
+# from plasticc.pca_components import get_pca_features
 import seaborn as sns
 import pandas as pd
 
@@ -28,13 +28,12 @@ sns.reset_orig()
 ROOT_DIR = '..'# os.getenv('PLASTICC_DIR')
 
 
-def get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=False, pca=False)\
-        :
+def get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=False, pca=False, helpers=None):
     X = []  # features
     y = []  # labels
     agg_map = helpers.aggregate_sntypes()
 
-    features = get_features(fpath, data_release, field, model, aggregate_classes=False)
+    features = get_features(fpath, data_release, field, model, aggregate_classes=False, helpers=helpers)
 
     # # Remove features that contain more have more than 5000 objects with NaNs
     # for name, nan_count in pd.DataFrame(features).isnull().sum().iteritems():
@@ -102,7 +101,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     for m in models:
         nobs = len(X[y == m])
         print(m, nobs)
-        if nobs <= 10:
+        if nobs <= 12:
             print("Removing model {}, because it only has {} objects.".format(m, nobs))
             remove_models.append(m)
     # Remove models in X,y that are not in models
@@ -125,6 +124,14 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.60, shuffle=True, random_state=42)
     model_names = [sntypes_map[model] for model in models]
 
+    # Count number in each model
+    nobs_train, nobs_test, model_labels = [], [], []
+    for m in models:
+        nobs_train.append(len(X_train[y_train == m]))
+        nobs_test.append(len(X_test[y_test == m]))
+    for i, m in enumerate(models):
+        model_labels.append("{}\ntrain: {}\ntest: {}".format(model_names[i], nobs_train[i], nobs_test[i]))
+
     # SMOTE to correct for imbalanced data on training set only
     sm = over_sampling.SMOTE(random_state=42, n_jobs=20)
     X_train, y_train = sm.fit_sample(X_train, y_train)
@@ -138,7 +145,6 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
         clf3 = GaussianNB()
         clf4 = KNeighborsClassifier(3, n_jobs=-1)
         classifier = VotingClassifier(estimators=[('RF', clf1), ('MLP', clf2), ('KNN', clf4)], voting='soft')
-
 
     # Train model
     classifier.fit(X_train, y_train)
@@ -164,7 +170,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     # visualize test performance
     if hasattr(classifier, "feature_importances_"):
         plot_feature_importance(classifier, feature_names, num_features, fig_dir)
-    plot_confusion_matrix(cnf_matrix, classes=model_names, normalize=True, title='Normalized confusion matrix_%s' % name, fig_dir=fig_dir, name=name)
+    plot_confusion_matrix(cnf_matrix, classes=model_labels, normalize=True, title='Normalized confusion matrix_%s' % name, fig_dir=fig_dir, name=name)
     # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir, add_save_name='')
 
     return classifier, X_train, y_train, X_test, y_test, score, y_pred
@@ -186,7 +192,7 @@ def main():
     # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
     remove_models = []
     feature_names = get_feature_names(passbands, ignore=('objid','redshift'))
-    X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False)
+    X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False, helpers=helpers)
 
     classifiers = [('RandomForest', RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=42)),
                    ('KNeighbors_10', KNeighborsClassifier(10)),

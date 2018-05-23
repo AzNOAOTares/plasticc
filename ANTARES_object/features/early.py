@@ -7,9 +7,6 @@ import pylab
 from collections import OrderedDict
 
 
-
-
-
 class EarlyMixin(object):
     """
     Methods to derive early classification features for LAobjects
@@ -45,20 +42,20 @@ class EarlyMixin(object):
             tlc = outlc.get(pb)
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            if len(ttime) <= 1:
+            if len(ttime) <= 1 or not np.any(ttime < 0):
                 continue
-            tFlux = tFlux - np.median(tFlux[ttime < 0])
+            tFluxUnred = tFluxUnred - np.median(tFluxUnred[ttime < 0])
             # mask = ttime > -30
-            # tFlux = tFlux[mask]
+            # tFluxUnred = tFluxUnred[mask]
             # ttime = ttime[mask]
-            # tFluxErr = tFluxErr[mask]
+            # tFluxErrUnred = tFluxErrUnred[mask]
 
             times[pb] = ttime
-            fluxes[pb] = tFlux
-            fluxerrs[pb] = tFluxErr
+            fluxes[pb] = tFluxUnred
+            fluxerrs[pb] = tFluxErrUnred
 
         x0 = [-7]
-        bounds = [(-20, 0)]
+        bounds = [(-20*(1+self.z), 0)]
         for pb in fluxes:
             x0 += [np.mean(fluxes[pb]), np.median(fluxes[pb])]
             bounds += [(0, max(fluxes[pb])), (min(fluxes[pb]), max(fluxes[pb]))]
@@ -75,7 +72,6 @@ class EarlyMixin(object):
 
         # best = fit_all_pb_lightcurves(time, flux, fluxerr)
         print('best', best)
-        print('times', times, 'fluxes', fluxes)
 
         return fit_func, best
 
@@ -94,6 +90,7 @@ class EarlyMixin(object):
         earlyriserate = {}
         a_fit = {}
         c_fit = {}
+        return_vals = {}
         outlc = self.get_lc(recompute=recompute)
 
         fit_func = getattr(self, 'early_fit_func', None)
@@ -107,36 +104,38 @@ class EarlyMixin(object):
             tlc = outlc.get(pb)
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            tFlux = tFlux - np.median(tFlux[ttime < 0])
+            tFluxUnred = tFluxUnred - np.median(tFluxUnred[ttime < 0])
             # mask = ttime > -30
-            # tFlux = tFlux[mask]
+            # tFluxUnred = tFluxUnred[mask]
             # ttime = ttime[mask]
-            # tFluxErr = tFluxErr[mask]
+            # tFluxErrUnred = tFluxErrUnred[mask]
 
-            if len(ttime) <= 1:
-                earlyriserate[pb] = 0
-                plt.errorbar(ttime, tFlux, yerr=tFluxErr, fmt='.', color=col[pb], label=pb)
+            if len(ttime) <= 1 or not np.any(ttime < 0):
+                return_vals[pb] = (-99, -99, -99)
+                plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=pb)
                 continue
 
             fit_flux = fit_func(np.arange(min(ttime), max(ttime), 0.2), *parameters[pb])
 
-            # print(fit_func, parameter)
-            # print(fit_func(5, *parameter))
-
-            plt.errorbar(ttime, tFlux, yerr=tFluxErr, fmt='.', color=col[pb], label=pb)
+            plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=pb)
             plt.plot(np.arange(min(ttime), max(ttime), 0.2), fit_flux, color=col[pb])
 
-            t0 = 1
-            t1 = 10
-            f0 = fit_func(t0, *parameters[pb])
+            a, c, t0 = parameters[pb]
+
+            t1 = 1 + t0
+            t2 = 10 + t0
             f1 = fit_func(t1, *parameters[pb])
-            tearlyriserate = (f1/f0) / ((t1 - t0)/(1 + self.z))
+            f2 = fit_func(t2, *parameters[pb])
+            tearlyriserate = (f2/f1) / ((t2 - t1)/(1 + self.z))
 
             earlyriserate[pb] = tearlyriserate
             a_fit[pb] = parameters[pb][0]
             c_fit[pb] = parameters[pb][1]
+            return_vals[pb] = (tearlyriserate, parameters[pb][0], parameters[pb][1])
 
         plt.title(self.objectId)
+        plt.xlabel("Days since trigger")
+        plt.ylabel("Flux")
         # plt.xlim(-40, 15)
         plt.legend()
         try:
@@ -147,7 +146,7 @@ class EarlyMixin(object):
         self.earlyriserate = earlyriserate
         self.a_fit = a_fit
         self.c_fit = c_fit
-        return earlyriserate, a_fit, c_fit
+        return return_vals
 
     def get_color_at_n_days(self, n, recompute=True):
         """
@@ -174,7 +173,7 @@ class EarlyMixin(object):
             tlc = outlc.get(pb)
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            if len(ttime) <= 1:
+            if len(ttime) <= 1 or not np.any(ttime < 0):
                 tflux_ndays[pb] = 0
                 continue
 
@@ -186,24 +185,30 @@ class EarlyMixin(object):
             else:
                 print("time", pb, ttime)
 
+            n = t0 + n
+
             tflux_ndays[pb] = fit_func(n, *parameters[pb])
+
         plt.figure()
+
         passbands = ('u', 'g', 'r', 'i', 'z', 'Y')  # order of filters matters as it must be 'u-g' rather than 'g-u'
         for i, pb1 in enumerate(passbands):
             for j, pb2 in enumerate(passbands):
                 if i < j:
                     c = pb1 + '-' + pb2
                     if pb1 not in tflux_ndays.keys() or pb2 not in tflux_ndays.keys() or tflux_ndays[pb2] == 0 or (pb1 in ignorepb or pb2 in ignorepb):
-                        color[c] = 0.
-                        color_slope[c] = 0.
+                        color[c] = -99.
+                        color_slope[c] = -99.
                         print("Not plotting", c)
                         continue
-                    color[c] = tflux_ndays[pb1] / tflux_ndays[pb2]
+                    color[c] = -2.5*np.log10(tflux_ndays[pb1] / tflux_ndays[pb2])
                     color_slope[c] = color[c] / n
                     fit_t = np.arange(-30, 15, 0.2)
-                    plt.plot(fit_t, fit_func(fit_t, *parameters[pb1])/fit_func(fit_t, *parameters[pb2]), label=c)
+                    plt.plot(fit_t, -2.5*np.log10(fit_func(fit_t, *parameters[pb1])/fit_func(fit_t, *parameters[pb2])), label=c)
 
         plt.title(self.objectId)
+        plt.xlabel("Days since trigger")
+        plt.ylabel("Color")
         # plt.xlim(-40, 15)
         plt.legend()
         plt.show()
@@ -213,7 +218,7 @@ class EarlyMixin(object):
 
 
 def lnlike(params, times, fluxes, fluxerrs):
-        print(params)
+        # print(params)
         t0 = params[0]
         pars = params[1:]
 
@@ -224,9 +229,9 @@ def lnlike(params, times, fluxes, fluxerrs):
             model = np.heaviside((times[pb] - t0), 1) * (a * (times[pb] - t0) ** 2) + c
             chi2 += sum((fluxes[pb] - model) ** 2 / fluxerrs[pb] ** 2)
 
-            print(pb, a, c)
+            # print(pb, a, c)
 
-        print('chi2', chi2, params)
+        # print('chi2', chi2, params)
         return -chi2
 
 
@@ -235,7 +240,7 @@ def lnprior(params):
     t0 = params[0]
     pars = params[1:]
 
-    if -20 < t0 < 0:
+    if -35 < t0 < 0:
         return 0.0
     return -np.inf
 
@@ -250,10 +255,12 @@ def lnprob(params, t, flux, fluxerr):
 def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=None):
 
     nwalkers = 100
-    nsteps = 3000
-    burn = 1000
+    nsteps = 500
+    burn = 50
     pos = np.array([x0 + 3*np.random.randn(ndim) for i in range(nwalkers)])
-    print(pos[:,0])
+    # print(pos[:,0])
+
+    print("running mcmc...")
 
     # Ensure intial params within parameter bounds
     params = OrderedDict()
@@ -275,8 +282,8 @@ def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=
         ind = np.where((pos[:,i] <= ll) | (pos[:,i] >= ul))
         nreplace = len(pos[:,i][ind])
         pos[:,i][ind] = np.random.rand(nreplace)*(ul - ll) + ll
-    print('new', np.array(pos)[:,0])
-    print(pos)
+    # print('new', np.array(pos)[:,0])
+    # print(pos)
 
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(times, fluxes, fluxerrs))
 
@@ -293,14 +300,14 @@ def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=
     posterior=prob
 
     print("best", bestpars)
-    import pylab
-    for j in range(nwalkers):
-        pylab.plot(posterior[:, j])
-    for i in range(len(params)):
-        pylab.figure()
-        pylab.title(list(params.keys())[i])
-        for j in range(nwalkers):
-            pylab.plot(pos[:, j, i])
+    # import pylab
+    # for j in range(nwalkers):
+    #     pylab.plot(posterior[:, j])
+    # for i in range(len(params)):
+    #     pylab.figure()
+    #     pylab.title(list(params.keys())[i])
+    #     for j in range(nwalkers):
+    #         pylab.plot(pos[:, j, i])
 
     samples = sampler.chain[:, burn:, :].reshape((-1, ndim))
     # samples[:, 2] = np.exp(samples[:, 2])
@@ -312,19 +319,19 @@ def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=
     bestpars = bestpars[1:]
     best = {pb: np.append(bestpars[i * 2:i * 2 + 2], t0) for i, pb in enumerate(times)}
 
-    to_delete = []
-    for i, name in enumerate(params):
-        if not np.any(samples[:, i]):  # all zeros for parameter then delete column
-            to_delete.append((i, name))
-    for i, name in to_delete:
-        samples = np.delete(samples, i, axis=1)
-        del params[name]
+    # to_delete = []
+    # for i, name in enumerate(params):
+    #     if not np.any(samples[:, i]):  # all zeros for parameter then delete column
+    #         to_delete.append((i, name))
+    # for i, name in to_delete:
+    #     samples = np.delete(samples, i, axis=1)
+    #     del params[name]
 
-    from chainconsumer import ChainConsumer
-    c = ChainConsumer()
-    c.add_chain(samples, parameters=list(params.keys()))
-    c.configure(summary=True, cloud=True)
-    c.plotter.plot()
-    c.plotter.plot_walks(convolve=100)
+    # from chainconsumer import ChainConsumer
+    # c = ChainConsumer()
+    # c.add_chain(samples, parameters=list(params.keys()))
+    # c.configure(summary=True, cloud=False)
+    # c.plotter.plot()
+    # c.plotter.plot_walks(convolve=100)
 
     return best
