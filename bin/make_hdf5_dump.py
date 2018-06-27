@@ -88,14 +88,24 @@ def main():
     kwargs = plasticc.get_data.parse_getdata_options()
     global data_release 
     data_release = kwargs.pop('data_release')
+    getter = plasticc.get_data.GetData(data_release)
 
     # we can use model as a dummy string to indicate if we are generating
     # training or test data
-    dummy = kwargs.pop('model')
+    dummy  = kwargs.pop('model')
+    offset = kwargs.pop('offset')
+    limit  = kwargs.pop('limit')
+
     if dummy == 'training':
         outfile = os.path.join(dump_dir, 'training_set.hdf5')
+        offset = None
     else:
-        outfile = os.path.join(dump_dir, 'test_set.hdf5')
+        if limit is None: 
+            outfile = os.path.join(dump_dir, 'test_set.hdf5')
+        else:
+            if offset is None:
+                offset = 0
+            outfile = os.path.join(dump_dir, 'test_n{}_set.hdf5'.format(offset))
 
     # make sure we remove any lingering files 
     if os.path.exists(outfile):
@@ -113,15 +123,8 @@ def main():
         kwargs['columns']=['objid','ptrobs_min','ptrobs_max','ra','decl', 'mwebv', 'mwebv_err',\
                         'hostgal_photoz', 'hostgal_photoz_err', 'sntype']
 
-    # set up options for data retrieval ignoring many of the command-line
-    # options
-    kwargs['model'] = '%'
-    kwargs['field'] = '%'
-    kwargs['sort']  = True
-    kwargs['shuffle'] = False
-    limit = kwargs.pop('limit')
 
-    getter = plasticc.get_data.GetData(data_release)
+
 
     # set an extrasql query to get just the DDF and WFD objects
     # sntype for testing = true sntype + 100 
@@ -130,7 +133,22 @@ def main():
     else:
         extrasql = "AND sntype > 100 AND ((objid LIKE 'WFD%') OR (objid LIKE 'DDF%'))"
 
+    # set up options for data retrieval ignoring many of the command-line
+    # options
     kwargs['extrasql'] = extrasql
+    kwargs['model'] = '%'
+    kwargs['field'] = '%'
+    kwargs['sort']  = True
+    kwargs['shuffle'] = False
+    kwargs['limit'] = None
+    kwargs['get_num_lightcurves'] = True
+    total = getter.get_lcs_headers(**kwargs)
+    total = list(total)[0]
+    kwargs['limit'] = total
+    kwargs['get_num_lightcurves'] = False
+    kwargs['offset'] = offset
+
+
     head = getter.get_lcs_headers(**kwargs)
 
     # make a big list of the header - NOTE THAT WE ALWAYS RETRIEVE ALL OBJECTS
@@ -174,6 +192,9 @@ def main():
         if os.path.exists(truth_file):
             os.remove(truth_file)
         # ... saving it in the truth table only
+        orig_name = orig_name.astype(bytes)
+        new_name  = new_name.astype(bytes)
+        sntype    = sntype.astype(bytes)
         truth_table = at.Table([orig_name, new_name, sntype], names=['objid','shortid','sntype'])
         truth_table.write(truth_file, compression=True, path='truth_table', serialize_meta=False, append=True)
 
