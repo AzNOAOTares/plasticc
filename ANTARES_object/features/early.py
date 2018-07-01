@@ -5,6 +5,12 @@ import emcee
 from scipy.stats import chisquare
 import pylab
 from collections import OrderedDict
+from matplotlib import rc
+import matplotlib as mpl
+# mpl.use('GTK3AGG')
+rc('text', usetex=False)
+# rc('axes', unicode_minus=True)
+# rc('font', **{'family':'serif','serif':['Times New Roman']})
 
 
 class EarlyMixin(object):
@@ -54,8 +60,8 @@ class EarlyMixin(object):
             fluxes[pb] = tFluxUnred
             fluxerrs[pb] = tFluxErrUnred
 
-        x0 = [-7]
-        bounds = [(-20*(1+self.z), 0)]
+        x0 = [-12]
+        bounds = [(-20, 0)]
         for pb in fluxes:
             x0 += [np.mean(fluxes[pb]), np.median(fluxes[pb])]
             bounds += [(0, max(fluxes[pb])), (min(fluxes[pb]), max(fluxes[pb]))]
@@ -66,6 +72,7 @@ class EarlyMixin(object):
         # best = {pb: np.append(bestpars[i*2:i*2+2], t0) for i, pb in enumerate(times)}
 
         ndim = len(x0)
+
         best = emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, np.array(x0), bounds)
 
         # best, covariance = curve_fit(fit_func, time, flux, sigma=fluxerr, p0=[max(flux), min(flux)])
@@ -126,18 +133,18 @@ class EarlyMixin(object):
             t2 = 10 + t0
             f1 = fit_func(t1, *parameters[pb])
             f2 = fit_func(t2, *parameters[pb])
-            tearlyriserate = (f2/f1) / ((t2 - t1)/(1 + self.z))
+            tearlyriserate = (f2 - f1) / (t2 - t1)
 
             earlyriserate[pb] = tearlyriserate
             a_fit[pb] = parameters[pb][0]
             c_fit[pb] = parameters[pb][1]
             return_vals[pb] = (tearlyriserate, parameters[pb][0], parameters[pb][1])
 
-        plt.title(self.objectId)
-        plt.xlabel("Days since trigger")
-        plt.ylabel("Flux")
+        # plt.title(self.objectId)
+        plt.xlabel("Days since trigger (rest frame)")
+        plt.ylabel("Relative Flux (distance corrected)")
         # plt.xlim(-40, 15)
-        plt.legend()
+        plt.legend(frameon=False)
         try:
             plt.show()
         except AttributeError:
@@ -160,6 +167,7 @@ class EarlyMixin(object):
         color = {}
         color_slope = {}
         outlc = self.get_lc(recompute=recompute)
+
 
         fit_func = getattr(self, 'early_fit_func', None)
         parameters = getattr(self, 'early_parameters', None)
@@ -196,7 +204,7 @@ class EarlyMixin(object):
             for j, pb2 in enumerate(passbands):
                 if i < j:
                     c = pb1 + '-' + pb2
-                    if pb1 not in tflux_ndays.keys() or pb2 not in tflux_ndays.keys() or tflux_ndays[pb2] == 0 or (pb1 in ignorepb or pb2 in ignorepb):
+                    if pb1 not in parameters.keys() or pb2 not in parameters.keys() or tflux_ndays[pb2] == 0 or (pb1 in ignorepb or pb2 in ignorepb):
                         color[c] = -99.
                         color_slope[c] = -99.
                         print("Not plotting", c)
@@ -204,13 +212,14 @@ class EarlyMixin(object):
                     color[c] = -2.5*np.log10(tflux_ndays[pb1] / tflux_ndays[pb2])
                     color_slope[c] = color[c] / n
                     fit_t = np.arange(-30, 15, 0.2)
-                    plt.plot(fit_t, -2.5*np.log10(fit_func(fit_t, *parameters[pb1])/fit_func(fit_t, *parameters[pb2])), label=c)
+                    plotcolor = -2.5*np.log10(fit_func(fit_t, *parameters[pb1])/fit_func(fit_t, *parameters[pb2]))
+                    plt.plot(fit_t[fit_t >= t0], plotcolor[fit_t >= t0], label=c)
 
-        plt.title(self.objectId)
-        plt.xlabel("Days since trigger")
+        # plt.title(self.objectId)
+        plt.xlabel("Days since trigger (rest frame)")
         plt.ylabel("Color")
         # plt.xlim(-40, 15)
-        plt.legend()
+        plt.legend(frameon=False)
         plt.show()
         self.color = color
         self.color_slope = color_slope
@@ -325,13 +334,9 @@ def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=
     #         to_delete.append((i, name))
     # for i, name in to_delete:
     #     samples = np.delete(samples, i, axis=1)
+    #     print(name)
     #     del params[name]
-
-    # from chainconsumer import ChainConsumer
-    # c = ChainConsumer()
-    # c.add_chain(samples, parameters=list(params.keys()))
-    # c.configure(summary=True, cloud=False)
-    # c.plotter.plot()
-    # c.plotter.plot_walks(convolve=100)
+    #
+    # np.save('samples', samples[::100])
 
     return best
