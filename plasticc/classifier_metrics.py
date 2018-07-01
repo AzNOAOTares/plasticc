@@ -26,22 +26,23 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     fig = plt.figure(figsize=(15, 12))
     plt.imshow(cm, interpolation='nearest', cmap=cmap, vmin=-1, vmax=1)
     plt.title(title)
-    plt.colorbar()
+    cb = plt.colorbar()
+    cb.ax.set_yticklabels(cb.ax.get_yticklabels(), fontsize=15)
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=90, fontsize=16)
-    plt.yticks(tick_marks, classes, fontsize=16)
+    plt.xticks(tick_marks, classes, rotation=90, fontsize=15)
+    plt.yticks(tick_marks, classes, fontsize=15)
 
     fmt = '.2f' if normalize else 'd'
     thresh = cm.max() / 2.
     for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
         plt.text(j, i, format(abs(cm[i, j]), fmt), horizontalalignment="center",
-                 color="white" if abs(cm[i, j]) > thresh else "black")
+                 color="white" if abs(cm[i, j]) > thresh else "black", fontsize=14)
 
     plt.tight_layout()
-    plt.ylabel('True label', fontsize=14)
-    plt.xlabel('Predicted label', fontsize=14)
+    plt.ylabel('True label', fontsize=16)
+    plt.xlabel('Predicted label', fontsize=16)
     plt.tight_layout()
-    plt.savefig(os.path.join(fig_dir, 'confusion_matrix_%s' % name))
+    plt.savefig(os.path.join(fig_dir, 'confusion_matrix_%s.pdf' % name))
 
 
 def plot_feature_importance(classifier, feature_names, num_features, fig_dir):
@@ -55,14 +56,15 @@ def plot_feature_importance(classifier, feature_names, num_features, fig_dir):
         print("%d. %s (%f)" % (f + 1, feature_names[indices[f]], importances[indices[f]]))
 
     # Plot the feature importances of the forest
+    num_features_to_plot = 50
     fig = plt.figure(figsize=(20, 10))
     plt.title("Feature importances")
-    plt.bar(range(num_features), importances[indices], color='#2ca02c', yerr=std[indices], align="center")
-    plt.xticks(range(num_features), feature_names[indices], rotation=90)
-    plt.tick_params(axis='both', labelsize=11)
-    plt.xlim([-1, num_features])
+    plt.bar(range(num_features_to_plot), importances[indices][:num_features_to_plot], color='#2ca02c', yerr=std[indices][:num_features_to_plot], align="center")
+    plt.xticks(range(num_features_to_plot), feature_names[indices][:num_features_to_plot], rotation=90)
+    plt.tick_params(axis='both', labelsize=13)
+    plt.xlim([-1, num_features_to_plot])
     plt.tight_layout()
-    plt.savefig(os.path.join(fig_dir, 'feature_importance'))
+    plt.savefig(os.path.join(fig_dir, 'feature_importance.pdf'))
 
 
 def plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir, add_save_name=''):
