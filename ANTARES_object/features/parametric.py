@@ -36,17 +36,20 @@ class ParametricMixin(object):
             # there's 5 parameters, so there should be at least 6
             nobs = len(ttime)
             if nobs < minpbobs:
+                print(nobs, "Not enough obs")
                 continue
 
             # demand at least 3 points before or at trigger
             pre_trigger = ttime <= trigger_time 
             npre_trigger = len(ttime[pre_trigger])
             if npre_trigger <= 3:
+                print(npre_trigger, "Not enough obs before trigger")
                 continue
 
             # demand at least 3 points after trigger
             npost_trigger = nobs - npre_trigger 
             if npost_trigger <= 3:
+                print(npost_trigger, "Not enough obs after trigger")
                 continue
 
             # make sure the points are actual detections, not saturated or non-detections 
@@ -55,6 +58,7 @@ class ParametricMixin(object):
             good_ind = ~(nd_ind | sat_ind)
             ngood = len(ttime[good_ind])
             if ngood <= 3:
+                print(ngood, "not enough good observations")
                 continue 
 
             # use only unsaturated measurements
@@ -65,8 +69,8 @@ class ParametricMixin(object):
 
             # hardcode some limits on parameters
             limit_A = (1E-6,  np.percentile(y, 99))
-            limit_B = (-1000., 1000.)
-            limit_t0 = (-5., 1.)
+            limit_B = (-2000., 2000.)
+            limit_t0 = (-10., 1.)
             limit_trise = (1., 50.)
             limit_tfall = (1., 50.)
 
@@ -92,7 +96,6 @@ class ParametricMixin(object):
                     print_level=1)
 
             m.migrad()
-            m.minos()
 
             vals = m.values 
             tparams = []
