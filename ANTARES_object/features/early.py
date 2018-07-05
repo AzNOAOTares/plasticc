@@ -119,13 +119,13 @@ class EarlyMixin(object):
 
             if len(ttime) <= 1 or not np.any(ttime < 0):
                 return_vals[pb] = (-99, -99, -99)
-                plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=pb)
+                # plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=pb)
                 continue
 
             fit_flux = fit_func(np.arange(min(ttime), max(ttime), 0.2), *parameters[pb])
 
-            plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=pb)
-            plt.plot(np.arange(min(ttime), max(ttime), 0.2), fit_flux, color=col[pb])
+            # plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=pb)
+            # plt.plot(np.arange(min(ttime), max(ttime), 0.2), fit_flux, color=col[pb])
 
             a, c, t0 = parameters[pb]
 
@@ -140,15 +140,15 @@ class EarlyMixin(object):
             c_fit[pb] = parameters[pb][1]
             return_vals[pb] = (tearlyriserate, parameters[pb][0], parameters[pb][1])
 
-        # plt.title(self.objectId)
-        plt.xlabel("Days since trigger (rest frame)")
-        plt.ylabel("Relative Flux (distance corrected)")
-        # plt.xlim(-40, 15)
-        plt.legend(frameon=False)
-        try:
-            plt.show()
-        except AttributeError:
-            import pdb; pdb.set_trace()
+        # # plt.title(self.objectId)
+        # plt.xlabel("Days since trigger (rest frame)")
+        # plt.ylabel("Relative Flux (distance corrected)")
+        # # plt.xlim(-40, 15)
+        # plt.legend(frameon=False)
+        # try:
+        #     plt.show()
+        # except AttributeError:
+        #     import pdb; pdb.set_trace()
 
         self.earlyriserate = earlyriserate
         self.a_fit = a_fit
@@ -197,7 +197,7 @@ class EarlyMixin(object):
 
             tflux_ndays[pb] = fit_func(n, *parameters[pb])
 
-        plt.figure()
+        # plt.figure()
 
         passbands = ('u', 'g', 'r', 'i', 'z', 'Y')  # order of filters matters as it must be 'u-g' rather than 'g-u'
         for i, pb1 in enumerate(passbands):
@@ -207,20 +207,20 @@ class EarlyMixin(object):
                     if pb1 not in parameters.keys() or pb2 not in parameters.keys() or tflux_ndays[pb2] == 0 or (pb1 in ignorepb or pb2 in ignorepb):
                         color[c] = -99.
                         color_slope[c] = -99.
-                        print("Not plotting", c)
+                        # print("Not plotting", c)
                         continue
                     color[c] = -2.5*np.log10(tflux_ndays[pb1] / tflux_ndays[pb2])
                     color_slope[c] = color[c] / n
-                    fit_t = np.arange(-30, 15, 0.2)
-                    plotcolor = -2.5*np.log10(fit_func(fit_t, *parameters[pb1])/fit_func(fit_t, *parameters[pb2]))
-                    plt.plot(fit_t[fit_t >= t0], plotcolor[fit_t >= t0], label=c)
+                    # fit_t = np.arange(-30, 15, 0.2)
+                    # plotcolor = -2.5*np.log10(fit_func(fit_t, *parameters[pb1])/fit_func(fit_t, *parameters[pb2]))
+                    # plt.plot(fit_t[fit_t >= t0], plotcolor[fit_t >= t0], label=c)
 
-        # plt.title(self.objectId)
-        plt.xlabel("Days since trigger (rest frame)")
-        plt.ylabel("Color")
-        # plt.xlim(-40, 15)
-        plt.legend(frameon=False)
-        plt.show()
+        # # plt.title(self.objectId)
+        # plt.xlabel("Days since trigger (rest frame)")
+        # plt.ylabel("Color")
+        # # plt.xlim(-40, 15)
+        # plt.legend(frameon=False)
+        # plt.show()
         self.color = color
         self.color_slope = color_slope
         return color, color_slope
@@ -263,11 +263,19 @@ def lnprob(params, t, flux, fluxerr):
 
 def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=None):
 
-    nwalkers = 100
-    nsteps = 500
+    nwalkers = 200
+    nsteps = 700
     burn = 50
     pos = np.array([x0 + 3*np.random.randn(ndim) for i in range(nwalkers)])
     # print(pos[:,0])
+
+    # print("DATA IS TO FOLLOW")
+    # print("times")
+    # print(times)
+    # print("fluxes")
+    # print(fluxes)
+    # print("fluxerrs")
+    # print(fluxerrs)
 
     print("running mcmc...")
 

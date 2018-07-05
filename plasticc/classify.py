@@ -85,7 +85,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
         for f in range(X.shape[1]):
             std = np.std(X[:, f])
             median = np.median(X[:, f])
-            mask = np.where(abs(X[:, f] - median) < 20 * std)[0]
+            mask = np.where(abs(X[:, f] - median) <= 20 * std)[0]
             if np.where(abs(X[:, f] - median) > 20 * std)[0].any():
                 pass
             X = X[mask]
