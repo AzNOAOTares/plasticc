@@ -103,9 +103,9 @@ def make_index_for_release(data_release, data_dir=None, redo=False):
         # do some string munging so we can set a more useful ID name
         basename = os.path.basename(header_file)
         dirname = os.path.split(os.path.dirname(header_file))[DIRNAMES]
-        fieldname, modelname = dirname.replace('LSST_', '').replace('TEST_','').replace('IDEAL_','').split('_')
+        fieldname, modelname = dirname.replace('LSST_', '').replace('TEST_','').replace('IDEAL_','').replace('ZTF_','').split('_')
         modelname = modelname.replace('MODEL','')
-        basename = basename.replace('LSST_','').replace('TEST_','').replace('IDEAL_','').replace(fieldname+'_','').replace('_HEAD.FITS.gz','').replace('_HEAD.FITS','')
+        basename = basename.replace('LSST_','').replace('TEST_','').replace('IDEAL_','').replace('ZTF_','').replace(fieldname+'_','').replace('_HEAD.FITS.gz','').replace('_HEAD.FITS','')
     
         header_data = get_file_data(header_file, extension=1)
         if header_data is None:
