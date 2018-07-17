@@ -16,9 +16,9 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from mlxtend.classifier import EnsembleVoteClassifier
 
-from plasticc.plasticc.read_features import get_features, get_feature_names
-from plasticc.plasticc import helpers
-from plasticc.plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
+from plasticc.read_features import get_features, get_feature_names
+from plasticc import helpers
+from plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
 # from plasticc.pca_components import get_pca_features
 import seaborn as sns
 import pandas as pd
@@ -33,7 +33,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     y = []  # labels
     agg_map = helpers.aggregate_sntypes()
 
-    features = get_features(fpath, data_release, field, model, aggregate_classes=False, helpers=helpers)
+    features = get_features(fpath, data_release, field, model, aggregate_classes=False)
 
     # # Remove features that contain more have more than 5000 objects with NaNs
     # for name, nan_count in pd.DataFrame(features).isnull().sum().iteritems():
@@ -85,7 +85,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
         for f in range(X.shape[1]):
             std = np.std(X[:, f])
             median = np.median(X[:, f])
-            mask = np.where(abs(X[:, f] - median) < 20 * std)[0]
+            mask = np.where(abs(X[:, f] - median) <= 20 * std)[0]
             if np.where(abs(X[:, f] - median) > 20 * std)[0].any():
                 pass
             X = X[mask]
@@ -120,7 +120,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     # # Plot feature space before oversampling
     # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir)
 
-    # Split into train/test
+    # Split into train/test TODO: Add k-fold cross-validation to get uncertainties on confusion matrix entries
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.60, shuffle=True, random_state=42)
     model_names = [sntypes_map[model] for model in models]
 
@@ -130,7 +130,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
         nobs_train.append(len(X_train[y_train == m]))
         nobs_test.append(len(X_test[y_test == m]))
     for i, m in enumerate(models):
-        model_labels.append("{}\ntrain: {}\ntest: {}".format(model_names[i], nobs_train[i], nobs_test[i]))
+        model_labels.append(model_names[i])  # model_labels.append("{}\ntrain: {}\ntest: {}".format(model_names[i], nobs_train[i], nobs_test[i]))
 
     # SMOTE to correct for imbalanced data on training set only
     sm = over_sampling.SMOTE(random_state=42, n_jobs=20)
@@ -142,9 +142,8 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     if classifier == 'voting':
         clf1 = RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)
         clf2 = MLPClassifier()
-        clf3 = GaussianNB()
-        clf4 = KNeighborsClassifier(3, n_jobs=-1)
-        classifier = VotingClassifier(estimators=[('RF', clf1), ('MLP', clf2), ('KNN', clf4)], voting='soft')
+        clf3 = KNeighborsClassifier(3, n_jobs=-1)
+        classifier = VotingClassifier(estimators=[('RF', clf1), ('MLP', clf2), ('KNN', clf3)], voting='soft')
 
     # Train model
     classifier.fit(X_train, y_train)
@@ -177,24 +176,24 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify_testing10')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_ddf_20180407_withcesium.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_20180407.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     data_release = '20180407'
-    field = 'DDF'
+    field = 'WFD'
     model = '%'
     passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
     models = [1, 3, 6, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91, 102, 103]
     # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
     remove_models = []
-    feature_names = get_feature_names(passbands, ignore=('objid','redshift'))
+    feature_names = get_feature_names(passbands, ignore=('objid',))
     X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False, helpers=helpers)
 
-    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=42)),
+    classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)),
                    ('KNeighbors_10', KNeighborsClassifier(10)),
                    ('MLPNeuralNet', MLPClassifier()),
                    ('NaiveBayes', GaussianNB()),
