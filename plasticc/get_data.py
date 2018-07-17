@@ -54,6 +54,8 @@ def parse_getdata_options(argv=None):
                         help='Shuffle the returned results from the MySQL index')
     parser.add_argument('--sort', required=False, type="bool", default="True",
                         help='Sort the returned results from the MySQL index')
+    parser.add_argument('--survey', required=False, default="LSST", 
+                        help="Specify the survey to process")
     parser.add_argument('--offset', required=False, default=None, type=int,
                         help='Return the MySQL results AFTER offset rows')
     parser.add_argument('--extrasql', required=False, default=None,
@@ -144,6 +146,24 @@ class GetData(object):
             return []
         return column_out
 
+    def get_photfile_for_objid(self, objid):
+        """
+        Returns the phot file for the object ID
+        """
+        field, model, base, snid = objid.split('_')
+        if field == 'IDEAL':
+            filename = "{0}_MODEL{1}/{0}_{2}_PHOT.FITS".format(field, model, base)
+        elif field == 'MSIP':
+            filename = "ZTF_{0}_MODEL{1}/ZTF_{0}_{2}_PHOT.FITS".format(field, model, base)
+        else:
+            filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
+        phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
+        if not os.path.exists(phot_file):
+            phot_file = phot_file + '.gz'
+        return phot_file
+
+
+
     def get_light_curve(self, objid, ptrobs_min, ptrobs_max, standard_zpt=27.5):
         """ Get lightcurve from fits file
 
@@ -162,14 +182,7 @@ class GetData(object):
             A DataFrame containing the MJD, FLT, FLUXCAL, FLUXCALERR, ZEROPT seperated by each filter.
             E.g. Access the magnitude in the z filter with phot_out['z']['MAG'].
         """
-        field, model, base, snid = objid.split('_')
-        if field == 'IDEAL':
-            filename = "{0}_MODEL{1}/{0}_{2}_PHOT.FITS".format(field, model, base)
-        else:
-            filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
-        phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
-        if not os.path.exists(phot_file):
-            phot_file = phot_file + '.gz'
+        phot_file = get_photfile_for_objid(objid)
 
         try:
             phot_HDU = afits.open(phot_file, memmap=True)
@@ -221,14 +234,7 @@ class GetData(object):
             A DataFrame containing the MJD, FLT, FLUXCAL, FLUXCALERR, ZEROPT seperated by each filter.
             E.g. Access the magnitude in the z filter with phot_out['z']['MAG'].
         """
-        field, model, base, snid = objid.split('_')
-        if field == 'IDEAL':
-            filename = "{0}_MODEL{1}/{0}_{2}_PHOT.FITS".format(field, model, base)
-        else:
-            filename = "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(field, model, base)
-        phot_file = os.path.join(DATA_DIR, self.data_release.replace('release_', ''), filename)
-        if not os.path.exists(phot_file):
-            phot_file = phot_file + '.gz'
+        phot_file = get_photfile_for_objid(objid)
 
         try:
             phot_HDU = afits.open(phot_file, memmap=True)
