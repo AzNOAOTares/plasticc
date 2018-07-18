@@ -43,7 +43,11 @@ def make_mysql_schema_from_astropy_bintable_cols(astropy_columns):
     # than to store several NULLs for all objects in mysql.
     use_fields = []
     for field in fields:
-        if field.startswith('SIMSED') or field.startswith('LCLIB') or field.startswith('SIM_TEMPLATE') or field.startswith('SIM_SALT2'):
+        if field.startswith('SIMSED')\
+            or field.startswith('LCLIB')\
+            or field.startswith('SIM_TEMPLATE')\
+            or field.startswith('SIM_SALT2')\
+            or field.startswith('SIM_GALFRAC'):
             continue
         else:
             use_fields.append(field)
