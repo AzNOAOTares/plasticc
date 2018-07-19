@@ -294,7 +294,7 @@ class GetData(object):
         sntypes_map = self.get_sntypes()
         return sorted([sntype[0] for sntype in sntypes]), sntypes_map
 
-    def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', extrasql='',
+    def get_lcs_headers(self, columns=None, field='%', model='%', base='%', snid='%', extrasql='', survey='LSST',
                         get_num_lightcurves=False, limit=None, shuffle=False, sort=True, offset=0, big=False):
         """ Gets the header data given specific conditions.
 
@@ -391,7 +391,7 @@ class GetData(object):
                       "field: {}, model: {}, base: {}, snid: {}".format(field, model, base, snid))
                 return
 
-    def get_lcs_data(self, columns=None, field='%', model='%', base='%', snid='%', \
+    def get_lcs_data(self, columns=None, field='%', model='%', base='%', snid='%', survey='LSST',\
                      limit=None, shuffle=False, sort=True, offset=0, big=False, extrasql=''):
         """ Gets the light curve and header data given specific conditions. Returns a generator of LC info.
 
