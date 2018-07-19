@@ -15,6 +15,7 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, VotingC
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from mlxtend.classifier import EnsembleVoteClassifier
+from sklearn.model_selection import KFold
 
 from plasticc.read_features import get_features, get_feature_names
 from plasticc import helpers
@@ -33,7 +34,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     y = []  # labels
     agg_map = helpers.aggregate_sntypes()
 
-    features = get_features(fpath, data_release, field, model, aggregate_classes=False)
+    features = get_features(fpath, data_release, field, model, aggregate_classes=False, helpers=helpers)
 
     # # Remove features that contain more have more than 5000 objects with NaNs
     # for name, nan_count in pd.DataFrame(features).isnull().sum().iteritems():
@@ -74,6 +75,8 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     y = y[mask]
     print("Num objects after removing objects where any features are NaN: ", len(X))
 
+    # Check for infinities
+
     # Remove rows that contain are too big or too small
     mask = ~np.logical_or(X < -1e30, X > 1e30).any(axis=1)
     X = X[mask]
@@ -86,6 +89,8 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
             std = np.std(X[:, f])
             median = np.median(X[:, f])
             mask = np.where(abs(X[:, f] - median) <= 20 * std)[0]
+            if len(mask) < len(X) or len(mask) == 0:
+                pass
             if np.where(abs(X[:, f] - median) > 20 * std)[0].any():
                 pass
             X = X[mask]
@@ -94,9 +99,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     return X, y, feature_names
 
 
-def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=(), name=''):
-    num_features = X.shape[1]
-
+def remove_redundant_classes(X, y, models, remove_models):
     # Remove models with fewer than 5 objects (as SMOTE can't work with that few objects)
     for m in models:
         nobs = len(X[y == m])
@@ -117,59 +120,180 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
         if m in models:
             models.remove(m)
 
-    # # Plot feature space before oversampling
-    # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir)
+    return X, y, models, remove_models
 
-    # Split into train/test TODO: Add k-fold cross-validation to get uncertainties on confusion matrix entries
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.60, shuffle=True, random_state=42)
-    model_names = [sntypes_map[model] for model in models]
 
-    # Count number in each model
+def make_class_labels(models, model_names, X_train, y_train, X_test, y_test):
+    """ Count number in each model. """
     nobs_train, nobs_test, model_labels = [], [], []
     for m in models:
         nobs_train.append(len(X_train[y_train == m]))
         nobs_test.append(len(X_test[y_test == m]))
     for i, m in enumerate(models):
-        model_labels.append(model_names[i])  # model_labels.append("{}\ntrain: {}\ntest: {}".format(model_names[i], nobs_train[i], nobs_test[i]))
+        model_labels.append("{}\ntrain: {}\ntest: {}".format(model_names[i], nobs_train[i], nobs_test[i]))
 
-    # SMOTE to correct for imbalanced data on training set only
-    sm = over_sampling.SMOTE(random_state=42, n_jobs=20)
+    return model_labels, nobs_train, nobs_test
+
+
+def oversampling(models, X_train, y_train):
+    """SMOTE to correct for imbalanced data on training set only."""
+    sm = over_sampling.SMOTE(random_state=42, n_jobs=2)
     X_train, y_train = sm.fit_sample(X_train, y_train)
     for m in models:
         nobs = len(X_train[y_train == m])
         print(m, nobs)
 
-    if classifier == 'voting':
-        clf1 = RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)
-        clf2 = MLPClassifier()
-        clf3 = KNeighborsClassifier(3, n_jobs=-1)
-        classifier = VotingClassifier(estimators=[('RF', clf1), ('MLP', clf2), ('KNN', clf3)], voting='soft')
+    return X_train, y_train
 
-    # Train model
+
+def save_truth_tables(classifier, X_test, y_test, name, models, fig_dir, numfold):
+    pred_proba = classifier.predict_proba(X_test)
+    truth_table = np.zeros(pred_proba.shape)
+    for i, m in enumerate(y_test):
+        truth_table[i][models.index(m)] = 1
+    np.savetxt(os.path.join(fig_dir, 'predicted_prob_{}_kfold_{}.csv'.format(name, numfold)), pred_proba)
+    np.savetxt(os.path.join(fig_dir, 'truth_table_{}_kfold_{}.csv'.format(name, numfold)), truth_table)
+
+
+def save_tree_diagram(classifier, feature_names, out_file='tree'):
+    from sklearn.tree import export_graphviz
+    export_graphviz(classifier.estimators_[3],
+                    out_file="{}.dot".format(out_file),
+                    feature_names=feature_names,
+                    filled=True,
+                    rounded=True)
+    # import pydot
+    # (graph,) = pydot.graph_from_dot_file('tree.dot')
+    # graph.write_png('tree.png')
+    # os.system('dot -Tpdf {0}.dot -o {0}.pdf'.format(out_file))
+
+
+def remove_objects_with_val(X, y, val):
+    print(X.shape, y.shape)
+    for i in range(len(X[0])):
+        mask = np.where(X[:,i] != val)[0]
+        X = X[mask]
+        y = y[mask]
+    print(X.shape, y.shape)
+
+    return X, y
+
+
+def get_n_best_features(n, X, y, classifier, feature_names, num_features, fig_dir, name, models, model_names):
+    # Classify on smaller feature list
+    c = classifier
+    classifier = RandomForestClassifier(n_estimators=c.n_estimators, n_jobs=c.n_jobs, random_state=c.random_state, max_leaf_nodes=c.max_leaf_nodes, max_depth=c.max_depth, min_samples_split=c.min_samples_split, min_samples_leaf=c.min_samples_leaf, min_weight_fraction_leaf=c.min_weight_fraction_leaf, max_features=c.max_features)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.60, shuffle=True, random_state=42)
+    sm = over_sampling.SMOTE(random_state=42, n_jobs=2)
+    X_train, y_train = sm.fit_sample(X_train, y_train)
+    model_labels, nobs_train, nobs_test = make_class_labels(models, model_names, X_train, y_train, X_test, y_test)
     classifier.fit(X_train, y_train)
-    score = classifier.score(X_test, y_test)
-
-    # Get Accuracy
     y_pred = classifier.predict(X_test)
     accuracy = len(np.where(y_pred == y_test)[0])
     print("Accuracy is: {}/{} = {}".format(accuracy, len(y_pred), accuracy / len(y_pred)))
-
-    # Compute confusion matrix
     cnf_matrix = confusion_matrix(y_test, y_pred)
-    np.set_printoptions(precision=2)
+    plot_feature_importance(classifier, feature_names, num_features, fig_dir)
+    plot_confusion_matrix(cnf_matrix, classes=model_labels, normalize=True, title='Normalized confusion matrix_%s' % name, fig_dir=fig_dir, name=name)
 
-    # Save probability arrays
-    # pred_proba = classifier.predict_proba(X_test)
-    # truth_table = np.zeros(pred_proba.shape)
-    # for i, m in enumerate(y_test):
-    #     truth_table[i][models.index(m)] = 1
-    # np.savetxt(os.path.join(fig_dir, 'predicted_prob_%s.csv' % name), pred_proba)
-    # np.savetxt(os.path.join(fig_dir, 'truth_table_%s.csv' % name), truth_table)
+    # Use top n features
+    importances = classifier.feature_importances_
+    indices = np.argsort(importances)[::-1]
+    print(indices)
+    feature_names = feature_names[indices][:n]
+    print(feature_names)
+    X = X[:, indices][:, :n]
+    num_features = n
+
+    return num_features, feature_names, X
+
+
+def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=(), name='', k=1):
+    num_features = X.shape[1]
+
+    X, y, models, remove_models =remove_redundant_classes(X, y, models, remove_models)
+
+    model_names = [sntypes_map[model] for model in models]
+
+    # Plot feature space before oversampling
+    # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir)
+
+    # Get best features
+    n = 50
+    num_features, feature_names, X = get_n_best_features(n, X, y, classifier, feature_names, num_features, fig_dir, name, models, model_names)
+
+    # Store each k fold info:
+    kfold_classifiers = []
+    kfold_cnf_matrices = []
+
+    # Split into train/test or k-fold
+    if k == 1:
+        data = train_test_split(X, y, train_size=0.60, shuffle=True, random_state=42)
+    else:
+        kfold = KFold(n_splits=k, shuffle=True, random_state=42)
+        data = kfold.split(X=X, y=y)
+
+    for numfold, datum in enumerate(data):
+        if k == 1:
+            X_train, X_test, y_train, y_test = data
+        else:
+            train_idx, test_idx = datum
+            X_train, X_test, y_train, y_test = X[train_idx], X[test_idx], y[train_idx], y[test_idx]
+            print("Fold number:", numfold)
+            c = classifier
+            classifier = RandomForestClassifier(n_estimators=c.n_estimators, n_jobs=c.n_jobs, random_state=c.random_state+numfold, max_leaf_nodes=c.max_leaf_nodes, max_depth=c.max_depth, min_samples_split=c.min_samples_split, min_samples_leaf=c.min_samples_leaf, min_weight_fraction_leaf=c.min_weight_fraction_leaf, max_features=c.max_features)
+
+        # Class labels and count train/test objects
+        model_labels, nobs_train, nobs_test = make_class_labels(models, model_names, X_train, y_train, X_test, y_test)
+
+        # SMOTE
+        X_train, y_train = oversampling(models, X_train, y_train)
+
+        if classifier == 'voting':
+            clf1 = RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)
+            clf2 = MLPClassifier()
+            clf3 = GaussianNB()
+            clf4 = KNeighborsClassifier(3, n_jobs=-1)
+            classifier = VotingClassifier(estimators=[('RF', clf1), ('MLP', clf2), ('KNN', clf4)], voting='soft')
+
+        # Train model
+        classifier.fit(X_train, y_train)
+        score = classifier.score(X_test, y_test)
+
+        # Get Accuracy
+        y_pred = classifier.predict(X_test)
+        accuracy = len(np.where(y_pred == y_test)[0])
+        print("Accuracy with top features is: {}/{} = {}".format(accuracy, len(y_pred), accuracy / len(y_pred)))
+
+        # Compute confusion matrix
+        cnf_matrix = confusion_matrix(y_test, y_pred)
+        np.set_printoptions(precision=2)
+        print(cnf_matrix)
+
+        # Save probability arrays
+        # save_truth_tables(classifier, X_test, y_test, name, models, fig_dir)
+
+        # Store kfold metrics
+        kfold_cnf_matrices.append(cnf_matrix)
+        kfold_classifiers.append(classifier)
+
+        if k == 1:
+            break
 
     # visualize test performance
+    if k == 1:
+        combine_kfolds = False
+    else:
+        combine_kfolds = True
+        cnf_matrix = kfold_cnf_matrices
     if hasattr(classifier, "feature_importances_"):
-        plot_feature_importance(classifier, feature_names, num_features, fig_dir)
-    plot_confusion_matrix(cnf_matrix, classes=model_labels, normalize=True, title='Normalized confusion matrix_%s' % name, fig_dir=fig_dir, name=name)
+        plot_feature_importance(classifier, feature_names, num_features, fig_dir, num_features_plot=n, name=name + '_with_top_{}features'.format(n))
+    plot_confusion_matrix(cnf_matrix, classes=model_labels, normalize=True, title='Normalized confusion matrix_{}_with_top_{}'.format(name, n), fig_dir=fig_dir, name=name + '_with_top_{}features'.format(n), combine_kfolds=combine_kfolds)
+
+    # Save tree diagram
+    save_tree_diagram(classifier, feature_names, out_file='tree_{}'.format(name))
+
+    # Plot feature space
+    # X, y = remove_objects_with_val(X, y, val=-99)
     # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir, add_save_name='')
 
     return classifier, X_train, y_train, X_test, y_test, score, y_pred
