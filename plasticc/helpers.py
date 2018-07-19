@@ -1,4 +1,4 @@
-#
+# Updated to match RK's mapping on 20180715 - GN
 #
 # def get_sntypes():
 #     sntypes_map = {1: 'SN1a', 2: 'CC-II', 3: 'CC-Ibc', 6: 'SNII', 12: 'IIpca', 13: 'SNIbc', 14: 'IIn',
@@ -66,64 +66,75 @@
 
 
 def get_sntypes():
-    sntypes_map = {1: 'SN1a', 2: 'CC', 6: 'SNII', 3: 'SNIbc', 4: 'IIn', 5: 'IIpca', 41: 'Ia-91bg', 42: 'Ia-91bg-Jones',
-                   45: 'pointIa', 50: 'Kilonova', 60: 'Magnetar', 61: 'PISN', 62: 'ILOT', 63: 'CART', 64: 'TDE',
-                   80: 'RRLyrae', 81: 'Mdwarf', 82: 'Mira', 90: 'BSR', 91: 'String'}
+    sntypes_map = {1: 'SNIa-Normal', 
+                   2: 'SNCC-II', 
+                   12: 'SNCC-II', 
+                   14: 'SNCC-II', 
+                   3: 'SNCC-Ibc', 
+                   13: 'SNCC-Ibc', 
+                   5: 'SNCC-Ibc',
+                   6: 'SNCC-II', 
+                   41: 'Ia-91bg',
+                   43: 'SNIa-x'
+                   45: 'pointIa', 
+                   51: 'Kilonova', 
+                   60: 'SLSN-I', 
+                   61: 'PISN', 
+                   62: 'ILOT', 
+                   63: 'CART', 
+                   64: 'TDE',
+                   70: 'AGN',
+                   80: 'RRLyrae', 
+                   81: 'Mdwarf', 
+                   83: 'EBE'
+                   84: 'Mira', 
+                   90: 'uLens-BSR', 
+                   91: 'uLens-1STAR',
+                   92: 'uLens-String',
+                   99: 'Rare'}
     return sntypes_map
 
 
-def aggregate_sntypes(reverse=False):
-    # aggregate_map = {'Ia': ('SN1a', 'Ia-91bg-Santiago', 'Ia-91bg-Jones'),
-    #                  'CC': ('CC', 'New_CC', 'IIn'),
-    #                  'Other': ('Kilonova', 'ILOT', 'BSR', 'String'),
-    #                  'SNIbc': ('SNIbc',),
-    #                  'pointIa': ('pointIa', ),
-    #                  'Magnetar': ('Magnetar',),
-    #                  'PISN': ('PISN',),
-    #                  'CART': ('CART',),
-    #                  '64': ('64',),
-    #                  'RRLyrae': ('RRLyrae',),
-    #                  'Mdwarf': ('Mdwarf',),
-    #                  'Mira': ('Mira',),
-    #                  }
-
     if reverse:
-        aggregate_map = {6: (4, 5),
-                         3: (3,),
-                         41: (41,),
+        aggregate_map = {99: (45, 61, 62, 63, 90, 92),
                          1: (1,),
+                         5: (3,13),
+                         6: (2, 12, 14),
+                         41: (41,),
+                         43: (43,),
                          45: (45,),
-                         50: (50,),
+                         51: (51,),
                          60: (60,),
-                         61: (61,),
-                         62: (62,),
-                         63: (63,),
                          64: (64,),
+                         70: (70,),
                          80: (80,),
                          81: (81,),
-                         82: (82,),
-                         90: (90,),
-                         91: (91,),
-                         }
+                         83: (83,),
+                         91: (91,)}
     else:
-        aggregate_map = {2: 'ignore', 3: 3,
-                         4: 6, 5: 6,
-                         41: 41, 42: 'ignore',
-                         1: 1,
-                         45: 45,
-                         50: 50,
+        aggregate_map = {1: 1,
+                         2: 6, 
+                         3: 5,
+                         12: 6,
+                         13: 5,
+                         14: 6,
+                         41: 41, 
+                         43: 43,
+                         45: 99,
+                         51: 51,
                          60: 60,
-                         61: 61,
-                         62: 62,
-                         63: 63,
+                         61: 99,
+                         62: 99,
+                         63: 99,
                          64: 64,
+                         70: 70,
                          80: 80,
                          81: 81,
-                         82: 82,
-                         90: 90,
+                         83: 83,
+                         90: 99,
                          91: 91,
+                         92: 99,
                          }
-        # Other is BSR (Binary Star remnant), ILOT, PISN
 
     return aggregate_map
 
