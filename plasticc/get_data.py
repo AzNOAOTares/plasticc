@@ -182,7 +182,7 @@ class GetData(object):
             A DataFrame containing the MJD, FLT, FLUXCAL, FLUXCALERR, ZEROPT seperated by each filter.
             E.g. Access the magnitude in the z filter with phot_out['z']['MAG'].
         """
-        phot_file = get_photfile_for_objid(objid)
+        phot_file = self.get_photfile_for_objid(objid)
 
         try:
             phot_HDU = afits.open(phot_file, memmap=True)
@@ -234,7 +234,7 @@ class GetData(object):
             A DataFrame containing the MJD, FLT, FLUXCAL, FLUXCALERR, ZEROPT seperated by each filter.
             E.g. Access the magnitude in the z filter with phot_out['z']['MAG'].
         """
-        phot_file = get_photfile_for_objid(objid)
+        phot_file = self.get_photfile_for_objid(objid)
 
         try:
             phot_HDU = afits.open(phot_file, memmap=True)
