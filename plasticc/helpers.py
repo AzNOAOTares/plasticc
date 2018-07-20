@@ -95,6 +95,7 @@ def get_sntypes():
     return sntypes_map
 
 
+def aggregate_sntypes(reverse=False):
     if reverse:
         aggregate_map = {99: (45, 61, 62, 63, 90, 92),
                          1: (1,),
