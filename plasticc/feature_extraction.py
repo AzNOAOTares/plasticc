@@ -6,7 +6,7 @@ import scipy
 import astropy.table as at
 from collections import OrderedDict
 from .get_data import GetData
-from ..ANTARES_object.LAobject import LAobject
+from ANTARES_object.LAobject import LAobject
 import h5py
 import multiprocessing as mp
 import math
@@ -215,11 +215,11 @@ def create_all_hdf_files(args):
 
 def main():
     machine = 6  # selecting machines 1 through 10
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'hdf_features_DDF_20180501')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'Tables', 'features', 'hdf_features_DDF_20180715')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    data_release = '20180501'
+    data_release = '20180715'
     field = 'DDF'
     model = '%'
     getter = GetData(data_release)
@@ -240,7 +240,7 @@ def main():
     #     i += 1
 
     offset = 0
-    offset_next = 200
+    offset_next = 40
     print(offset_next)
 
     # Multiprocessing
@@ -249,7 +249,7 @@ def main():
     args_list = []
     file_list = os.listdir(save_dir)
     for i in i_list:
-        if 'features_{}.hdf5'.format(i) not in file_list:
+        if True:#'features_{}.hdf5'.format(i) not in file_list:
             print(os.path.join(save_dir, 'features_{}.hdf5'.format(i)))
             args_list.append((data_release, i, save_dir, field, model, batch_size, sort, redo))
 
@@ -266,7 +266,7 @@ def main():
     #     save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
     #                           batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
     #
-    combine_hdf_files(save_dir, data_release, 'features_ddf_20180501_withcesium.hdf5')
+    combine_hdf_files(save_dir, data_release, 'features_ddf_20180715.hdf5')
 
 
 if __name__ == '__main__':
