@@ -82,7 +82,7 @@ class EarlyMixin(object):
 
         return fit_func, best
 
-    def get_early_rise_rate(self, recompute=False):
+    def get_early_rise_rate(self, recompute=False, plot=False):
         """
         Compute the early rise rate (slope) of the light curve.
         """
@@ -106,8 +106,12 @@ class EarlyMixin(object):
             fit_func, parameters = self._fit_early_lightcurve(outlc)
             self.early_fit_func, self.early_parameters = fit_func, parameters
 
+        if plot:
+            plt.figure(figsize=(12, 10))
+            ymin, ymax = -10, 10
+
         col = {'u': 'b', 'g': 'g', 'r': 'r', 'i': 'm', 'z': 'k', 'Y': 'y'}
-        for i, pb in enumerate(outlc):
+        for i, pb in enumerate(['u', 'g', 'r', 'i', 'z', 'Y']):
             tlc = outlc.get(pb)
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
@@ -119,13 +123,11 @@ class EarlyMixin(object):
 
             if len(ttime) <= 1 or not np.any(ttime < 0):
                 return_vals[pb] = (-99, -99, -99)
-                # plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=pb)
+                if plot:
+                    plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=pb)
                 continue
 
             fit_flux = fit_func(np.arange(min(ttime), max(ttime), 0.2), *parameters[pb])
-
-            # plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=pb)
-            # plt.plot(np.arange(min(ttime), max(ttime), 0.2), fit_flux, color=col[pb])
 
             a, c, t0 = parameters[pb]
 
@@ -140,15 +142,28 @@ class EarlyMixin(object):
             c_fit[pb] = parameters[pb][1]
             return_vals[pb] = (tearlyriserate, parameters[pb][0], parameters[pb][1])
 
-        # # plt.title(self.objectId)
-        # plt.xlabel("Days since trigger (rest frame)")
-        # plt.ylabel("Relative Flux (distance corrected)")
-        # # plt.xlim(-40, 15)
-        # plt.legend(frameon=False)
-        # try:
-        #     plt.show()
-        # except AttributeError:
-        #     import pdb; pdb.set_trace()
+            if plot:
+                label = "{:>2}: a ={:6.2f}, c ={:6.2f}, slope ={:6.2f}".format(pb, a, c, tearlyriserate)
+                plt.errorbar(ttime, tFluxUnred, yerr=tFluxErrUnred, fmt='.', color=col[pb], label=label)
+                plt.plot(np.arange(min(ttime), max(ttime), 0.2), fit_flux, color=col[pb])
+                ymin = min(ymin, (min(tFluxUnred[ttime >= -40]) - max(tFluxErrUnred[ttime >= -40])))
+                ymax = max(ymax, (max(tFluxUnred[ttime >= -40]) + max(tFluxErrUnred[ttime >= -40])))
+
+        if plot:
+            plt.title(self.objectId)
+            plt.xlabel("Days since trigger (rest frame)", fontsize=13)
+            plt.ylabel("Relative Flux (distance corrected)", fontsize=13)
+            plt.xlim(-40, 15)
+            plt.ylim(ymin, ymax)
+            plt.autoscale(enable=True, axis='y', tight=True)
+            plt.tick_params(axis='both', labelsize=12)
+
+            plt.errorbar([0], [0], yerr=[0], alpha=0.0, label="$t_0$ ={:7.2f}".format(t0))
+            plt.errorbar([0], [0], yerr=[0], alpha=0.0, label="$z = {:.3f}$".format(self.z))
+            # plt.autoscale(enable=True, axis='y', tight=True)
+            plt.legend(frameon=False, loc='upper left')
+            plt.savefig(self.objectId + "_ylims_fit.pdf")
+            # plt.show()
 
         self.earlyriserate = earlyriserate
         self.a_fit = a_fit
@@ -334,6 +349,11 @@ def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=
     print(bestpars)
     t0 = bestpars[0]
     bestpars = bestpars[1:]
+
+    for i, pb in enumerate(times):
+        if len(times[pb][times[pb] > t0]) == 0:
+            bestpars[i * 2] = 0  # set `a' to zero if no data points above t0
+
     best = {pb: np.append(bestpars[i * 2:i * 2 + 2], t0) for i, pb in enumerate(times)}
 
     # to_delete = []
