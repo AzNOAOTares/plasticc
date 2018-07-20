@@ -15,7 +15,7 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, VotingC
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from mlxtend.classifier import EnsembleVoteClassifier
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, RandomizedSearchCV, RepeatedKFold
 
 from plasticc.read_features import get_features, get_feature_names
 from plasticc import helpers
@@ -137,6 +137,7 @@ def make_class_labels(models, model_names, X_train, y_train, X_test, y_test):
 
 def oversampling(models, X_train, y_train):
     """SMOTE to correct for imbalanced data on training set only."""
+    print("SMOTE...")
     sm = over_sampling.SMOTE(random_state=42, n_jobs=2)
     X_train, y_train = sm.fit_sample(X_train, y_train)
     for m in models:
@@ -207,10 +208,63 @@ def get_n_best_features(n, X, y, classifier, feature_names, num_features, fig_di
     return num_features, feature_names, X
 
 
+def hyper_parameter_tuning(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=(), name=''):
+    """
+    Use a random grid of hyperparameters to search for best hyperparameters.
+
+    Good example on RandomizedSearchCV here:
+    https://towardsdatascience.com/hyperparameter-tuning-the-random-forest-in-python-using-scikit-learn-28d2aa77dd74
+    """
+
+    # Hyperparameter grid
+    n_estimators = [int(x) for x in np.linspace(start=200, stop=2000, num=10)]
+    max_features = ['auto', 'sqrt']
+    max_depth = [int(x) for x in np.linspace(10, 110, num=11)]
+    max_depth.append(None)
+    min_samples_split = [2, 5, 10]
+    min_samples_leaf = [1, 2, 4]
+    bootstrap = [True, False]
+    random_grid = {'n_estimators': n_estimators,
+                   'max_features': max_features,
+                   'max_depth': max_depth,
+                   'min_samples_split': min_samples_split,
+                   'min_samples_leaf': min_samples_leaf,
+                   'bootstrap': bootstrap}
+
+    # Get data
+    num_features = X.shape[1]
+    model_names = [sntypes_map[model] for model in models]
+    X, y, models, remove_models = remove_redundant_classes(X, y, models, remove_models)
+
+    # Get best features
+    n = 50
+    num_features, feature_names, X = get_n_best_features(n, X, y, classifier, feature_names, num_features, fig_dir, name, models, model_names)
+
+    # Randomised Search
+    clf_random = RandomizedSearchCV(estimator=classifier, param_distributions=random_grid, n_iter=7, cv=3, verbose=2,
+                                   random_state=42, n_jobs=2)
+    clf_random.fit(X, y)
+    print(clf_random.best_params_)
+
+    def evaluate(model, test_features, test_labels):
+        predictions = model.predict(test_features)
+        errors = abs(predictions - test_labels)
+        mape = 100 * np.mean(errors / test_labels)
+        accuracy = 100 - mape
+        print('Model Performance')
+        print('Average Error: {:0.4f} degrees.'.format(np.mean(errors)))
+        print('Accuracy = {:0.2f}%.'.format(accuracy))
+
+        return accuracy
+
+    best_random = clf_random.best_estimator_
+    # random_accuracy = evaluate(best_random, test_features, test_labels)
+
+
 def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=(), name='', k=1):
     num_features = X.shape[1]
 
-    X, y, models, remove_models =remove_redundant_classes(X, y, models, remove_models)
+    X, y, models, remove_models = remove_redundant_classes(X, y, models, remove_models)
 
     model_names = [sntypes_map[model] for model in models]
 
