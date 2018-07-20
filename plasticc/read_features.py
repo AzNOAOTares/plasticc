@@ -8,7 +8,8 @@ def get_feature_names(passbands, ignore=()):
                            'shapiro_%s' % p, 'p-value_%s' % p, 'skew_%s' % p, 'q31_%s' % p,
                            'stetsonk_%s' % p, 'acorr_%s' % p, 'von-neumann_%s' % p, 'hlratio_%s' % p,
                            'amplitude_%s' % p, 'filt-amplitude_%s' % p,  'somean_%s' % p, 'rms_%s' % p, 'mad_%s' % p,
-                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p] for p in passbands], [])
+                           'stetsonj_%s' % p, 'stetsonl_%s' % p, 'entropy_%s' % p, 'nobs4096_%s' % p,
+                           'risetime_%s' % p, 'riserate_%s' % p] for p in passbands], [])
 
     color_fields = []
     for i, pb1 in enumerate(passbands):
