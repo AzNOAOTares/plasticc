@@ -75,7 +75,7 @@ def get_sntypes():
                    5: 'SNCC-Ibc',
                    6: 'SNCC-II', 
                    41: 'Ia-91bg',
-                   43: 'SNIa-x'
+                   43: 'SNIa-x',
                    45: 'pointIa', 
                    51: 'Kilonova', 
                    60: 'SLSN-I', 
@@ -86,7 +86,7 @@ def get_sntypes():
                    70: 'AGN',
                    80: 'RRLyrae', 
                    81: 'Mdwarf', 
-                   83: 'EBE'
+                   83: 'EBE',
                    84: 'Mira', 
                    90: 'uLens-BSR', 
                    91: 'uLens-1STAR',
