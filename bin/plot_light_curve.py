@@ -1,10 +1,10 @@
 import sys
 import matplotlib.pyplot as plt
-import plasticc.get_data
+from ..plasticc import get_data
 
 
 def plot_light_curve(objid, data_release='20180407'):
-    getter = plasticc.get_data.GetData(data_release)
+    getter = get_data.GetData(data_release)
     field, model, base, snid = objid.split('_')
     result = getter.get_lcs_data(field=field, snid=snid, model=model, base=base)
     head, phot = next(result)

@@ -4,21 +4,22 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 import sys
 import os
-ROOT_DIR = os.getenv('PLASTICC_DIR')
-WORK_DIR = os.path.join(ROOT_DIR, 'plasticc')
-sys.path.append(WORK_DIR)
+import warnings
 import numpy as np
 import pandas as pd
 from astropy.stats import sigma_clip
 import astropy.table as at
 import pymysql
 from collections import OrderedDict
-from plasticc.get_data import GetData
-import ANTARES_object
-import warnings
-import snmachine.snfeatures as sf
+from ..plasticc.get_data import GetData
+from .. import ANTARES_object
+
+ROOT_DIR = os.getenv('PLASTICC_DIR')
+WORK_DIR = os.path.join(ROOT_DIR, 'plasticc')
+sys.path.append(WORK_DIR)
 
 DIRNAMES = 1
+
 
 def make_light_curve_batches(data_release, field_in='%', model_in='%', batch_size=1000):
     """

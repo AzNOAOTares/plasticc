@@ -4,9 +4,9 @@ import h5py
 from sklearn.decomposition import PCA, FastICA
 from chainconsumer import ChainConsumer
 
-import helpers
+from . import helpers
 
-from read_features import get_feature_names, get_features
+from .read_features import get_feature_names, get_features
 
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 

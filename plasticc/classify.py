@@ -17,10 +17,10 @@ from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from mlxtend.classifier import EnsembleVoteClassifier
 from sklearn.model_selection import KFold, RandomizedSearchCV, RepeatedKFold
 
-from plasticc.read_features import get_features, get_feature_names
-from plasticc import helpers
-from plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
-# from plasticc.pca_components import get_pca_features
+from .read_features import get_features, get_feature_names
+from . import helpers
+from .classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
+# from .pca_components import get_pca_features
 import seaborn as sns
 import pandas as pd
 

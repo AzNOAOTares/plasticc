@@ -5,8 +5,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy import stats
 import pandas as pd
 import seaborn as sns
-from plasticc import helpers
-from plasticc.read_features import get_features, get_feature_names
+from ..plasticc import helpers
+from ..plasticc.read_features import get_features, get_feature_names
 
 ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
 

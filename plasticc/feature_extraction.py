@@ -5,8 +5,8 @@ import numpy as np
 import scipy
 import astropy.table as at
 from collections import OrderedDict
-from plasticc.get_data import GetData
-from ANTARES_object.LAobject import LAobject
+from .get_data import GetData
+from ..ANTARES_object.LAobject import LAobject
 import h5py
 import multiprocessing as mp
 import math

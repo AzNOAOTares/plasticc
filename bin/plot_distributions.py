@@ -3,13 +3,13 @@ import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-ROOT_DIR = os.getenv('PLASTICC_DIR')
-MOD_DIR  = os.path.join(ROOT_DIR, 'plasticc')
-sys.path.append(MOD_DIR)
-from plasticc.get_data import GetData
+from ..plasticc.get_data import GetData
 import multiprocessing as mp
 import itertools
 
+ROOT_DIR = os.getenv('PLASTICC_DIR')
+MOD_DIR = os.path.join(ROOT_DIR, 'plasticc')
+sys.path.append(MOD_DIR)
 
 
 def get_class_distributions(field, sntype, getdata):
