@@ -1,8 +1,6 @@
 import h5py
 import numpy as np
 
-from plasticc import helpers
-
 
 def get_feature_names(passbands, ignore=()):
     feature_names = ['objid', 'redshift']
@@ -32,7 +30,7 @@ def get_feature_names(passbands, ignore=()):
     return feature_names
 
 
-def get_features(fpath, data_release, field_in='%', model_in='%', aggregate_classes=False):
+def get_features(fpath, data_release, field_in='%', model_in='%', aggregate_classes=False, helpers=None):
     """ Get features from hdf5 files. """
     hdffile = h5py.File(fpath, 'r')
     features = np.array(hdffile[data_release])

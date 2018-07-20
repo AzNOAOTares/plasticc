@@ -5,7 +5,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy import stats
 import pandas as pd
 import seaborn as sns
-import helpers
+from plasticc import helpers
 from plasticc.read_features import get_features, get_feature_names
 
 ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
@@ -29,7 +29,7 @@ def convert_rescaled_flux_to_array(rescaled_flux_str_array):
 
 
 def get_features_dict(fpath, data_release, feature_names=('redshift',), field='DDF', model='1', passbands=None, aggregate_classes=False):
-    features = get_features(fpath, data_release, field, model, aggregate_classes=aggregate_classes)
+    features = get_features(fpath, data_release, field, model, aggregate_classes=aggregate_classes, helpers=helpers)
 
     features_dict = {pb: {} for pb in passbands + ['general_features']}
     for feat in feature_names:
@@ -132,8 +132,9 @@ def get_limits(y, feature=None):
         try:
             ymin, ymax = minmax[feature[:-2]]
         except KeyError:
-            ymin, ymax = (None, None)
-    # ymin, ymax = np.percentile(y, 0), np.percentile(y, 99)
+            # ymin, ymax = (None, None)
+            datarange = np.percentile(y, 95) - np.percentile(y, 5)
+            ymin, ymax = (np.percentile(y, 5) - datarange*3), (np.percentile(y, 95) + datarange*3)
 
     return ymin, ymax
 
@@ -164,7 +165,7 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
     # plt.yticks(rotation=0,fontsize=22)
     # plt.xticks(rotation=90,fontsize=22)
     # plt.tight_layout()
-    # plt.savefig(os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'correlation', 'correlation.pdf'))
+    # plt.savefig(os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'correlation', 'SN1a'))
 
     # Convert to 3D DataFrame instead of 2D dataframe of dicts
     for pb in passbands + ['general_features']:
@@ -246,7 +247,7 @@ def main():
 
     feature_names = get_feature_names(passbands, ignore=())
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test.pdf')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
