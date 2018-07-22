@@ -13,7 +13,7 @@ import scipy.stats
 import scipy.interpolate as scinterp
 from astropy.stats import median_absolute_deviation
 from cesium import featurize
-from .. import constants 
+from .. import constants
 from . import stats_computation
 
 
@@ -29,7 +29,7 @@ class BaseMixin(object):
         Return a lightcurve suitable for computing features
         """
         outlc = getattr(self, '_outlc', None)
-        if outlc is None or recompute:        
+        if outlc is None or recompute:
             filters = self.filters
             outlc = {}
 
@@ -41,7 +41,7 @@ class BaseMixin(object):
                 if len(ind) > 0:
                     outlc[pb] = ind
             self._outlc = outlc
-       
+
         # for each of the default_cols, get the elements for t passband
         out = {}
         for pb, ind in outlc.items():
@@ -64,17 +64,17 @@ class BaseMixin(object):
         for i, pb in enumerate(outlc):
             tlc = outlc.get(pb)
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
-                
+
             newflux = tFluxRenorm
             if len(newflux) <= 1:  # if t Flux is empty or there's only measure
                 amp = 0.
             else:
                 f_99 = np.percentile(newflux, 99)
-                f_01 = np.percentile(newflux,  1)
+                f_01 = np.percentile(newflux, 1)
                 f_50 = np.percentile(newflux, 50)
-                amp = np.abs((f_99 - f_01)/(f_50 - f_01))
+                amp = np.abs((f_99 - f_01) / (f_50 - f_01))
                 if not np.isfinite(amp):
-                    amp = 0. 
+                    amp = 0.
             outamp[pb] = amp
 
         self.setattr_from_dict_default('amplitude', outamp, 0.)
@@ -96,7 +96,7 @@ class BaseMixin(object):
         for i, pb in enumerate(outlc):
             tlc = outlc.get(pb)
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
-                
+
             photmask = tphotflag >= constants.GOOD_PHOTFLAG
             newflux = tFluxRenorm[photmask]
 
@@ -104,17 +104,16 @@ class BaseMixin(object):
                 amp = 0.
             else:
                 f_99 = np.percentile(newflux, 99)
-                f_01 = np.percentile(newflux,  1)
+                f_01 = np.percentile(newflux, 1)
                 f_50 = np.percentile(newflux, 50)
-                amp = np.abs((f_99 - f_01)/(f_50 - f_01))
+                amp = np.abs((f_99 - f_01) / (f_50 - f_01))
                 if not np.isfinite(amp):
-                    amp = 0. 
+                    amp = 0.
             outamp[pb] = amp
 
         self.setattr_from_dict_default('filtered_amplitude', outamp, 0.)
         self.filtered_amplitude = outamp
         return outamp
-
 
     def get_stats(self, recompute=False):
         """
@@ -143,7 +142,6 @@ class BaseMixin(object):
 
         self.stats = outstats
         return outstats
-
 
     def get_filtered_stats(self, recompute=False):
         """
@@ -175,7 +173,6 @@ class BaseMixin(object):
         self.filtered_stats = outstats
         return outstats
 
-
     def get_skew(self, recompute=False):
         """
         Different definition of skewness
@@ -192,14 +189,13 @@ class BaseMixin(object):
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
             npb = len(tFluxRenorm)
             tmean = np.mean(tFluxRenorm)
-            tstd  = np.std(tFluxRenorm)
+            tstd = np.std(tFluxRenorm)
 
             tskew = (1. / npb) * math.fsum(((tFluxRenorm - tmean) ** 3.) / (tstd ** 3.))
             outskew[pb] = tskew
 
         self.skew = outskew
         return outskew
-
 
     def get_StdOverMean(self, recompute=False):
         """
@@ -209,10 +205,9 @@ class BaseMixin(object):
         outSOMean = {pb: (x[3] ** 0.5 / x[2]) for pb, x in outstats.items()}
         return outSOMean
 
-
     def get_ShapiroWilk(self, recompute=False):
         """
-        Get the Shapriro-Wilk W statistic and the p-value for the test 
+        Get the Shapriro-Wilk W statistic and the p-value for the test
         """
 
         sw = getattr(self, 'ShapiroWilk', None)
@@ -230,7 +225,6 @@ class BaseMixin(object):
             sw[pb] = (tsw, tswp)
         self.ShapiroWilk = sw
         return sw
-
 
     def get_Q31(self, recompute=False):
         """
@@ -252,7 +246,6 @@ class BaseMixin(object):
         self.Q31 = q31
         return q31
 
-
     def get_RMS(self, recompute=False):
         """
         Get the RMS of the lightcurve
@@ -271,21 +264,20 @@ class BaseMixin(object):
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
             photmask = tphotflag >= constants.GOOD_PHOTFLAG
-            tFluxRenorm    = tFluxRenorm[photmask]
-            tFluxErrRenorm = tFluxErrRenorm[photmask] 
+            tFluxRenorm = tFluxRenorm[photmask]
+            tFluxErrRenorm = tFluxErrRenorm[photmask]
 
             if len(tFluxRenorm) <= 1:  # if t Flux is empty or has only one element
                 rms[pb] = 0.
                 continue
-    
+
             tmean = np.mean(tFluxRenorm)
             trms = math.fsum(((tFluxRenorm - tmean) / tFluxErrRenorm) ** 2.)
-            trms /= math.fsum(1./ tFluxErrRenorm** 2.)
+            trms /= math.fsum(1. / tFluxErrRenorm ** 2.)
             trms = trms ** 0.5
             rms[pb] = trms
         self.RMS = rms
         return rms
-
 
     def get_ShannonEntropy(self, recompute=False):
         """
@@ -306,7 +298,6 @@ class BaseMixin(object):
             entropy[pb] = tEntropy
         self.entropy = entropy
         return entropy
-
 
     def get_MAD(self, recompute=False):
         """
@@ -334,7 +325,6 @@ class BaseMixin(object):
             mad[pb] = tmad
         self.MAD = mad
         return mad
-
 
     def get_vonNeumannRatio(self, recompute=False):
         """
@@ -373,7 +363,6 @@ class BaseMixin(object):
         self.VNR = vnr
         return vnr
 
-
     def get_StetsonJ(self, recompute=False):
         """
         Compute the Stetson J statistic of the lightcurve
@@ -398,7 +387,7 @@ class BaseMixin(object):
                 continue
 
             photmask = tphotflag >= constants.GOOD_PHOTFLAG
-            tFluxRenorm    = tFluxRenorm[photmask]
+            tFluxRenorm = tFluxRenorm[photmask]
             tFluxErrRenorm = tFluxErrRenorm[photmask]
 
             tmean = tstats[2]
@@ -415,7 +404,6 @@ class BaseMixin(object):
             stetsonJ[pb] = tJ
         self.stetsonJ = stetsonJ
         return stetsonJ
-
 
     def get_StetsonK(self, recompute=False):
         """
@@ -448,12 +436,11 @@ class BaseMixin(object):
                 continue
 
             delta = (npb / (npb - 1)) * ((tFluxRenorm - tmean) / tFluxErrRenorm)
-            tK = (np.sum(np.fabs(delta))/npb) / np.sqrt(np.sum(delta*delta) /npb)
+            tK = (np.sum(np.fabs(delta)) / npb) / np.sqrt(np.sum(delta * delta) / npb)
             tK = np.nan_to_num(tK)
             stetsonK[pb] = tK
         self.stetsonK = stetsonK
         return stetsonK
-
 
     def get_StetsonL(self, recompute=False):
         """
@@ -464,19 +451,18 @@ class BaseMixin(object):
             if not recompute:
                 return stetsonL
 
-        stetsonJ = self. get_StetsonJ(recompute=recompute)
-        stetsonK = self. get_StetsonK(recompute=recompute)
+        stetsonJ = self.get_StetsonJ(recompute=recompute)
+        stetsonK = self.get_StetsonK(recompute=recompute)
 
         stetsonL = {}
         for pb in stetsonJ:
             tJ = stetsonJ.get(pb, 0.)
             tK = stetsonK.get(pb, 0.)
-            tL = tJ*tK/0.798
+            tL = tJ * tK / 0.798
             tL = np.nan_to_num(tL)
             stetsonL[pb] = tL
-        self.stetsonL = stetsonL 
-        return stetsonL 
-
+        self.stetsonL = stetsonL
+        return stetsonL
 
     def get_AcorrIntegral(self, recompute=False):
         """
@@ -520,7 +506,6 @@ class BaseMixin(object):
         self.AcorrInt = AcorrInt
         return AcorrInt
 
-
     def get_hlratio(self, recompute=False):
         """
         Compute the ratio of amplitude of observations higher than the average
@@ -541,7 +526,7 @@ class BaseMixin(object):
             tlc = outlc.get(pb)
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-            tWeight = 1. / tFluxErrRenorm 
+            tWeight = 1. / tFluxErrRenorm
 
             tstats = outstats.get(pb)
             if tstats is None:
@@ -563,10 +548,10 @@ class BaseMixin(object):
         self.hlratio = hlratio
         return hlratio
 
-
-    def get_color_amplitudes(self, recompute=False):
+    def get_color_amplitudes(self, recompute=False, passbands=('u', 'g', 'r', 'i', 'z', 'Y')):
         """
         Get the amplitude difference between passbands
+        passbands = ('u', 'g', 'r', 'i', 'z', 'Y') # order of filters matters as it must be 'u-g' rather than 'g-u'
         """
         colorAmp = getattr(self, 'colorAmp', None)
         if colorAmp is not None:
@@ -576,7 +561,6 @@ class BaseMixin(object):
         colorAmp = {}
         amp = self.get_filtered_amplitude(recompute=recompute)
 
-        passbands = ('u', 'g', 'r', 'i', 'z', 'Y') # order of filters matters as it must be 'u-g' rather than 'g-u'
         for i, pb1 in enumerate(passbands):
             for j, pb2 in enumerate(passbands):
                 if i < j:
@@ -590,8 +574,10 @@ class BaseMixin(object):
         self.colorAmp = colorAmp
         return colorAmp
 
-
-    def get_color_mean(self, recompute=False):
+    def get_color_mean(self, recompute=False, passbands=('u', 'g', 'r', 'i', 'z', 'Y')):
+        """
+        passbands = ('u', 'g', 'r', 'i', 'z', 'Y') # order of filters matters as it must be 'u-g' rather than 'g-u'
+        """
         colorMean = getattr(self, 'colorMean', None)
         if colorMean is not None:
             if not recompute:
@@ -606,7 +592,6 @@ class BaseMixin(object):
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
             tmean[pb] = np.mean(tFluxRenorm)
 
-        passbands = ('u', 'g', 'r', 'i', 'z', 'Y') # order of filters matters as it must be 'u-g' rather than 'g-u'
         for i, pb1 in enumerate(passbands):
             for j, pb2 in enumerate(passbands):
                 if i < j:
@@ -735,7 +720,6 @@ class BaseMixin(object):
         self.risetime = risetime
         return risetime
 
-
     def get_rise_rate(self, recompute=False):
         """
         Compute the rise rate (slope) of the light curve.
@@ -760,7 +744,6 @@ class BaseMixin(object):
             riserate[pb] = triserate
         self.riserate = riserate
         return riserate
-
 
 # features_all_cesium = ['all_times_nhist_numpeaks',
 #                        'all_times_nhist_peak1_bin',
