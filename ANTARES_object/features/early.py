@@ -82,7 +82,7 @@ class EarlyMixin(object):
 
         return fit_func, best
 
-    def get_early_rise_rate(self, recompute=False, plot=False):
+    def get_early_rise_rate(self, recompute=False, plot=False, passbands=('u', 'g', 'r', 'i', 'z', 'Y')):
         """
         Compute the early rise rate (slope) of the light curve.
         """
@@ -111,7 +111,7 @@ class EarlyMixin(object):
             ymin, ymax = -10, 10
 
         col = {'u': 'b', 'g': 'g', 'r': 'r', 'i': 'm', 'z': 'k', 'Y': 'y'}
-        for i, pb in enumerate(['u', 'g', 'r', 'i', 'z', 'Y']):
+        for i, pb in enumerate(passbands):
             tlc = outlc.get(pb)
             ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
@@ -163,16 +163,17 @@ class EarlyMixin(object):
             # plt.autoscale(enable=True, axis='y', tight=True)
             plt.legend(frameon=False, loc='upper left')
             plt.savefig(self.objectId + "_ylims_fit.pdf")
-            # plt.show()
+            plt.show()
 
         self.earlyriserate = earlyriserate
         self.a_fit = a_fit
         self.c_fit = c_fit
         return return_vals
 
-    def get_color_at_n_days(self, n, recompute=True):
+    def get_color_at_n_days(self, n, recompute=True, passbands=('u', 'g', 'r', 'i', 'z', 'Y')):
         """
         Compute the colors at n days and the linear slope of the color
+        passbands = ('u', 'g', 'r', 'i', 'z', 'Y')  # order of filters matters as it must be 'u-g' rather than 'g-u'
         """
         color = getattr(self, 'color', None)
         if color is not None:
@@ -214,7 +215,6 @@ class EarlyMixin(object):
 
         # plt.figure()
 
-        passbands = ('u', 'g', 'r', 'i', 'z', 'Y')  # order of filters matters as it must be 'u-g' rather than 'g-u'
         for i, pb1 in enumerate(passbands):
             for j, pb2 in enumerate(passbands):
                 if i < j:
