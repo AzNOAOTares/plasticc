@@ -248,12 +248,12 @@ class GetData(object):
 
 
     @staticmethod
-    def convert_pandas_lc_to_recarray_lc(phot):
+    def convert_pandas_lc_to_recarray_lc(phot, passbands=('u', 'g', 'r', 'i', 'z', 'Y')):
         """
         ANTARES_object not Pandas format broken up by passband
         TODO: This is ugly - just have an option for get_lcs_data to return one or the other
         """
-        pbs = ('u', 'g', 'r', 'i', 'z', 'Y')
+        pbs = passbands
         # name mapping for the defaults in phot_fields
         # any other column is going to become just lowercase it's current name
         name_map = {'FLUXCAL': 'flux', 'FLUXCALERR': 'dflux', 'ZEROPT': 'zpt',\
