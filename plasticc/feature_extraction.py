@@ -75,7 +75,7 @@ def save_antares_features(data_release, fname, field_in='%', model_in='%', batch
             return np.nan
 
     getter = GetData(data_release)
-    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'hostgal_specz', 'mwebv', 'sim_dlmu'], field=field_in,
+    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'hostgal_photoz', 'mwebv', 'sim_dlmu'], field=field_in,
                                   model=model_in, snid='%', limit=batch_size, offset=offset, shuffle=False, sort=sort)
     count = 0
     for head, phot in result:
@@ -215,12 +215,12 @@ def create_all_hdf_files(args):
 
 def main():
     machine = 6  # selecting machines 1 through 10
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'Tables', 'features', 'hdf_features_WFD_20180715')
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'Tables', 'features', 'hdf_features_DDF_20180715')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
     data_release = '20180715'
-    field = 'WFD'
+    field = 'DDF'
     model = '%'
     getter = GetData(data_release)
     nobjects = next(getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True, big=False))
@@ -240,7 +240,7 @@ def main():
     #     i += 1
 
     offset = 0
-    offset_next = 4000
+    offset_next = 40
     print(offset_next)
 
     # Multiprocessing
@@ -266,7 +266,7 @@ def main():
     #     save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
     #                           batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
     #
-    combine_hdf_files(save_dir, data_release, 'features_wfd_20180715.hdf5')
+    combine_hdf_files(save_dir, data_release, 'features_ddf_20180715.hdf5')
 
 
 if __name__ == '__main__':

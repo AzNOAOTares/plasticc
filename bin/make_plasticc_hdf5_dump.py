@@ -98,11 +98,11 @@ def main():
     _ = kwargs.get('field')
 
     # set the header keywords for training and testing
-    # same except for sntype will be removed from test and hostgal_specz isn't
+    # same except for sntype will be removed from test and hostgal_photoz isn't
     # provided
     if dummy == 'training':
         kwargs['columns']=['objid','ptrobs_min','ptrobs_max','ra','decl', 'mwebv', 'mwebv_err',\
-                        'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'sntype']
+                        'hostgal_photoz', 'hostgal_photoz', 'hostgal_photoz_err', 'sntype']
     else:
         kwargs['columns']=['objid','ptrobs_min','ptrobs_max','ra','decl', 'mwebv', 'mwebv_err',\
                         'hostgal_photoz', 'hostgal_photoz_err', 'sntype']

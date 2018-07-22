@@ -63,7 +63,7 @@ def get_features_for_light_curve_batch(data_release, field_in='%', model_in='%',
     NOSHUFFLE = False
 
     getter = GetData(data_release)
-    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'hostgal_specz', 'mwebv', 'sim_dlmu'],\
+    result = getter.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd', 'hostgal_photoz', 'mwebv', 'sim_dlmu'],\
                                 field=field_in, model=model_in,\
                                 shuffle=NOSHUFFLE, sort=SORT,\
                                 limit=batch_size, offset=offset)

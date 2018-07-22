@@ -36,7 +36,7 @@ def main():
 
     _ = kwargs.pop('model')
     _ = kwargs.get('field')
-    kwargs['columns']=['objid','ptrobs_min','ptrobs_max','hostgal_specz']
+    kwargs['columns']=['objid','ptrobs_min','ptrobs_max','hostgal_photoz']
     
     out_field = 'DDF'
     kwargs['field'] = out_field 
