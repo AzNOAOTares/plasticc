@@ -107,7 +107,7 @@ def get_distributions_multiprocessing(data_release, fig_dir):
             ax.set_ylabel(stat)
             ax.set_ylim(bottom=0)
             autolabel(rects, ax)
-            fig.tight_layout(rect=[0,0,1,1])
+            fig.tight_layout(rect=[0.03,0.03,1,1])
             fig.savefig("{0}/distributions/{1}_{2}_{3}.pdf".format(fig_dir, field, stat, data_release))
     return sntype_stats
 
