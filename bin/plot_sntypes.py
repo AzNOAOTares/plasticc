@@ -7,12 +7,12 @@ sys.path.append(WORK_DIR)
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from ..plasticc.get_data import GetData
+from plasticc.get_data import GetData
 from astropy.stats import sigma_clip
 from collections import OrderedDict
 
 
-def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', snid_in='%', cadences=None, limit=100, shuffle=False):
+def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', snid_in='%', limit=100, shuffle=False):
     getdata = GetData(data_release)
     result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'peakmjd'],\
             field=field_in, model=sntype_in, snid=snid_in, limit=limit, shuffle=shuffle, sort=False)
@@ -20,10 +20,8 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
     t_plot, flux_plot, fluxerr_plot, peak_mjd_plot = {}, {}, {}, {}
     sntypes_map = getdata.get_sntypes()
     sntype_name = sntypes_map[sntype_in]
-    med_cad = cadences[sntype_name]
 
     peak_mjd_all = getdata.get_column_for_sntype(column_name='peakmjd', sntype=sntype_in, field=field_in)
-    non_transients = ['RRLyrae', 'Mdwarf', 'Mira']
 
     n = OrderedDict()
     n['u'] = 0
@@ -43,8 +41,16 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
             data = phot.get(f)
             if data is None:
                 continue
-            flt, flux, fluxerr, mjd, zeropt = data
+            flt, flux, fluxerr, mjd, photflag, zeropt = data
+            ind = photflag != 1024
+            flt = flt[ind]
+            flux= flux[ind]
+            fluxerr = fluxerr[ind]
+            mjd = mjd[ind]
+            photflag = photflag[ind]
+            zeropt = zeropt[ind]
             t = mjd - peak_mjd
+
 
             filtered_err = sigma_clip(fluxerr, sigma=3., iters=5, copy=True)
             filtered_flux = sigma_clip(flux, sigma=7., iters=5, copy=True)
@@ -81,7 +87,6 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
             ax.errorbar(t_plot[f][j], flux_plot[f][j], yerr=fluxerr_plot[f][j], marker='.', linestyle='None')
     fig.suptitle("{}".format(sntype_name))
     fig.tight_layout(rect=[0, 0.03, 1, 0.90])
-    fig.savefig("{0}/model_lc_plots/{1}_{2}.pdf".format(fig_dir, field_in, sntype_name))
     return(fig)
 
 
@@ -97,19 +102,10 @@ if __name__ == '__main__':
 
     print("PLOTTING LIGHTCURVES")
 
-    epoch_ranges = {'SN1a': 112.5, 'CC': 112.1, 'SNIbc': 110.9, 'IIn': 115.6, 'SNIa-91bg': 111.0, 'pointIa': 106.1,
-                    'Kilonova': 0., 'Magnetar': 560.9, 'PISN': 252.5, 'ILOT': 116.6, 'CART': 488.6,
-                    'RRLyrae': 818.4, 'Mdwarf': 804.5}
-
-    median_cadences = {'SN1a': 7.279, 'CC': 7.525, 'SNIbc': 7.621, 'IIn': 7.102, 'SNIa-91bg': 7.855, 'pointIa': 8.835,
-                    'Kilonova': 0., 'Magnetar': 7.145, 'PISN': 7.256, 'ILOT': 6.987, 'CART': 8.502,
-                    'RRLyrae': 18.37, 'Mdwarf': 21.79, 'Mira': 7., 'BSR': 7., 'String': 7}
-
-
-
     with PdfPages(f'{fig_dir}/all_{data_release}_{field}.pdf') as pdf:
-        for s in [1, 2, 3, 4, 42, 45, 50, 60, 61, 62, 63, 80, 81, 82]:
-            fig = plot_light_curves(data_release=data_release, fig_dir=fig_dir, field_in=field, sntype_in=s, snid_in='%', cadences=median_cadences, limit=limit, shuffle=shuffle)
+        getdata = GetData(data_release)
+        for s in getdata.get_sntypes():
+            fig = plot_light_curves(data_release=data_release, fig_dir=fig_dir, field_in=field, sntype_in=s, snid_in='%', limit=limit, shuffle=shuffle)
             pdf.savefig(fig)
             plt.close(fig)
     print("PLOTTED LIGHTCURVES")
