@@ -3,13 +3,12 @@ import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from ..plasticc.get_data import GetData
 import multiprocessing as mp
 import itertools
-
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 MOD_DIR = os.path.join(ROOT_DIR, 'plasticc')
 sys.path.append(MOD_DIR)
+from plasticc.get_data import GetData
 
 
 def get_class_distributions(field, sntype, getdata):
@@ -89,7 +88,6 @@ def get_distributions_multiprocessing(data_release, fig_dir):
         stats, field, sntype, bad_mags_part = out
         bad_mags += bad_mags_part
         for key, value in stats.items():
-            print(key, value)
             sntype_stats[key][field][sntype] = value
 
     print("PLOTTING HISTOGRAMS")
@@ -102,14 +100,14 @@ def get_distributions_multiprocessing(data_release, fig_dir):
             yerr = list(yerr)
             if stat == 'nobjects':
                 y = [x[0] for x in y]
-            print(y, yerr)
             rects = ax.bar(range(len(sntypes)), y, yerr=yerr, align='center')
             ax.set_xticks(range(len(sntypes)))
-            ax.set_xticklabels(sntype_names)
+            ax.set_xticklabels(sntype_names, rotation=90)
             ax.set_xlabel('sntype')
             ax.set_ylabel(stat)
             ax.set_ylim(bottom=0)
             autolabel(rects, ax)
+            fig.tight_layout(rect=[0,0,1,1])
             fig.savefig("{0}/distributions/{1}_{2}_{3}.pdf".format(fig_dir, field, stat, data_release))
     return sntype_stats
 
