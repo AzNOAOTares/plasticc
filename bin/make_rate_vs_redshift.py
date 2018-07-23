@@ -82,12 +82,13 @@ def main():
             ax1.plot(redshift_range, density(redshift_range), color=c, label=model_name)
             ax2.set_xlabel('redshift', fontsize='xx-large')
             ax2.set_ylabel(model_name, fontsize='xx-large')
-            ax2.set_ylim(0, 3.)
+            ax2.set_xlim(0, 3.5)
             pdf.savefig(fig1)
         #end loop over models
         ax1.set_xlabel('redshift', fontsize='xx-large')
         ax1.set_ylabel('PDF', fontsize='xx-large')
         ax1.legend(frameon=False)
+        ax1.set_xlim(0, 3.5)
         pdf.savefig(fig2)
     #close pdf fig
 
