@@ -30,7 +30,7 @@ cmap2.set_bad('grey')
 cmap2.set_under('white')
 
 def map_from_arrays(l, b, obj, model_name, pix_2_coord_dict=None,\
-                 interp=True, interp_min=0., verbose=False, overwrite=False, NSIDE=32):
+                 interp=True, interp_min=0., verbose=False, overwrite=False, NSIDE=32, fig_dir=None):
     """
     Build a Healpix map from some arrays, l, b, objname
     
@@ -49,6 +49,9 @@ def map_from_arrays(l, b, obj, model_name, pix_2_coord_dict=None,\
     # we just need to make it large enough that each HEALpix Pixel covers at least one Simlib pointing
 
     filename = '{}.fits'.format(model_name)
+    if fig_dir is None:
+        fig_dir = os.getcwd()
+    filename = os.path.join(fig_dir, filename)
     if os.path.exists(filename) and not overwrite:
         try:
             mapdata = hp.fitsfunc.read_map(filename, h=False, verbose=True)       
@@ -235,8 +238,9 @@ def main():
             fig_num = plt.gcf().number
 
             pix_2_coord_dict = {}
+            map_dir = os.path.join(fig_dir, 'rate_analysis', 'maps', out_field)
             model_map, pix_2_coord_dict, NSIDE = map_from_arrays(l, b, objid, model_name,\
-                          pix_2_coord_dict = pix_2_coord_dict, interp=False, overwrite=False, NSIDE=16)
+                          pix_2_coord_dict = pix_2_coord_dict, interp=False, overwrite=False, NSIDE=16, fig_dir=map_dir)
 
             hp.mollview(model_map, coord=['G',], norm='hist', title=model_name, cmap=cmap2, fig=fig_num)
             hp.graticule(coord=['C'])
