@@ -35,11 +35,8 @@ def main():
     data_release = kwargs.pop('data_release')
 
     _ = kwargs.pop('model')
-    _ = kwargs.get('field')
+    out_field = kwargs.get('field')
     kwargs['columns']=['objid','ptrobs_min','ptrobs_max','hostgal_photoz']
-    
-    out_field = 'DDF'
-    kwargs['field'] = out_field 
 
     sntypes = plasticc.get_data.GetData.get_sntypes()
     getter = plasticc.get_data.GetData(data_release)
@@ -85,6 +82,7 @@ def main():
             ax1.plot(redshift_range, density(redshift_range), color=c, label=model_name)
             ax2.set_xlabel('redshift', fontsize='xx-large')
             ax2.set_ylabel(model_name, fontsize='xx-large')
+            ax2.set_ylim(0, 3.)
             pdf.savefig(fig1)
         #end loop over models
         ax1.set_xlabel('redshift', fontsize='xx-large')
