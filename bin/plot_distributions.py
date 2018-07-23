@@ -19,6 +19,7 @@ def get_class_distributions(field, sntype, getdata):
 
     # Get the number of objects for each sntype
     result = getdata.get_lcs_headers(field=field, model=sntype, get_num_lightcurves=True)
+    result = list(result)
     stats['nobjects'] = (result, 0)
     print("GOT COUNTS", field, sntype)
 
@@ -34,10 +35,10 @@ def get_class_distributions(field, sntype, getdata):
 
         # Loop through the filter light curves in each spectrum
         for f in phot.columns:  # Filter names
-            flt, flux, fluxerr, mjd, zeropt = phot[f]
+            flt, flux, fluxerr, mjd, photflag, zeropt = phot[f]
             # remove fluxes with mag = 128
-            g = np.where(flux > 0)[0]  # good indexes (where magnitude isn't 128)
-            b = np.where(flux <= 0)[0]  # bad indexes (where magnitude isn't 128)
+            g = np.where(photflag != 1024)[0]  # good indexes (where magnitude isn't 128)
+            b = np.where(photflag == 1024)[0]  # bad indexes  (where magnitude isn't 128)
             if g.size == 0:
                 bad_mags.append([objid, f, mjd[b], 'ALL'])
                 continue
@@ -51,9 +52,6 @@ def get_class_distributions(field, sntype, getdata):
             cadence_list[f].append(np.median(np.diff(mjd)))
 
             n += 1
-            if n % 1000 == 0:
-                print(n)
-
     if n == 0:
         stats['mean_mwebv'] = (0, 0)
         stats['mean_epoch_range'] = (0, 0)
@@ -71,7 +69,10 @@ def get_distributions_multiprocessing(data_release, fig_dir):
     getdata = GetData(data_release)
     fields = ['DDF', 'WFD']
     sntypes_map = getdata.get_sntypes()
-    sntypes = sntypes_map.keys()
+    sntypes = list(sntypes_map.keys())
+    sntypes.remove(6)
+    sntypes.remove(5)
+    sntypes.remove(99)
     sntype_names = [sntypes_map[i] for i in sntypes]
     sntypes_and_fields = list(itertools.product(fields, sntypes))
     sntype_stats = {'nobjects': {'DDF': {}, 'WFD': {}}, 'mean_mwebv': {'DDF': {}, 'WFD': {}},
@@ -88,19 +89,20 @@ def get_distributions_multiprocessing(data_release, fig_dir):
         stats, field, sntype, bad_mags_part = out
         bad_mags += bad_mags_part
         for key, value in stats.items():
+            print(key, value)
             sntype_stats[key][field][sntype] = value
-
-    # Save Bad mags
-    with open('bad_mags.txt', 'w') as f:
-        for line in bad_mags:
-            f.write("%s\n" % line)
 
     print("PLOTTING HISTOGRAMS")
     # Plot the histogram for each statistic
     for field in fields:
         for stat in sntype_stats:
             fig, ax = plt.subplots(figsize=(20, 10))
-            y, yerr = list(zip(*sntype_stats[stat][field].values()))
+            y, yerr = zip(*sntype_stats[stat][field].values())
+            y = list(y)
+            yerr = list(yerr)
+            if stat == 'nobjects':
+                y = [x[0] for x in y]
+            print(y, yerr)
             rects = ax.bar(range(len(sntypes)), y, yerr=yerr, align='center')
             ax.set_xticks(range(len(sntypes)))
             ax.set_xticklabels(sntype_names)
@@ -138,7 +140,7 @@ if __name__ == '__main__':
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
 
-    get_distributions_multiprocessing(data_release='20180221', fig_dir=fig_dir)
+    get_distributions_multiprocessing(data_release='20180715', fig_dir=fig_dir)
 
     plt.show()
 

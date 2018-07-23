@@ -90,7 +90,7 @@ if __name__ == '__main__':
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
 
-    data_release = '20180221'
+    data_release = '20180715'
     field = 'WFD'
     limit=30
     shuffle=True
@@ -104,6 +104,7 @@ if __name__ == '__main__':
     median_cadences = {'SN1a': 7.279, 'CC': 7.525, 'SNIbc': 7.621, 'IIn': 7.102, 'SNIa-91bg': 7.855, 'pointIa': 8.835,
                     'Kilonova': 0., 'Magnetar': 7.145, 'PISN': 7.256, 'ILOT': 6.987, 'CART': 8.502,
                     'RRLyrae': 18.37, 'Mdwarf': 21.79, 'Mira': 7., 'BSR': 7., 'String': 7}
+
 
 
     with PdfPages(f'{fig_dir}/all_{data_release}_{field}.pdf') as pdf:
