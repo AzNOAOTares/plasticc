@@ -76,9 +76,7 @@ def get_sntypes():
                    6: 'SNCC-II', 
                    41: 'Ia-91bg',
                    43: 'SNIa-x',
-                   45: 'pointIa',
-                   50: 'Kilonova1',
-                   51: 'Kilonova2',
+                   51: 'Kilonova',
                    60: 'SLSN-I', 
                    61: 'PISN', 
                    62: 'ILOT', 
@@ -92,20 +90,19 @@ def get_sntypes():
                    90: 'uLens-BSR', 
                    91: 'uLens-1STAR',
                    92: 'uLens-String',
+                   93: 'uLens-1STAR',
                    99: 'Rare'}
     return sntypes_map
 
 
 def aggregate_sntypes(reverse=False):
     if reverse:
-        aggregate_map = {99: (45, 61, 62, 63, 90, 92),
+        aggregate_map = {99: (61, 62, 63, 90, 92),
                          1: (1,),
                          5: (3,13),
                          6: (2, 12, 14),
                          41: (41,),
                          43: (43,),
-                         45: (45,),
-                         50: (50,),
                          51: (51,),
                          60: (60,),
                          64: (64,),
@@ -114,7 +111,8 @@ def aggregate_sntypes(reverse=False):
                          81: (81,),
                          83: (83,),
                          84: (84,),
-                         91: (91,)}
+                         94: (91, 93)
+                         }
     else:
         aggregate_map = {1: 1,
                          2: 6, 
@@ -124,8 +122,6 @@ def aggregate_sntypes(reverse=False):
                          14: 6,
                          41: 41, 
                          43: 43,
-                         45: 99,
-                         50: 50,
                          51: 51,
                          60: 60,
                          61: 99,
@@ -138,8 +134,9 @@ def aggregate_sntypes(reverse=False):
                          83: 83,
                          84: 84,
                          90: 99,
-                         91: 91,
+                         91: 94,
                          92: 99,
+                         93: 94,
                          }
 
     return aggregate_map
