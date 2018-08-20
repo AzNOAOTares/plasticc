@@ -604,6 +604,37 @@ class BaseMixin(object):
         self.colorMean = colorMean
         return colorMean
 
+    def historic_color(self, recompute=False, passbands=('u', 'g', 'r', 'i', 'z', 'Y')):
+        historicColors = getattr(self, 'historicColors', None)
+        if historicColors is not None:
+            if not recompute:
+                return historicColors
+
+        historicColors = {}
+        outlc = self.get_lc(recompute=recompute)
+
+        tmedianflux = {}
+        for i, pb in enumerate(outlc):
+            tlc = outlc.get(pb)
+            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
+
+            photmask = tphotflag >= constants.GOOD_PHOTFLAG
+
+            tmedianflux[pb] = np.median(tFluxUnred[photmask])
+
+        for i, pb1 in enumerate(passbands):
+            for j, pb2 in enumerate(passbands):
+                if i < j:
+                    color = pb1 + '-' + pb2
+                    if pb1 not in tmedianflux.keys() or pb2 not in tmedianflux.keys():
+                        tmedianflux[color] = 0.
+                        continue
+                    historicColors[color] = tmedianflux[pb1] / tmedianflux[pb2]
+
+        self.historicColors = historicColors
+        return historicColors
+
+
     def get_cesium_features(self, recompute=False):
         """
         Compute all relevant cesium features.
