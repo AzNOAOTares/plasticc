@@ -31,6 +31,9 @@ def task(entry):
     Worker function to process a table of light curves from fits_files
     """
     this_file_lcs = {}
+    cols = ['MJD', 'FLT', 'FLUXCAL', 'FLUXCALERR', 'PHOTFLAG']
+    # map the passbands to integers - include the extra space that's in Rick's files so we can skip stripping
+    flt_map = {'u ':0,'g ':1,'r ':2, 'i ':3,'z ':4,'Y ':5}
 
     fits_files = entry['filename']
     uniq_files = np.unique(fits_files)
@@ -56,14 +59,12 @@ def task(entry):
             ptrobs_max = row['ptrobs_max']
             phot_data = data[ptrobs_min - 1:ptrobs_max]
 
-            lc = at.Table(phot_data)
-            flt = np.array([x.strip() for x in lc['FLT']])
-            flt = flt.astype(bytes)
+            lc = at.Table(phot_data)[cols]
+            flt = np.array([flt_map(x) for x in lc['FLT']], dtype=np.uint8)
             mjd = lc['MJD']
-            tai = Time(mjd, format='mjd', precision=7, scale='utc').isot
             
-            thislc = at.Table([mjd, flt, lc['FLUXCAL'], lc['FLUXCALERR'], lc['PHOTFLAG'], tai],\
-                    names=['mjd','passband','flux','flux_err','photflag', 'time_stamp'])
+            thislc = at.Table([mjd, flt, lc['FLUXCAL'], lc['FLUXCALERR'], lc['PHOTFLAG']],\
+                    names=['mjd','passband','flux','flux_err','photflag'])
             ind = thislc['photflag'] != 1024
             if len(thislc[ind]) == 0:
                 print(f'Fuck {objid} has no useful observations')
@@ -80,7 +81,7 @@ def task(entry):
     for obj in entry['object_id']:
         lc = this_file_lcs.get(obj, None)
         if lc is not None:
-            this_obs_lines = ['{},{:.4f},{},{:.5E},{:.5E},{:d},{}'.format(obj, *x) for x in lc]  
+            this_obs_lines = ['{},{:.4f},{:d},{:.6f},{:.6f},{:d}'.format(obj, *x) for x in lc]  
             batch_lines += this_obs_lines
             nbatch += 1
     return nbatch, batch_lines
@@ -199,11 +200,14 @@ def main():
         mask = np.array([True if x in train_types else False for x in out['sntype']])
         out = out[mask]
 
-    # galactic objects have -9 as redshift - change to 0
+    # TODO CHECK IF RICK IS GENERATING RANDOM TYPE OR I SHOULD
+
+    # galactic objects have -9 as redshift - change to NaN
+    # the numpy.isclose should have worked last time.... check this by hand.
     dummy_val = np.repeat(-9, len(out))
-    ind = np.isclose(out['hostgal_photoz'], dummy_val)
-    out['hostgal_photoz'][ind] = 0.
-    out['hostgal_photoz_err'][ind] = 0.
+    ind = out['hostgal_photoz'] == -9.
+    out['hostgal_photoz'][ind] = np.nan
+    out['hostgal_photoz_err'][ind] = np.nan
 
     # figure out what fits files the data are in
     fits_files =[ "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(*x.split('_')) for x in out['objid']] 
@@ -213,29 +217,37 @@ def main():
     # new name = <SNID>
     orig_name = out['objid']
     new_name = np.array([ x.split('_')[-1] for x in orig_name], dtype=np.int32)
+    ddf_field = np.zeros(len(new_name))
+    ind = new_name < 1000000
+    ddf_field[ind] = 1
 
     # preseve the mapping  between old name, new name and file name
     out['object_id'] = new_name
     out['filename'] = fits_files
+    out['ddf_bool'] = ddf_field
 
     # sort things by object id - Rick has already randomized these, so we preserve his order.
     out.sort('object_id')
+    del new_name 
+    del fits_files
+    del ddf_field
+    out.rename_column('sntype','target')
 
     # if we are generating test data, save a truth table
     if dummy == 'training':
-        out.rename_column('sntype','class')
+        pass
     else: 
-        out_name = out['objid']
-        sntype   = out['sntype']
+        out_name = out['object_id']
+        target   = out['target']
 
         # remove the model type from the output header that goes with the test data
-        out.remove_column('sntype')
+        out.remove_column('target')
 
         truth_file = outfile.replace('_set.csv', '_truthtable.csv')
         if os.path.exists(truth_file):
             os.remove(truth_file)
 
-        truth_table = at.Table([out_name, sntype], names=['object_id','class'])
+        truth_table = at.Table([out_name, target], names=['object_id','target'])
         truth_table.write(truth_file)
         print(f'Wrote {truth_file}')
 
@@ -258,8 +270,9 @@ def main():
     with MultiPool() as pool:
         with tqdm(total=nmc) as pbar:
             with open(outfile, 'w') as f:
-                f.write('object_id,mjd,passband,flux,flux_err,detected_bool,time_stamp\n')
-                for result in pool.imap_unordered(task, batches):
+                f.write('object_id,mjd,passband,flux,flux_err,detected_bool\n')
+                # change to pool.imap so order is preserved
+                for result in pool.imap(task, batches):
                     nbatch, batchlines = result
                     pbar.update(nbatch)
                     f.write('\n'.join(batchlines))
@@ -270,11 +283,12 @@ def main():
     # write out the header
     out.remove_columns(['objid', 'ptrobs_min', 'ptrobs_max', 'filename'])
     out.rename_column('sim_dlmu','distance_modulus')
-    
-    cols = ['object_id','ra','decl', 'mwebv', 'mwebv_err', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distance_modulus']
+   
+    # TODO - CHECK IF WE ARE REMOVING RA, DECL OR NOT
+    cols = ['object_id','ra','decl', 'ddf_bool', 'mwebv', 'mwebv_err', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distance_modulus']
 
     if dummy == 'training':
-        cols.append('class')
+        cols.append('target')
     out = out[cols]
     out.write(header_file, format='ascii.csv', overwrite=True)
 
