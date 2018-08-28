@@ -67,7 +67,7 @@ def main():
         
         c = to_hex(next(color), keep_alpha=False)
         objid, _, _, hz, dhz = zip(*list(head)) 
-        long_model_name = f'{model_name}_{model}'
+        long_model_name = f'{model_name}_{model}: {nobs}'
     
         try:
             density = gaussian_kde(hz, bw_method='scott')
