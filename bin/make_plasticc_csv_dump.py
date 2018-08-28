@@ -371,24 +371,6 @@ def main():
         batches.append(this_batch_lcs)
     gc.collect()
 
-    #### HACK ####
-    # remove and rename some columns from the metadata output
-    # this isn't strictly necessary, since we choose exactly what columns to output
-    # but this makes sure astropy also strips any metadata about the columns itself
-    out.remove_columns(['objid', 'ptrobs_min', 'ptrobs_max', 'filename', 'sntype'])
-    out.rename_column('sim_dlmu','distance_modulus')
-   
-    # setup what columns get output into the headers
-    cols = ['object_id','ra','decl', 'ddf_bool', 'mwebv', 'mwebv_err', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distance_modulus']
-    if dummy == 'training':
-        cols.append('target')
-    out = out[cols]
-
-    # write out the header
-    out.write(header_file, format='ascii.csv', overwrite=True)
-    #### HACK ####
-    sys.exit(-1)
-
     # create a map from batch number to first objid in each batch
     # batch number is helpful to name files by batch
     # this is sequential, but you might imagine more complicated schemes
