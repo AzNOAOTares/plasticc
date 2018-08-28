@@ -239,20 +239,25 @@ def main():
 
             pix_2_coord_dict = {}
             map_dir = os.path.join(fig_dir, 'rate_analysis', 'maps', out_field)
-            model_map, pix_2_coord_dict, NSIDE = map_from_arrays(l, b, objid, model_name,\
+            if not os.path.exists(map_dir):
+                os.makedirs(map_dir)
+            full_model_name = f'{model_name}_{model}_{out_field}_{data_release}'
+            long_model_name = f'{model_name}_{model}'
+            model_map, pix_2_coord_dict, NSIDE = map_from_arrays(l, b, objid, full_model_name,\
                           pix_2_coord_dict = pix_2_coord_dict, interp=False, overwrite=False, NSIDE=16, fig_dir=map_dir)
 
             hp.mollview(model_map, coord=['G',], norm='hist', title=model_name, cmap=cmap2, fig=fig_num)
             hp.graticule(coord=['C'])
             pdf.savefig(fig1)
 
-            c = next(color)
-            density = gaussian_kde(b, bw_method='scott')
-            ax2.plot(b_range, density(b_range), color=c)
+            if len(b) > 10:
+                c = next(color)
+                density = gaussian_kde(b, bw_method='scott')
+                ax2.plot(b_range, density(b_range), color=c)
 
-            patch = mpatches.Patch(color=c, label=model_name)
-            legend.append(patch)
-            labels.append(model_name)
+                patch = mpatches.Patch(color=c, label=long_model_name)
+                legend.append(patch)
+                labels.append(long_model_name)
 
             if nobs > 10:
                 alpha = 1./int(np.log10(nobs))
