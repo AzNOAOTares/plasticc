@@ -288,6 +288,10 @@ class GetData(object):
     def get_sntypes():
         return helpers.get_sntypes()
 
+    @staticmethod
+    def aggregate_sntypes(reverse=False):
+        return helpers.aggregate_sntypes(reverse=reverse)
+
     def get_avail_sntypes(self):
         """ Returns a list of the different transient classes in the database. """
         sntypes = database.exec_sql_query("SELECT DISTINCT sntype FROM {};".format(self.data_release))
