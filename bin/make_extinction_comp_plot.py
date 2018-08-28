@@ -41,7 +41,7 @@ def main():
 
     cmap = plt.cm.tab20
     nlines = len(sntypes.keys())
-    color = iter(cmap(np.linspace(0,1,nlines)))
+    color = iter(cmap(np.linspace(0,1,nlines-3))) 
     fig1 = plt.figure(figsize=(15,10))
     ax1 = fig1.add_subplot(111)
 

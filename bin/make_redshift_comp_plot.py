@@ -37,8 +37,9 @@ def main():
     getter = plasticc.get_data.GetData(data_release)
 
     cmap = plt.cm.tab20
-    nlines = len(sntypes.keys())
-    color = iter(cmap(np.linspace(0,1,nlines)))
+    keys = np.array(list(sntypes.keys()))
+    nlines = len(keys[keys < 80])
+    color = iter(cmap(np.linspace(0,1,nlines - 2))) 
 
     redshift_range = np.arange(0, 3.01, 0.01)
 
