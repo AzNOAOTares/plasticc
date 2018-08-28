@@ -23,7 +23,7 @@ import gc
 import warnings
 warnings.simplefilter('ignore')
 from astropy.time import Time
-data_release = '20180727'
+data_release = '20180827'
 
 
 def task(entry):
@@ -34,6 +34,7 @@ def task(entry):
     cols = ['MJD', 'FLT', 'FLUXCAL', 'FLUXCALERR', 'PHOTFLAG']
     # map the passbands to integers - include the extra space that's in Rick's files so we can skip stripping
     flt_map = {'u ':0,'g ':1,'r ':2, 'i ':3,'z ':4,'Y ':5}
+    batch_key = entry[0]['object_id']
 
     fits_files = entry['filename']
     uniq_files = np.unique(fits_files)
@@ -60,7 +61,7 @@ def task(entry):
             phot_data = data[ptrobs_min - 1:ptrobs_max]
 
             lc = at.Table(phot_data)[cols]
-            flt = np.array([flt_map(x) for x in lc['FLT']], dtype=np.uint8)
+            flt = np.array([flt_map[x] for x in lc['FLT']], dtype=np.uint8)
             mjd = lc['MJD']
             
             thislc = at.Table([mjd, flt, lc['FLUXCAL'], lc['FLUXCALERR'], lc['PHOTFLAG']],\
@@ -84,10 +85,14 @@ def task(entry):
             this_obs_lines = ['{},{:.4f},{:d},{:.6f},{:.6f},{:d}'.format(obj, *x) for x in lc]  
             batch_lines += this_obs_lines
             nbatch += 1
-    return nbatch, batch_lines
+    return batch_key, nbatch, batch_lines
 
 
 def main():
+    # how many files should we split the test output into
+    nfiles = 10
+    wfd_thresh = 1000000
+
     # setup paths for output 
     dump_dir = os.path.join(WORK_DIR, 'csv_dump')
     if not os.path.exists(dump_dir):
@@ -116,7 +121,7 @@ def main():
             if offset is None:
                 offset = 0
             outfile = os.path.join(dump_dir, 'plasticc_test_n{}_set.csv'.format(offset))
-    header_file = outfile.replace('.csv','_header.csv')
+    header_file = outfile.replace('.csv','_metadata.csv')
 
     # make sure we remove any lingering files 
     if os.path.exists(outfile):
@@ -154,10 +159,15 @@ def main():
 
 
     out = getter.get_lcs_headers(**kwargs)
-    # current as of 20180801
-    aggregate_types = {1:1, 2:2, 3:3, 12:2, 13:3, 14:2, 41:41, 43:43, 51:51,
+    # current as of 20180827
+    aggregate_types = {11:11, 2:2, 3:3, 12:2, 13:3, 14:2, 41:41, 43:43, 51:51,
             60:60, 61:99, 62:99, 63:99, 64:64, 70:70, 80:80, 81:81, 83:83,
             84:84, 90:99, 91:91, 92:99, 93:91}
+    aggregate_names = {11:'SNIa-normal', 2:'SNCC-II', 3:'SNCC-Ibc', 12:'SNCC-II', 13:'SNCC-Ibc', 
+                    14:'SNCC-II', 41:'SNIa-91bg', 43:'SNIa-x',51:'KN', 60:'SLSN-I', 61:'PISN', 
+                    62:'ILOT', 63:'CART', 64:'TDE',70:'AGN', 80:'RRlyrae', 81:'Mdwarf', 83:'EBE', 
+                    84:'MIRA', 90:'uLens-Binary', 91:'uLens-Point', 92:'uLens-STRING', 93:'uLens-Point'}
+
     if dummy == 'training':
         pass 
     else:
@@ -192,16 +202,52 @@ def main():
         new_type = np.array([aggregate_types.get(x, None) for x in out['sntype']])
     out['sntype'] = new_type 
 
+    # type 99 is not included in training
+    train_types = set(aggregate_types.values())  - set([99,])
+    train_types = list(train_types)
+
     # make sure that there are no "other" classes included in the training data
     if dummy == 'training':
-        # type 99 is not included in training
-        train_types = set(aggregate_types.values())  - set([99,])
-        train_types = list(train_types)
         mask = np.array([True if x in train_types else False for x in out['sntype']])
         out = out[mask]
 
-    # TODO CHECK IF RICK IS GENERATING RANDOM TYPE OR I SHOULD
+    # randomize the output type ID - keep rare as 99
+    target_map_file = outfile.replace('.csv', '_targetmap.txt').replace('_test_set','').replace('_training_set','')
+    try:
+        target_map_data = at.Table.read(target_map_file, format='ascii')
+        train_types = target_map_data['train_types']
+        target_types = target_map_data['target_types']
+        print(f'Restoring Target Map from {target_map_file}')
+    except Exception as e:
+        target_types = np.random.choice(99, len(train_types), replace=False).tolist()
+        target_map_data = at.Table([train_types, target_types], names=['train_types', 'target_types'])
+        target_map_data.write(target_map_file, format='ascii.fixed_width', delimiter=' ', overwrite=True)
+        print(f'Wrote target mapping to file {target_map_file}')
 
+    target_map = dict(zip(train_types, target_types))
+    target = np.array([target_map.get(x, 99) for x in out['sntype']])
+    out['target'] = target
+    print('Mapping as {}'.format(target_map))
+
+    # orig map file is like target_map (and also private) but includes the rares
+    orig_map_file = outfile.replace('.csv', '_origmap.txt').replace('_test_set','').replace('_training_set','')
+    if not os.path.exists(orig_map_file):
+        orig = []
+        aggregated = []
+        mapped = []
+        names = []
+        for key, val in aggregate_types.items():
+            name = aggregate_names.get(key, 'Rare')
+            names.append(name)
+            orig.append(key)
+            aggregated.append(val)
+            mapping = target_map.get(val, 99)
+            mapped.append(mapping)
+        orig_map_data = at.Table([orig, aggregated, mapped, names],\
+                            names=['ORIG_NUM', 'MODEL_NUM', 'TARGET', 'MODEL_NAME'])
+        orig_map_data.write(orig_map_file, format='ascii.fixed_width', delimiter=' ', overwrite=True)
+        print(f'Wrote original mapping to file {orig_map_file}')
+    
     # galactic objects have -9 as redshift - change to NaN
     # the numpy.isclose should have worked last time.... check this by hand.
     dummy_val = np.repeat(-9, len(out))
@@ -218,7 +264,7 @@ def main():
     orig_name = out['objid']
     new_name = np.array([ x.split('_')[-1] for x in orig_name], dtype=np.int32)
     ddf_field = np.zeros(len(new_name))
-    ind = new_name < 1000000
+    ind = new_name < wfd_thresh
     ddf_field[ind] = 1
 
     # preseve the mapping  between old name, new name and file name
@@ -231,7 +277,8 @@ def main():
     del new_name 
     del fits_files
     del ddf_field
-    out.rename_column('sntype','target')
+    del target 
+    del new_type
 
     # if we are generating test data, save a truth table
     if dummy == 'training':
@@ -253,7 +300,19 @@ def main():
 
     nmc = len(out)
     out_ind = np.arange(nmc)
-    batch_inds = np.array_split(out_ind, multiprocessing.cpu_count())
+    if dummy == 'training':
+        batch_inds = np.array_split(out_ind, max(multiprocessing.cpu_count()-4, 0))
+    else:
+        # if this is test data, we want to break files up so that DDF and WFD
+        # are in separate files and the number of files is split so we don't
+        # have a giant CSV file
+        batch_inds = []
+        ind = np.where(out['object_id'] < wfd_thresh)[0]
+        print('DDF objects {}'.format(len(ind)))
+        batch_inds.append(ind)
+        ind = np.where(out['object_id'] >= wfd_thresh)[0]
+        print('WFD objects {}'.format(len(ind)))
+        batch_inds += np.array_split(ind, nfiles)
 
     # make batches to load the data 
     batches = []
@@ -265,26 +324,51 @@ def main():
                                     names=['object_id','ptrobs_min', 'ptrobs_max', 'filename'])
         batches.append(this_batch_lcs)
     gc.collect()
+    batch_ids = np.arange(len(batches)) + 1
+    batch_keys = [x['object_id'][0] for x in batches]
+    batch_map = dict(zip(batch_keys, batch_ids))
 
     # do the output
-    with MultiPool() as pool:
-        with tqdm(total=nmc) as pbar:
-            with open(outfile, 'w') as f:
-                f.write('object_id,mjd,passband,flux,flux_err,detected_bool\n')
-                # change to pool.imap so order is preserved
-                for result in pool.imap(task, batches):
-                    nbatch, batchlines = result
-                    pbar.update(nbatch)
-                    f.write('\n'.join(batchlines))
-                    f.write('\n')
-            gc.collect()
+    if dummy == 'training':
+        with MultiPool() as pool:
+            with tqdm(total=nmc) as pbar:
+                with open(outfile, 'w') as f:
+                    f.write('object_id,mjd,passband,flux,flux_err,detected_bool\n')
+                    # change to pool.imap so order is preserved in output file
+                    for result in pool.imap(task, batches):
+                        _, nbatch, batchlines = result
+                        pbar.update(nbatch)
+                        f.write('\n'.join(batchlines))
+                        f.write('\n')
+                gc.collect()
+    else:
+        with MultiPool() as pool:
+            with tqdm(total=nmc) as pbar:
+                for batch in batches:
+                    batch_key = batch[0]['object_id']
+                    batch_id = batch_map[batch_key]
+                    batchfile = outfile.replace('.csv', f'_batch{batch_id}.csv')
+                    ind = np.arange(len(batch))
+                    mini_inds = np.array_split(ind, max(multiprocessing.cpu_count()-4, 0))
+                    mini_batches = [batch[x] for x in mini_inds]
+                    nbatch = 0
+                    batchlines = []
+                    for result in pool.imap(task, mini_batches):
+                        _, mini_nbatch, mini_batchlines = result
+                        nbatch += mini_nbatch
+                        batchlines += mini_batchlines
+                        pbar.update(mini_nbatch)
+                    with open(batchfile, 'w') as f:
+                        f.write('object_id,mjd,passband,flux,flux_err,detected_bool\n')
+                        f.write('\n'.join(batchlines))
+                        f.write('\n')
+                    gc.collect()
 
     
     # write out the header
-    out.remove_columns(['objid', 'ptrobs_min', 'ptrobs_max', 'filename'])
+    out.remove_columns(['objid', 'ptrobs_min', 'ptrobs_max', 'filename', 'sntype'])
     out.rename_column('sim_dlmu','distance_modulus')
    
-    # TODO - CHECK IF WE ARE REMOVING RA, DECL OR NOT
     cols = ['object_id','ra','decl', 'ddf_bool', 'mwebv', 'mwebv_err', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distance_modulus']
 
     if dummy == 'training':
