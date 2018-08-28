@@ -88,15 +88,26 @@ def task(entry):
     return batch_key, nbatch, batch_lines
 
 
+def fixpath(filename, public=True):
+    dirn = os.path.dirname(filename)
+    basen = os.path.basename(filename)
+    if public:
+        dirn = os.path.join(dirn, 'public')
+    else:
+        dirn = os.path.join(dirn, 'private')
+    if not os.path.exists(dirn):
+        os.makedirs(dirn)
+
+    fixn = os.path.join(dirn, basen)
+    return fixn
+
+
+
+
 def main():
     # how many files should we split the test output into
     nfiles = 10
     wfd_thresh = 1000000
-
-    # setup paths for output 
-    dump_dir = os.path.join(WORK_DIR, 'csv_dump')
-    if not os.path.exists(dump_dir):
-        os.makedirs(dump_dir)
 
     # get the options for the code and set the data_release globally (ugly) to
     # allow MultiPool to work
@@ -104,6 +115,11 @@ def main():
     global data_release 
     data_release = kwargs.pop('data_release')
     getter = plasticc.get_data.GetData(data_release)
+
+    # setup paths for output 
+    dump_dir = os.path.join(WORK_DIR, 'csv_dump', data_release)
+    if not os.path.exists(dump_dir):
+        os.makedirs(dump_dir)
 
     # we can use model as a dummy string to indicate if we are generating
     # training or test data
@@ -121,7 +137,10 @@ def main():
             if offset is None:
                 offset = 0
             outfile = os.path.join(dump_dir, 'plasticc_test_n{}_set.csv'.format(offset))
+
+
     header_file = outfile.replace('.csv','_metadata.csv')
+    header_file = fixpath(header_file)
 
     # make sure we remove any lingering files 
     if os.path.exists(outfile):
@@ -213,6 +232,7 @@ def main():
 
     # randomize the output type ID - keep rare as 99
     target_map_file = outfile.replace('.csv', '_targetmap.txt').replace('_test_set','').replace('_training_set','')
+    target_map_file = fixpath(target_map_file, public=False)
     try:
         target_map_data = at.Table.read(target_map_file, format='ascii')
         train_types = target_map_data['train_types']
@@ -231,6 +251,7 @@ def main():
 
     # orig map file is like target_map (and also private) but includes the rares
     orig_map_file = outfile.replace('.csv', '_origmap.txt').replace('_test_set','').replace('_training_set','')
+    orig_map_file = fixpath(orig_map_file, public=False)
     if not os.path.exists(orig_map_file):
         orig = []
         aggregated = []
@@ -291,6 +312,7 @@ def main():
         out.remove_column('target')
 
         truth_file = outfile.replace('_set.csv', '_truthtable.csv')
+        truth_file = fixpath(truth_file, public=False)
         if os.path.exists(truth_file):
             os.remove(truth_file)
 
@@ -348,6 +370,7 @@ def main():
                     batch_key = batch[0]['object_id']
                     batch_id = batch_map[batch_key]
                     batchfile = outfile.replace('.csv', f'_batch{batch_id}.csv')
+                    batchfile = fixpath(batchfile)
                     ind = np.arange(len(batch))
                     mini_inds = np.array_split(ind, max(multiprocessing.cpu_count()-4, 0))
                     mini_batches = [batch[x] for x in mini_inds]
