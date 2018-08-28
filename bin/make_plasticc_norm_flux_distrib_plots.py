@@ -62,7 +62,7 @@ def main():
     out_snr = np.arange(0, 200.1, 0.1)
 
     cmap = plt.cm.tab20
-    nlines = len(sntypes.keys())
+    nlines = len(sntypes.keys()) - 3 #there's three meta types
     color = iter(cmap(np.linspace(0,1,nlines)))
 
     with PdfPages(f'{fig_dir}/Flux_distrib_{data_release}_{out_field}.pdf') as pdf:
@@ -90,7 +90,7 @@ def main():
                 obs = lc['flux'] 
                 flux_err = lc['dflux']
 
-                if sntypes.get(model) in ('RRLyrae','BSR','String','Mdwarf'):
+                if model >= 80:
                     tfield, tmodel, tbase, tid  = obsid.split('_')
                     header_dir = 'LSST_{}_MODEL{}'.format(tfield, tmodel)
                     header_file = 'LSST_{}_{}_HEAD.FITS.gz'.format(tfield, tbase)
@@ -155,7 +155,7 @@ def main():
             ax1.plot(out_values, lpdf+i/10., color=c, label=label, lw=3)
             ax2.plot(out_values, lcdf+i/10, color=c, label=label, lw=3)
 
-            if not (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR', 'String')):
+            if model < 80:
                 fig4 = plt.figure(figsize=(15, 10))
                 ax4 = fig4.add_subplot(1,1,1)
                 ax4.plot(sim_flux, sig_flux, marker='o', color=c,  markersize=2, alpha=0.35, linestyle='None')
@@ -163,7 +163,7 @@ def main():
                 ax4.set_ylabel('fluxcalerr')
                 fig4.suptitle(label)
                 fig4.tight_layout(rect=[0, 0.03, 1, 0.92])
-                fig4.savefig('{}/{}_{}_{}_noise_vs_flux.png'.format(fig_dir, sntypes.get(model), data_release, field))
+                fig4.savefig('{}/{}_{}_{}_{}_noise_vs_flux.png'.format(fig_dir, sntypes.get(model), model, data_release, field))
                 plt.close(fig4)
             ax3.plot(out_snr, lsn+i/10, color=c, label=label, lw=3)
 
