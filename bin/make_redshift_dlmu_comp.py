@@ -12,7 +12,8 @@ import numpy as np
 import plasticc
 import plasticc.get_data
 import seaborn as sns
-
+import astropy.table as at
+from astropy.cosmology import FlatLambdaCDM
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_hex
 
@@ -31,7 +32,7 @@ def main():
 
     kwargs['model'] = '%'
     kwargs['field'] = '%'
-    kwargs['columns']=['objid','hostgal_specz','hostgal_photoz', 'sim_redshift_host', 'sim_dlmu', 'redshift_helio', 'redshift_final', 'sim_redshift_cmb', 'sntype']
+    kwargs['columns']=['objid','hostgal_specz','hostgal_photoz', 'sim_redshift_host', 'sim_dlmu', 'redshift_helio', 'redshift_final', 'sim_redshift_cmb', 'sntype', 'snid']
     kwargs['extrasql'] = "AND sntype < 80 AND ((objid LIKE 'DDF%') or (objid LIKE 'WFD%'))"
     kwargs['big'] = True
 
@@ -45,11 +46,35 @@ def main():
         message = 'Not enough observations to make plot. Check SQL.'
         raise RuntimeError(message)
 
-    objid, sz, hz, tz, mu, solz, fz, cz,  target = zip(*head)
+    objid, sz, hz, tz, mu, solz, fz, cz,  target, snid = zip(*head)
+
+
+    cosmo = FlatLambdaCDM(70, 0.3)
+    snid = np.array(snid, dtype=np.int32)
+    tz = np.array(tz)
+    mu = np.array(mu)
+    indz = tz.argsort()
+    tmu = cosmo.distmod(tz).value
+    deltamu = (tmu - mu) 
+    outliers = (np.abs(deltamu) >= 0.3*(1+tz))
+
+    out = at.Table([snid, tz, sz, hz, mu, tmu, deltamu],\
+            names=['snid', 'sim_redshift_host', 'hostgal_specz', 'hostgal_photoz', 'sim_dlmu', 'calc_mu', 'deltamu']) 
+    out = out[outliers]
+    cols = out.dtype.names
+    for col in cols[1:]:
+        out[col].format= '%.4f'
+    out.sort('snid')
+
+    out.write(f'redshift_distmod_outliers_{data_release}.txt',\
+            format='ascii.fixed_width', delimiter=' ', overwrite=True)
+
 
     fig_kw = {'figsize':(15, 10)}
     fig, ax = plt.subplots(2, 3, sharey=True, **fig_kw)
     ax[0][0].scatter(tz, mu, marker='.') 
+    ax[0][0].plot(tz[indz], tmu[indz], linestyle='--', lw=0.5, color='C1', marker='.')
+    ax[0][0].scatter(tz[outliers], mu[outliers], marker='.', color='C3') 
     ax[0][1].scatter(sz, mu, marker='.') 
     ax[0][2].scatter(hz, mu, marker='.') 
     ax[1][0].scatter(solz, mu, marker='.') 
