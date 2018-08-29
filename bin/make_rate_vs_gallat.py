@@ -224,7 +224,7 @@ def main():
             if nobs == 0:
                 continue
 
-            objid, _, _, ra, dec = zip(*list(head)) 
+            objid, _, _, ra, dec = zip(*head) 
 
             ra = np.array(ra)
             dec = np.array(dec)

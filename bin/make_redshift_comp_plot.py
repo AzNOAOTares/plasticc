@@ -61,7 +61,7 @@ def main():
                 continue
             
             c = to_hex(next(color), keep_alpha=False)
-            objid, _, _, hz, dhz, z = zip(*list(head)) 
+            objid, _, _, hz, dhz, z = zip(*head) 
             if nobs <= 2500:
                 g1 = (sns.jointplot(z, hz, color=c, kind='scatter', xlim=(0, 3.), ylim=(0,3.), height=8).set_axis_labels("z", "hostz"))
                 g2 = (sns.jointplot(hz, dhz, color=c, kind='scatter', xlim=(0, 3.), height=8).set_axis_labels("hostz", "hostz_err"))

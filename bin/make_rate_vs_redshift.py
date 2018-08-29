@@ -65,7 +65,7 @@ def main():
             if nobs == 0:
                 continue
 
-            objid, _, _, redshift = zip(*list(head)) 
+            objid, _, _, redshift = zip(*head) 
 
             objid = np.array(objid)
             redshift = np.array(redshift)

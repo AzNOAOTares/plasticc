@@ -67,7 +67,7 @@ def main():
             continue
         
         c = to_hex(next(color), keep_alpha=False)
-        objid, _, _, hz, dhz = zip(*list(head)) 
+        objid, _, _, hz, dhz = zip(*head) 
         long_model_name = f'{model_name}_{model}: {nobs}'
     
         try:
