@@ -63,14 +63,16 @@ def plot_corr_ellipses(data, ax=None, **kwargs):
     ax.add_collection(ec)
     for xt, yt, val in zip(x[~ind], y[~ind], Mfull[~ind]):
         strval = '{:+.2f}'.format(val).replace('0.','.')
-        ax.text(xt, yt, strval, ha='right', va='center', fontsize='small')
+        ax.text(xt, yt, strval, ha='center', va='baseline', fontsize='small')
 
     # if data is a DataFrame, use the row/column names as tick labels
     if isinstance(data, pd.DataFrame):
         ax.set_xticks(np.arange(M.shape[1]))
         ax.set_xticklabels(data.columns, rotation=30)
         ax.set_yticks(np.arange(M.shape[0]))
-        ax.set_yticklabels(data.index)
+        ax.set_yticklabels(data.index, rotation=30)
+    ax.set_xlim(x.min()-0.5, x.max()+0.5)
+    ax.set_ylim(x.min()-0.5, x.max()+0.5)
     ax.set_aspect('equal')
     return ec
 
@@ -96,6 +98,10 @@ def main():
     kwargs['extrasql'] = 'AND sntype > 100'
 
     aggregate_map = plasticc.get_data.GetData.aggregate_sntypes()
+    # temporarily modify the aggrgate map to keep extragalactic and galactic separate
+    for key, val in aggregate_map.items():
+        if key < 80 and val >= 80:
+            aggregate_map[key] = key
     getter = plasticc.get_data.GetData(data_release)
     head = getter.get_lcs_headers(**kwargs)
     objid, ra, dec, hz, dhz, mwebv, sntype = zip(*list(head))
@@ -113,26 +119,38 @@ def main():
     df = pd.DataFrame.from_dict(data)
     df.sort_values('objid', inplace=True)
     df = df.assign(rowid=pd.Series(np.arange(len(objid))).values)
+
     df1 = df.loc[df['target'] <  80]
     df2 = df.loc[df['target'] >= 80]
+    df2.drop(['hostz', 'hostz_err'], axis=1, inplace=True)
 
     corr_mat1 = df1.corr()
     corr_mat2 = df2.corr()
     
     fig_kw = {'figsize':(12, 5)}
-    fig, ax = plt.subplots(1, 2, sharex=True, sharey=True, **fig_kw)
+    fig, ax = plt.subplots(1, 2, **fig_kw)
     ec1 = plot_corr_ellipses(corr_mat1, ax=ax[0], cmap='RdBu', clim=[-1, 1])
     ec2 = plot_corr_ellipses(corr_mat2, ax=ax[1], cmap='RdBu', clim=[-1, 1])
 
     # colorbar axes.    
+    left, bottom, width, height = ax[0].get_position().bounds
+    cax = fig.add_axes([left-0.06, bottom, 0.01, height])
+    cb = plt.colorbar(ec1, orientation='vertical', cax=cax)
+    cb.set_label('Correlation coefficient')
+    cax.yaxis.set_ticks_position('left')
+    cax.yaxis.set_label_position('left')
+
     left, bottom, width, height = ax[1].get_position().bounds
     cax = fig.add_axes([left+width+0.01, bottom, 0.01, height])
     cb = plt.colorbar(ec2, orientation='vertical', cax=cax)
     cb.set_label('Correlation coefficient')
-    ax[0].margins(0.03)
-    ax[1].margins(0.03)
+
+
+    #ax[0].margins(0.03)
+    #ax[1].margins(0.03)
+    
     ax[0].set_title('Extragalactic')
-    ax[1].set_title('Galactic + Rare')
+    ax[1].set_title('Galactic')
     out_fn = f'header_correlations_{data_release}_{field}.pdf'
     out_fn = os.path.join(fig_dir, out_fn)
     fig.savefig(out_fn)
