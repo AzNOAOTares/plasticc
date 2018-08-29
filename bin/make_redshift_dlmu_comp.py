@@ -30,9 +30,9 @@ def main():
     _ = kwargs.get('field')
 
     kwargs['model'] = '%'
-    kwargs['field'] = 'LSST'
-    kwargs['columns']=['objid','hostgal_specz','hostgal_photoz', 'sim_redshift_host', 'sim_dlmu', 'sntype']
-    kwargs['extrasql'] = 'AND sntype < 80'
+    kwargs['field'] = '%'
+    kwargs['columns']=['objid','hostgal_specz','hostgal_photoz', 'sim_redshift_host', 'sim_dlmu', 'redshift_helio', 'redshift_final', 'sim_redshift_cmb', 'sntype']
+    kwargs['extrasql'] = "AND sntype < 80 AND ((objid LIKE 'DDF%') or (objid LIKE 'WFD%'))"
     kwargs['big'] = True
 
     sntypes = plasticc.get_data.GetData.get_sntypes()
@@ -45,18 +45,26 @@ def main():
         message = 'Not enough observations to make plot. Check SQL.'
         raise RuntimeError(message)
 
-    objid, sz, hz, tz, mu, target = sip(*head)
+    objid, sz, hz, tz, mu, solz, fz, cz,  target = zip(*head)
 
-    fig, ax = plt.subplots(1, 3, sharey=True)
-    ax[0].scatter(tz, mu, marker='.') 
-    ax[1].scatter(sz, mu, marker='.') 
-    ax[2].scatter(hz, mu, marker='.') 
-    ax[0].set_xlabel('SIM_REDSHIFT_HOST')
-    ax[1].set_xlabel('HOSTGAL_SPECZ')
-    ax[2].set_xlabel('HOSTGAL_PHOTOZ')
-    ax[0].set_ylabel('SIM_DLMU')
+    fig_kw = {'figsize':(15, 10)}
+    fig, ax = plt.subplots(2, 3, sharey=True, **fig_kw)
+    ax[0][0].scatter(tz, mu, marker='.') 
+    ax[0][1].scatter(sz, mu, marker='.') 
+    ax[0][2].scatter(hz, mu, marker='.') 
+    ax[1][0].scatter(solz, mu, marker='.') 
+    ax[1][1].scatter(cz, mu, marker='.') 
+    ax[1][2].scatter(fz, mu, marker='.') 
+    ax[0][0].set_xlabel('SIM_REDSHIFT_HOST')
+    ax[0][1].set_xlabel('HOSTGAL_SPECZ')
+    ax[0][2].set_xlabel('HOSTGAL_PHOTOZ')
+    ax[1][0].set_xlabel('REDSHIFT_HELIO')
+    ax[1][1].set_xlabel('SIM_REDSHIFT_CMB')
+    ax[1][2].set_xlabel('REDSHIFT_FINAL')
+    ax[0][0].set_ylabel('SIM_DLMU')
+    ax[1][0].set_ylabel('SIM_DLMU')
     fig.tight_layout()
-    out_file = os.path.join(fig_dir, f'redshift_mu_{data_release)_training_extragal.pdf')
+    out_file = os.path.join(fig_dir, f'redshift_mu_{data_release}_training_extragal.pdf')
     fig.savefig(out_file)
     plt.close(fig)
 
