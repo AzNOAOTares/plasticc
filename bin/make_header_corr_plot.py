@@ -13,13 +13,13 @@ import plasticc
 import plasticc.get_data
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from matplotlib.colors import to_hex
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord
 import astropy.units as u
-from matplotlib import pyplot as plt
 from matplotlib.collections import EllipseCollection
 
 
@@ -35,16 +35,35 @@ def plot_corr_ellipses(data, ax=None, **kwargs):
 
     # xy locations of each ellipse center
     xy = np.indices(M.shape)[::-1].reshape(2, -1).T
+    x, y = zip(*xy)
+    x = np.array(x, dtype=np.int8)
+    y = np.array(y, dtype=np.int8)
+    ind = x <= y
 
     # set the relative sizes of the major/minor axes according to the strength of
     # the positive/negative correlation
     w = np.ones_like(M).ravel()
     h = 1 - np.abs(M).ravel()
+    w*= 0.85
+    h*= 0.85
     a = 45 * np.sign(M).ravel()
+    w = w[ind]
+    h = h[ind]
+    a = a[ind]
+    xymat = xy[ind]
+    Mfull = M.ravel()
+    Mhalf = Mfull[ind]
 
-    ec = EllipseCollection(widths=w, heights=h, angles=a, units='x', offsets=xy,
-                           transOffset=ax.transData, array=M.ravel(), **kwargs)
+    linewidths = np.repeat(1 + np.abs(Mhalf), len(h))
+    edgecolors = cm.binary(np.abs(Mhalf))
+
+    ec = EllipseCollection(widths=w, heights=h, angles=a, units='x', offsets=xymat,
+                           linewidths=linewidths, edgecolors=edgecolors,
+                           transOffset=ax.transData, array=Mhalf, **kwargs)
     ax.add_collection(ec)
+    for xt, yt, val in zip(x[~ind], y[~ind], Mfull[~ind]):
+        strval = '{:+.2f}'.format(val).replace('0.','.')
+        ax.text(xt, yt, strval, ha='right', va='center', fontsize='small')
 
     # if data is a DataFrame, use the row/column names as tick labels
     if isinstance(data, pd.DataFrame):
@@ -52,17 +71,19 @@ def plot_corr_ellipses(data, ax=None, **kwargs):
         ax.set_xticklabels(data.columns, rotation=30)
         ax.set_yticks(np.arange(M.shape[0]))
         ax.set_yticklabels(data.index)
+    ax.set_aspect('equal')
     return ec
 
 
 def main():
-    fig_dir = os.path.join(WORK_DIR, 'Figures')
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
 
     kwargs = plasticc.get_data.parse_getdata_options()
     print("This config ", kwargs)
     data_release = kwargs.pop('data_release')
+
+    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release)
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
 
     _ = kwargs.pop('model')
     field = kwargs.get('field')
@@ -80,13 +101,9 @@ def main():
     objid, ra, dec, hz, dhz, mwebv, sntype = zip(*list(head))
     target = [aggregate_map.get(x, 99) if x < 100 else aggregate_map.get(x-100, 99) for x in sntype] 
     target = np.array(target, dtype=np.int8)
-    utypes = sorted(np.unique(target))
-    new_types = np.arange(len(utypes))
-    new_map = dict(zip(utypes, new_types))
-    new_target = [new_map.get(x, 99) for x in target] 
 
     if field == 'DDF':
-        data = {'objid':np.array(objid, dtype=np.int32), 'hostz':hz, 'hostz_err':dhz, 'mwebv':mwebv, 'target':new_target}
+        data = {'objid':np.array(objid, dtype=np.int32), 'hostz':hz, 'hostz_err':dhz, 'mwebv':mwebv, 'target':target}
     else:
         c = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame='icrs')
         l = c.galactic.l.value
@@ -96,15 +113,26 @@ def main():
     df = pd.DataFrame.from_dict(data)
     df.sort_values('objid', inplace=True)
     df = df.assign(rowid=pd.Series(np.arange(len(objid))).values)
+    df1 = df.loc[df['target'] <  80]
+    df2 = df.loc[df['target'] >= 80]
 
-    corr_mat = df.corr()
-    print(corr_mat)
+    corr_mat1 = df1.corr()
+    corr_mat2 = df2.corr()
+    
+    fig_kw = {'figsize':(12, 5)}
+    fig, ax = plt.subplots(1, 2, sharex=True, sharey=True, **fig_kw)
+    ec1 = plot_corr_ellipses(corr_mat1, ax=ax[0], cmap='RdBu', clim=[-1, 1])
+    ec2 = plot_corr_ellipses(corr_mat2, ax=ax[1], cmap='RdBu', clim=[-1, 1])
 
-    fig, ax = plt.subplots(1, 1)
-    ec = plot_corr_ellipses(corr_mat, ax=ax, cmap='seismic', clim=[-1, 1])
-    cb = fig.colorbar(ec)
+    # colorbar axes.    
+    left, bottom, width, height = ax[1].get_position().bounds
+    cax = fig.add_axes([left+width+0.01, bottom, 0.01, height])
+    cb = plt.colorbar(ec2, orientation='vertical', cax=cax)
     cb.set_label('Correlation coefficient')
-    ax.margins(0.1)
+    ax[0].margins(0.03)
+    ax[1].margins(0.03)
+    ax[0].set_title('Extragalactic')
+    ax[1].set_title('Galactic + Rare')
     out_fn = f'header_correlations_{data_release}_{field}.pdf'
     out_fn = os.path.join(fig_dir, out_fn)
     fig.savefig(out_fn)

@@ -134,11 +134,14 @@ def autolabel(rects, ax):
 
 
 if __name__ == '__main__':
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures')
+
+    data_release = '20180827'
+
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', data_release)
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
 
-    get_distributions_multiprocessing(data_release='20180827', fig_dir=fig_dir)
+    get_distributions_multiprocessing(data_release=data_release, fig_dir=fig_dir)
 
     plt.show()
 

@@ -153,19 +153,6 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
     features_by_model = pd.DataFrame(features_by_model)  # DF structure eg: [SNIbc: Y: objid]
     features_by_model = features_by_model.transpose()  # DF structure eg: [Y: SNIbc: objid]
 
-    # # Plot correlation matrix
-    # plt.figure(figsize=(20, 20))
-    # df = pd.DataFrame(features_by_model['r']['SN1a'])
-    # # all_feat = features_by_model.transpose()['SN1a']
-    # # df = pd.DataFrame({**all_feat['r'], **all_feat['i'], **all_feat['z'], **all_feat['Y'], **all_feat['general_features']})
-    # import seaborn as sns
-    # corr = df.corr()
-    # sns.heatmap(corr,xticklabels=corr.columns.values,yticklabels=corr.columns.values, vmin=-1, vmax=1)
-    # sns.set(font_scale=1.9)
-    # plt.yticks(rotation=0,fontsize=22)
-    # plt.xticks(rotation=90,fontsize=22)
-    # plt.tight_layout()
-    # plt.savefig(os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'correlation', 'SN1a'))
 
     # Convert to 3D DataFrame instead of 2D dataframe of dicts
     for pb in passbands + ['general_features']:
@@ -237,7 +224,10 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
+
+    data_release = '20180407'
+
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', data_release, 'features_test')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
@@ -247,12 +237,9 @@ def main():
 
     feature_names = get_feature_names(passbands, ignore=())
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
     models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
     # models = [1, 2, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90]
-    plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models, aggregate_classes=False)
+    plot_features_joy_plot(fpath, data_release, feature_names, 'DDF', fig_dir, sntypes_map, passbands, models, aggregate_classes=False)
 
 
 if __name__ == '__main__':

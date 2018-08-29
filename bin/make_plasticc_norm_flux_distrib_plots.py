@@ -24,15 +24,16 @@ import astropy.io.fits as afits
 import pickle
 
 def main():
-    fig_dir = os.path.join(WORK_DIR, 'Figures')
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
 
     colors = OrderedDict([('u','blueviolet'), ('g','green'), ('r','red'), ('i','orange'), ('z','black'), ('Y','gold')])
 
     kwargs = plasticc.get_data.parse_getdata_options()
     print("This config ", kwargs)
     data_release = kwargs.pop('data_release')
+
+    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release)
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
 
     _ = kwargs.pop('model')
     field = kwargs.get('field')

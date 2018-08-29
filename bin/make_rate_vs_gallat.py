@@ -179,13 +179,14 @@ def map_from_arrays(l, b, obj, model_name, pix_2_coord_dict=None,\
 
 def main():
 
-    fig_dir = os.path.join(WORK_DIR, 'Figures')
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
 
     kwargs = plasticc.get_data.parse_getdata_options()
     print("This config ", kwargs)
     data_release = kwargs.pop('data_release')
+
+    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release)
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
 
     _ = kwargs.pop('model')
     _ = kwargs.get('field')

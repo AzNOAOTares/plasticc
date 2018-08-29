@@ -91,14 +91,15 @@ def plot_light_curves(data_release, fig_dir=None, field_in='%', sntype_in='%', s
 
 
 if __name__ == '__main__':
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures')
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
 
     data_release = '20180715'
     field = 'WFD'
     limit=30
     shuffle=True
+
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', data_release)
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
 
     print("PLOTTING LIGHTCURVES")
 
