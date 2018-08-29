@@ -34,9 +34,12 @@ def main():
     print("This config ", kwargs)
     data_release = kwargs.pop('data_release')
 
-    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release)
+    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release, 'cadence_analysis')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
+    png_dir = os.path.join(fig_dir, 'png')
+    if not os.path.exists(png_dir):
+        os.makedirs(png_dir)
 
     _ = kwargs.pop('model')
     field = kwargs.get('field')
@@ -70,7 +73,7 @@ def main():
 
     table_fn = f'{table_dir}/cadence_analysis_{data_release}_{out_field}.txt'
 
-    with PdfPages(f'{fig_dir}/cadence_analysis/cadence_vs_gallat_{data_release}_{out_field}.pdf') as pdf:
+    with PdfPages(f'{fig_dir}/cadence_vs_gallat_{data_release}_{out_field}.pdf') as pdf:
         for i,  model in enumerate(sntypes.keys()):
             model_name = sntypes[model]
             print(model_name)
@@ -203,7 +206,7 @@ def main():
         pdf.savefig(fig2)
         fig1.legend(legend, labels, ncol=5, fontsize='small', loc='upper center')
         fig1.tight_layout(rect=[0,0,1,0.93])
-        fig1.savefig('{}/cadence_analysis/sky_distribution_{}_{}.png'.format(fig_dir, field, data_release))
+        fig1.savefig('{}/sky_distribution_{}_{}.png'.format(png_dir, field, data_release))
     #close pdf fig
 
 

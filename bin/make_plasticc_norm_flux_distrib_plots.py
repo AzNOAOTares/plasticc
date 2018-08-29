@@ -34,6 +34,9 @@ def main():
     fig_dir = os.path.join(WORK_DIR, 'Figures', data_release)
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
+    png_dir = os.path.join(fig_dir, 'png')
+    if not os.path.exists(png_dir):
+        os.makedirs(png_dir)
 
     _ = kwargs.pop('model')
     field = kwargs.get('field')
@@ -164,7 +167,7 @@ def main():
                 ax4.set_ylabel('fluxcalerr')
                 fig4.suptitle(label)
                 fig4.tight_layout(rect=[0, 0.03, 1, 0.92])
-                fig4.savefig('{}/{}_{}_{}_{}_noise_vs_flux.png'.format(fig_dir, sntypes.get(model), model, data_release, field))
+                fig4.savefig('{}/{}_{}_{}_{}_noise_vs_flux.png'.format(png_dir, sntypes.get(model), model, data_release, field))
                 plt.close(fig4)
             ax3.plot(out_snr, lsn+i/10, color=c, label=label, lw=3)
 
