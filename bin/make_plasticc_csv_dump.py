@@ -170,7 +170,7 @@ def main():
     # set the header keywords for training and testing
     # same except for sntype will be removed from test and hostgal_photoz isn't
     # provided
-    kwargs['columns']=['objid','ptrobs_min','ptrobs_max','ra','decl', 'mwebv', 'mwebv_err',\
+    kwargs['columns']=['objid','ptrobs_min','ptrobs_max','ra','decl', 'mwebv',\
                         'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'sim_dlmu','sntype']
 
     # set an extrasql query to get just the DDF and WFD objects
@@ -452,7 +452,7 @@ def main():
     out.rename_column('sim_dlmu','distance_modulus')
    
     # setup what columns get output into the headers
-    cols = ['object_id','ra','decl', 'ddf_bool', 'mwebv', 'mwebv_err', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distance_modulus']
+    cols = ['object_id','ra','decl', 'ddf_bool', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distance_modulus', 'mwebv']
     if dummy == 'training':
         cols.append('target')
     out = out[cols]
