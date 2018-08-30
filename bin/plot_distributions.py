@@ -135,7 +135,7 @@ def autolabel(rects, ax):
 
 if __name__ == '__main__':
 
-    data_release = '20180827'
+    data_release = '20180830'
 
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', data_release)
     if not os.path.exists(fig_dir):

@@ -28,13 +28,13 @@ def main():
     print("This config ", kwargs)
     data_release = kwargs.pop('data_release')
 
-    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release)
+    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release, 'rate_analysis')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
 
     _ = kwargs.pop('model')
     out_field = kwargs.get('field')
-    kwargs['columns']=['objid','ptrobs_min','ptrobs_max','mwebv', 'mwebv_err', ]
+    kwargs['columns']=['objid','mwebv', ]
 
     sntypes = plasticc.get_data.GetData.get_sntypes()
     getter = plasticc.get_data.GetData(data_release)
@@ -67,7 +67,7 @@ def main():
             continue
         
         c = to_hex(next(color), keep_alpha=False)
-        objid, _, _, hz, dhz = zip(*head) 
+        objid, hz = zip(*head) 
         long_model_name = f'{model_name}_{model}: {nobs}'
     
         try:
@@ -82,7 +82,7 @@ def main():
     ax1.legend(frameon=False)
     ax1.set_xlim(0, upper_lim - step)
     fig1.tight_layout()
-    fig1.savefig(f'{fig_dir}/rate_analysis/extinction_checks_{data_release}_{out_field}.pdf')
+    fig1.savefig(f'{fig_dir}/extinction_checks_{data_release}_{out_field}.pdf')
     plt.close(fig1)
 
 

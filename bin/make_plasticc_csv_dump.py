@@ -5,7 +5,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 from collections import OrderedDict
 import sys
-import time
 import os
 import numpy as np
 import multiprocessing
@@ -23,11 +22,12 @@ import random
 import gc
 import warnings
 warnings.simplefilter('ignore')
-from astropy.time import Time
+from astropy.cosmology import FlatLambdaCDM
+from astropy.coordinates import SkyCoord, ICRS
 import gzip
 
 # default - this is for tracking so we know what the last version that went to Kaggle was
-data_release = '20180827'
+data_release = '20180830'
 
 
 def task(entry):
@@ -133,7 +133,8 @@ def main():
     getter = plasticc.get_data.GetData(data_release)
 
     # setup paths for output 
-    dump_dir = os.path.join(WORK_DIR, 'csv_dump', data_release)
+    base_dir = os.path.join(WORK_DIR, 'csv_dump')
+    dump_dir = os.path.join(base_dir, data_release)
     if not os.path.exists(dump_dir):
         os.makedirs(dump_dir)
 
@@ -171,7 +172,7 @@ def main():
     # same except for sntype will be removed from test and hostgal_photoz isn't
     # provided
     kwargs['columns']=['objid','ptrobs_min','ptrobs_max','ra','decl', 'mwebv',\
-                        'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'sim_dlmu','sntype']
+                        'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err','sntype']
 
     # set an extrasql query to get just the DDF and WFD objects
     # sntype for testing = true sntype + 100 
@@ -250,8 +251,7 @@ def main():
         out = out[mask]
 
     # randomize the output type ID - keep rare as 99
-    target_map_file = outfile.replace('.csv', '_targetmap.txt').replace('_test_set','').replace('_training_set','')
-    target_map_file = fixpath(target_map_file, public=False)
+    target_map_file = outfile.replace('.csv', '_targetmap.txt').replace('_test_set','').replace('_training_set','').replace(dump_dir, base_dir)
     try:
         target_map_data = at.Table.read(target_map_file, format='ascii')
         train_types = target_map_data['train_types']
@@ -262,6 +262,10 @@ def main():
         target_map_data = at.Table([train_types, target_types], names=['train_types', 'target_types'])
         target_map_data.write(target_map_file, format='ascii.fixed_width', delimiter=' ', overwrite=True)
         print(f'Wrote target mapping to file {target_map_file}')
+        target_map_file = target_map_file.replace(base_dir, dump_dir)
+        target_map_file = fixpath(target_map_file, public=False)
+        target_map_data.write(target_map_file, format='ascii.fixed_width', delimiter=' ', overwrite=True)
+        print(f'Wrote distribution target mapping to file {target_map_file}')
 
     # map the aggregated IDs to random target IDs
     target_map = dict(zip(train_types, target_types))
@@ -297,6 +301,18 @@ def main():
     ind = out['hostgal_specz'] == -9.
     out['hostgal_specz'][ind] = np.nan
 
+    # add galactic coordinates
+    c = SkyCoord(out['ra'], out['decl'], "icrs", unit='deg')
+    gal = c.galactic
+    out['gall'] = gal.l.value 
+    out['galb'] = gal.b.value 
+
+    # add distance modulus
+    cosmo = FlatLambdaCDM(70, 0.3)
+    out['distmod'] = cosmo.distmod(out['hostgal_photoz']).value
+    ind = np.isfinite(out['distmod'])
+    out['distmod'][~ind] = np.nan
+
     # figure out what fits files the data are in
     fits_files =[ "LSST_{0}_MODEL{1}/LSST_{0}_{2}_PHOT.FITS".format(*x.split('_')) for x in out['objid']] 
     fits_files = np.array(fits_files)
@@ -305,7 +321,7 @@ def main():
     # new name = <SNID>
     orig_name = out['objid']
     new_name = np.array([ x.split('_')[-1] for x in orig_name], dtype=np.int32)
-    ddf_field = np.zeros(len(new_name))
+    ddf_field = np.zeros(len(new_name), dtype=np.uint8)
     ind = new_name < wfd_thresh
     ddf_field[ind] = 1
 
@@ -346,7 +362,7 @@ def main():
     nmc = len(out)
     out_ind = np.arange(nmc)
     if dummy == 'training':
-        batch_inds = np.array_split(out_ind, max(multiprocessing.cpu_count()-4, 0))
+        batch_inds = np.array_split(out_ind, min(32, max(multiprocessing.cpu_count()-4, 0)))
     else:
         # if this is test data, we want to break files up so that DDF and WFD
         # are in separate files and the number of files is split so we don't
@@ -449,13 +465,19 @@ def main():
     # this isn't strictly necessary, since we choose exactly what columns to output
     # but this makes sure astropy also strips any metadata about the columns itself
     out.remove_columns(['objid', 'ptrobs_min', 'ptrobs_max', 'filename', 'sntype'])
-    out.rename_column('sim_dlmu','distance_modulus')
    
     # setup what columns get output into the headers
-    cols = ['object_id','ra','decl', 'ddf_bool', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distance_modulus', 'mwebv']
+    cols = ['object_id','ra','decl', 'gall', 'galb', 'ddf_bool', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distmod', 'mwebv']
     if dummy == 'training':
         cols.append('target')
     out = out[cols]
+
+    # fix column precision
+    precision = {'ra':6, 'decl':6, 'gall':6, 'galb':6,\
+            'hostgal_specz':4, 'hostgal_photoz':4, 'hostgal_photoz_err':4, 'distmod':4, 'mwebv':3}
+    for col, val in precision.items():
+        formatstr = f'%.{val}f'
+        out[col].format= formatstr
 
     # write out the header
     out.write(header_file, format='ascii.csv', overwrite=True)

@@ -102,12 +102,12 @@ def main():
                     header_data = make_index.get_file_data(header_file, extension=1)
                     snid = np.array([x.strip() for x in header_data['SNID']])
                     ind = (snid == tid)
-                    tu = header_data['LCLIB(TEMPLATE_MAG_u)'][ind][0]
-                    tg = header_data['LCLIB(TEMPLATE_MAG_g)'][ind][0]
-                    tr = header_data['LCLIB(TEMPLATE_MAG_r)'][ind][0]
-                    ti = header_data['LCLIB(TEMPLATE_MAG_i)'][ind][0]
-                    tz = header_data['LCLIB(TEMPLATE_MAG_z)'][ind][0]
-                    tY = header_data['LCLIB(TEMPLATE_MAG_Y)'][ind][0]
+                    tu = header_data['SIM_TEMPLATEMAG_u'][ind][0]
+                    tg = header_data['SIM_TEMPLATEMAG_g'][ind][0]
+                    tr = header_data['SIM_TEMPLATEMAG_r'][ind][0]
+                    ti = header_data['SIM_TEMPLATEMAG_i'][ind][0]
+                    tz = header_data['SIM_TEMPLATEMAG_z'][ind][0]
+                    tY = header_data['SIM_TEMPLATEMAG_Y'][ind][0]
                     template_mag_lookup = {'u':tu, 'g':tg, 'r':tr, 'i':ti, 'z':tz, 'Y':tY}
                     temp_mag = np.array([template_mag_lookup.get(x) for x in lc['pb']])
                     temp_flux = 10**(0.4*(27.5 - temp_mag))

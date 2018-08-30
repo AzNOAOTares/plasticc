@@ -26,7 +26,7 @@ def main():
     print("This config ", kwargs)
     data_release = kwargs.pop('data_release')
 
-    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release)
+    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release, 'rate_analysis')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
 
@@ -44,7 +44,7 @@ def main():
 
     redshift_range = np.arange(0, 3.01, 0.01)
 
-    with PdfPages(f'{fig_dir}/rate_analysis/redshift_checks_{data_release}_{out_field}.pdf') as pdf:
+    with PdfPages(f'{fig_dir}/redshift_checks_{data_release}_{out_field}.pdf') as pdf:
         for i,  model in enumerate(sntypes.keys()):
             if model >= 80:
                 break
