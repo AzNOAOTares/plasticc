@@ -257,6 +257,10 @@ def main():
         train_types = target_map_data['train_types']
         target_types = target_map_data['target_types']
         print(f'Restoring Target Map from {target_map_file}')
+        target_map_file = target_map_file.replace(base_dir, dump_dir)
+        target_map_file = fixpath(target_map_file, public=False)
+        target_map_data.write(target_map_file, format='ascii.fixed_width', delimiter=' ', overwrite=True)
+        print(f'Wrote distribution target mapping to file {target_map_file}')
     except Exception as e:
         target_types = np.random.choice(99, len(train_types), replace=False).tolist()
         target_map_data = at.Table([train_types, target_types], names=['train_types', 'target_types'])
@@ -361,8 +365,10 @@ def main():
 
     nmc = len(out)
     out_ind = np.arange(nmc)
+    nthreads = max(multiprocessing.cpu_count()//2 -1 , 1)
+    print(f'Using {nthreads} threads.')
     if dummy == 'training':
-        batch_inds = np.array_split(out_ind, min(32, max(multiprocessing.cpu_count()-4, 0)))
+        batch_inds = np.array_split(out_ind, nthreads)
     else:
         # if this is test data, we want to break files up so that DDF and WFD
         # are in separate files and the number of files is split so we don't
@@ -399,7 +405,7 @@ def main():
     if dummy == 'training':
         # training is simple -  dump each batch into one file in sequence
         outfile = fixpath(outfile, gzip=True)
-        with MultiPool() as pool:
+        with MultiPool(processes=nthreads) as pool:
             with tqdm(total=nmc) as pbar:
                 outlines = 'object_id,mjd,passband,flux,flux_err,detected_bool\n'
                 # change to pool.imap so order is preserved in output file
@@ -417,7 +423,7 @@ def main():
                     f.write(outbytes)
 
     else:
-        with MultiPool() as pool:
+        with MultiPool(processes=nthreads) as pool:
 
             # these variables will set the accessed time and modified time to the same numbers for all batches
             st_atime = None 

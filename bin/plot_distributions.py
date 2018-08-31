@@ -143,7 +143,6 @@ if __name__ == '__main__':
 
     get_distributions_multiprocessing(data_release=data_release, fig_dir=fig_dir)
 
-    plt.show()
 
 
 
