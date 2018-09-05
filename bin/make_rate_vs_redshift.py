@@ -26,13 +26,14 @@ from astropy.visualization import hist
 
 
 def main():
-    fig_dir = os.path.join(WORK_DIR, 'Figures')
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
 
     kwargs = plasticc.get_data.parse_getdata_options()
     print("This config ", kwargs)
     data_release = kwargs.pop('data_release')
+
+    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release)
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
 
     _ = kwargs.pop('model')
     out_field = kwargs.get('field')
@@ -64,7 +65,7 @@ def main():
             if nobs == 0:
                 continue
 
-            objid, _, _, redshift = zip(*list(head)) 
+            objid, _, _, redshift = zip(*head) 
 
             objid = np.array(objid)
             redshift = np.array(redshift)

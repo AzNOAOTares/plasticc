@@ -5,8 +5,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy import stats
 import pandas as pd
 import seaborn as sns
-from plasticc import helpers
-from plasticc.read_features import get_features, get_feature_names
+from ..plasticc import helpers
+from ..plasticc.read_features import get_features, get_feature_names
 
 ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
 
@@ -141,7 +141,7 @@ def get_limits(y, feature=None):
 
 def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), field='DDF', fig_dir='.', sntypes_map=None,
                            passbands=('r',), models=(1,), aggregate_classes=False):
-    sns.set(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
+    # sns.set(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
     model_names = []
     features_by_model = {}
     for model in models:
@@ -153,19 +153,6 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
     features_by_model = pd.DataFrame(features_by_model)  # DF structure eg: [SNIbc: Y: objid]
     features_by_model = features_by_model.transpose()  # DF structure eg: [Y: SNIbc: objid]
 
-    # # Plot correlation matrix
-    # plt.figure(figsize=(20, 20))
-    # df = pd.DataFrame(features_by_model['r']['SN1a'])
-    # # all_feat = features_by_model.transpose()['SN1a']
-    # # df = pd.DataFrame({**all_feat['r'], **all_feat['i'], **all_feat['z'], **all_feat['Y'], **all_feat['general_features']})
-    # import seaborn as sns
-    # corr = df.corr()
-    # sns.heatmap(corr,xticklabels=corr.columns.values,yticklabels=corr.columns.values, vmin=-1, vmax=1)
-    # sns.set(font_scale=1.9)
-    # plt.yticks(rotation=0,fontsize=22)
-    # plt.xticks(rotation=90,fontsize=22)
-    # plt.tight_layout()
-    # plt.savefig(os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'correlation', 'SN1a'))
 
     # Convert to 3D DataFrame instead of 2D dataframe of dicts
     for pb in passbands + ['general_features']:
@@ -237,20 +224,22 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF_20180727')
+
+    data_release = '20180407'
+
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', data_release, 'features_test')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF_20180727.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
 
     feature_names = get_feature_names(passbands, ignore=())
 
-    # models = [1, 2, 12, 14, 13, 41, 43, 45, 50, 51, 60, 61, 62, 63, 64, 70, 80, 81, 83, 84, 90, 91, 92]
-    models = [1, 2, 12, 14, 3, 13, 41, 43, 45, 50, 51, 60, 61, 62, 63, 64, 70, 80, 81, 83, 84, 90, 91, 92, 93, 99]
-    # models = [1, 5, 6, 41, 43, 45, 50, 51, 60, 64, 70, 80, 81, 83, 84, 91, 93, 99]
-    plot_features_joy_plot(fpath, '20180727', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models, aggregate_classes=False)
+    models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
+    # models = [1, 2, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90]
+    plot_features_joy_plot(fpath, data_release, feature_names, 'DDF', fig_dir, sntypes_map, passbands, models, aggregate_classes=False)
 
 
 if __name__ == '__main__':

@@ -15,6 +15,7 @@ import plasticc.database
 import make_index
 import plasticc.get_data
 import matplotlib.colors as mcl
+import astropy.table as at
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from collections import OrderedDict
@@ -24,9 +25,6 @@ import astropy.io.fits as afits
 import pickle
 
 def main():
-    fig_dir = os.path.join(WORK_DIR, 'Figures')
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
 
     colors = OrderedDict([('u','blueviolet'), ('g','green'), ('r','red'), ('i','orange'), ('z','black'), ('Y','gold')])
 
@@ -34,7 +32,14 @@ def main():
     print("This config ", kwargs)
     data_release = kwargs.pop('data_release')
 
-    _ = kwargs.pop('model')
+    fig_dir = os.path.join(WORK_DIR, 'Figures', data_release)
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
+    png_dir = os.path.join(fig_dir, 'png')
+    if not os.path.exists(png_dir):
+        os.makedirs(png_dir)
+
+    model = kwargs.pop('model')
     field = kwargs.get('field')
     
     out_field = field
@@ -62,22 +67,30 @@ def main():
     out_snr = np.arange(0, 200.1, 0.1)
 
     cmap = plt.cm.tab20
-    nlines = len(sntypes.keys())
+    nlines = len(sntypes.keys()) - 3 #there's three meta types
     color = iter(cmap(np.linspace(0,1,nlines)))
+    if model is '%':
+        models = sntypes.keys()
+    else: 
+        models = [model,]
+
+    all_stats = []
 
     with PdfPages(f'{fig_dir}/Flux_distrib_{data_release}_{out_field}.pdf') as pdf:
-        for i,  model in enumerate(sntypes.keys()):
-
+        for i,  model in enumerate(models):
+            model = int(model)
 
             kwargs['model'] = model
             lcdata = getter.get_lcs_data(**kwargs)
             if lcdata is None:
                 continue
 
-            sim_flux  = None 
-            obs_flux  = None
+            sim_flux = None 
+            obs_flux = None
             sig_flux = None 
             snr      = None
+            all_temp = None
+            allid    = None 
 
             nobj = 0
             for head, phot in lcdata:
@@ -90,23 +103,29 @@ def main():
                 obs = lc['flux'] 
                 flux_err = lc['dflux']
 
-                if sntypes.get(model) in ('RRLyrae','BSR','String','Mdwarf'):
+                if model >= 70:
                     tfield, tmodel, tbase, tid  = obsid.split('_')
                     header_dir = 'LSST_{}_MODEL{}'.format(tfield, tmodel)
                     header_file = 'LSST_{}_{}_HEAD.FITS.gz'.format(tfield, tbase)
                     header_file = os.path.join(DATA_DIR, data_release, header_dir, header_file)
                     header_data = make_index.get_file_data(header_file, extension=1)
                     snid = np.array([x.strip() for x in header_data['SNID']])
-                    ind = (snid == tid)
-                    tu = header_data['LCLIB(TEMPLATE_MAG_u)'][ind][0]
-                    tg = header_data['LCLIB(TEMPLATE_MAG_g)'][ind][0]
-                    tr = header_data['LCLIB(TEMPLATE_MAG_r)'][ind][0]
-                    ti = header_data['LCLIB(TEMPLATE_MAG_i)'][ind][0]
-                    tz = header_data['LCLIB(TEMPLATE_MAG_z)'][ind][0]
-                    tY = header_data['LCLIB(TEMPLATE_MAG_Y)'][ind][0]
+                    ind = np.where(snid == tid)
+                    tu = header_data['SIM_TEMPLATEMAG_u'][ind][0]
+                    tg = header_data['SIM_TEMPLATEMAG_g'][ind][0]
+                    tr = header_data['SIM_TEMPLATEMAG_r'][ind][0]
+                    ti = header_data['SIM_TEMPLATEMAG_i'][ind][0]
+                    tz = header_data['SIM_TEMPLATEMAG_z'][ind][0]
+                    tY = header_data['SIM_TEMPLATEMAG_Y'][ind][0]
                     template_mag_lookup = {'u':tu, 'g':tg, 'r':tr, 'i':ti, 'z':tz, 'Y':tY}
                     temp_mag = np.array([template_mag_lookup.get(x) for x in lc['pb']])
                     temp_flux = 10**(0.4*(27.5 - temp_mag))
+
+                    #outfile = f'dump/{tid}_test.txt'
+                    #test_data = at.Table([lc['mjd'], lc['pb'], obs, flux_err, temp_mag, temp_flux, lc['sim_magobs'], sim, obs+temp_flux - sim, (obs+temp_flux - sim)/flux_err],\
+                    #            names=['MJD','PB', 'FLUXCAL','FLUXCAL_ERR','SIM_TEMPLATEMAG', 'SIM_TEMPLATEFLUX', 'SIM_MAGOBS','SIM_FLUXOBS', 'RES', 'NORM_RES'])
+                    #test_data.write(outfile, format='ascii.fixed_width', overwrite=True, delimiter=' ')
+                     
                 else:
                     temp_flux = 0. 
 
@@ -141,6 +160,8 @@ def main():
             #    continue 
 
             c = next(color)
+            stats = describe(norm_flux)
+            all_stats.append((sntypes.get(model), model, stats[0], stats[2], stats[3], stats[1][0], stats[1][1], stats[4], stats[5]))
             print(sntypes.get(model), nobj, describe(norm_flux))
 
             kernel = gaussian_kde(norm_flux)
@@ -155,7 +176,7 @@ def main():
             ax1.plot(out_values, lpdf+i/10., color=c, label=label, lw=3)
             ax2.plot(out_values, lcdf+i/10, color=c, label=label, lw=3)
 
-            if not (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR', 'String')):
+            if model < 80:
                 fig4 = plt.figure(figsize=(15, 10))
                 ax4 = fig4.add_subplot(1,1,1)
                 ax4.plot(sim_flux, sig_flux, marker='o', color=c,  markersize=2, alpha=0.35, linestyle='None')
@@ -163,7 +184,7 @@ def main():
                 ax4.set_ylabel('fluxcalerr')
                 fig4.suptitle(label)
                 fig4.tight_layout(rect=[0, 0.03, 1, 0.92])
-                fig4.savefig('{}/{}_{}_{}_noise_vs_flux.png'.format(fig_dir, sntypes.get(model), data_release, field))
+                fig4.savefig('{}/{}_{}_{}_{}_noise_vs_flux.png'.format(png_dir, sntypes.get(model), model, data_release, field))
                 plt.close(fig4)
             ax3.plot(out_snr, lsn+i/10, color=c, label=label, lw=3)
 
@@ -184,6 +205,13 @@ def main():
         ax3.set_xlabel('SNR')
         ax3.set_ylabel('PDF')
         ax3.legend(frameon=False, fontsize='small')
+
+        all_stats = at.Table(rows=all_stats, names=['model','sntype', 'nobs', 'mean','variance','min','max','skewness', 'kurtosis'])
+        names = all_stats.dtype.names 
+        for name in names[3:]:
+            all_stats[name].format='%+.4f'
+        print(all_stats)
+        all_stats.write(f'{fig_dir}/normflux_stats_{data_release}_{out_field}.txt', format='ascii.fixed_width', delimiter=' ', overwrite=True)
 
         pdf.savefig(fig1)
         pdf.savefig(fig2)
