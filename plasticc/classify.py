@@ -16,10 +16,11 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from mlxtend.classifier import EnsembleVoteClassifier
 from sklearn.model_selection import KFold, RandomizedSearchCV, RepeatedKFold
+from sklearn.externals import joblib
 
-from .read_features import get_features, get_feature_names
-from . import helpers
-from .classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
+from plasticc.read_features import get_features, get_feature_names
+from plasticc import helpers
+from plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
 # from .pca_components import get_pca_features
 import seaborn as sns
 import pandas as pd
@@ -156,17 +157,20 @@ def save_truth_tables(classifier, X_test, y_test, name, models, fig_dir, numfold
     np.savetxt(os.path.join(fig_dir, 'truth_table_{}_kfold_{}.csv'.format(name, numfold)), truth_table)
 
 
-def save_tree_diagram(classifier, feature_names, out_file='tree'):
+def save_tree_diagram(classifier, feature_names, out_file='tree', fig_dir='.'):
+    dotfile = os.path.join(fig_dir, "{}.dot".format(out_file))
+    imagefile = os.path.join(fig_dir, "{}.pdf".format(out_file))
+
     from sklearn.tree import export_graphviz
     export_graphviz(classifier.estimators_[3],
-                    out_file="{}.dot".format(out_file),
+                    out_file=dotfile,
                     feature_names=feature_names,
                     filled=True,
                     rounded=True)
     # import pydot
     # (graph,) = pydot.graph_from_dot_file('tree.dot')
     # graph.write_png('tree.png')
-    # os.system('dot -Tpdf {0}.dot -o {0}.pdf'.format(out_file))
+    os.system('dot -Tpdf {0} -o {1}'.format(dotfile, imagefile))
 
 
 def remove_objects_with_val(X, y, val):
@@ -333,6 +337,9 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
         if k == 1:
             break
 
+    # Save model
+    joblib.dump(classifier, os.path.join(fig_dir, 'classifier.joblib'))
+
     # visualize test performance
     if k == 1:
         combine_kfolds = False
@@ -344,7 +351,7 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
     plot_confusion_matrix(cnf_matrix, classes=model_labels, normalize=True, title='Normalized confusion matrix_{}_with_top_{}'.format(name, n), fig_dir=fig_dir, name=name + '_with_top_{}features'.format(n), combine_kfolds=combine_kfolds)
 
     # Save tree diagram
-    save_tree_diagram(classifier, feature_names, out_file='tree_{}'.format(name))
+    save_tree_diagram(classifier, feature_names, out_file='tree_{}'.format(name), fig_dir=fig_dir)
 
     # Plot feature space
     # X, y = remove_objects_with_val(X, y, val=-99)
@@ -354,19 +361,19 @@ def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', 
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify_testing10')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify_20180727_DDF')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_20180407.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF_20180727.hdf5')
     sntypes_map = helpers.get_sntypes()
 
-    data_release = '20180407'
-    field = 'WFD'
+    data_release = '20180727'
+    field = 'DDF'
     model = '%'
     passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
-    models = [1, 3, 6, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91, 102, 103]
-    # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
+    # models = [1, 3, 6, 41, 45, 51, 60, 61, 62, 63, 64, 80, 81, 90, 91, 102, 103]
+    models = [1, 5, 6, 41, 43, 45, 50, 51, 60, 64, 70, 80, 81, 83, 84, 91, 93, 99]
     remove_models = []
     feature_names = get_feature_names(passbands, ignore=('objid',))
     X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False, helpers=helpers)

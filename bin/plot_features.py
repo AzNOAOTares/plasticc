@@ -5,8 +5,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy import stats
 import pandas as pd
 import seaborn as sns
-from ..plasticc import helpers
-from ..plasticc.read_features import get_features, get_feature_names
+from plasticc import helpers
+from plasticc.read_features import get_features, get_feature_names
 
 ROOT_DIR = '..'  # os.getenv('PLASTICC_DIR')
 
@@ -141,7 +141,7 @@ def get_limits(y, feature=None):
 
 def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), field='DDF', fig_dir='.', sntypes_map=None,
                            passbands=('r',), models=(1,), aggregate_classes=False):
-    # sns.set(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
+    sns.set(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
     model_names = []
     features_by_model = {}
     for model in models:
@@ -237,22 +237,20 @@ def plot_features_joy_plot(fpath, data_release, feature_names=('redshift',), fie
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_DDF_20180727')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_test.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF_20180727.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     passbands = ['u', 'g', 'r', 'i', 'z', 'Y']
 
     feature_names = get_feature_names(passbands, ignore=())
 
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'features_test')
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
-    models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 80, 81, 90]
-    # models = [1, 2, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90]
-    plot_features_joy_plot(fpath, '20180407', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models, aggregate_classes=False)
+    # models = [1, 2, 12, 14, 13, 41, 43, 45, 50, 51, 60, 61, 62, 63, 64, 70, 80, 81, 83, 84, 90, 91, 92]
+    models = [1, 2, 12, 14, 3, 13, 41, 43, 45, 50, 51, 60, 61, 62, 63, 64, 70, 80, 81, 83, 84, 90, 91, 92, 93, 99]
+    # models = [1, 5, 6, 41, 43, 45, 50, 51, 60, 64, 70, 80, 81, 83, 84, 91, 93, 99]
+    plot_features_joy_plot(fpath, '20180727', feature_names, 'DDF', fig_dir, sntypes_map, passbands, models, aggregate_classes=False)
 
 
 if __name__ == '__main__':

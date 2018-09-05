@@ -10,6 +10,9 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
     """
+
+    np.savetxt(os.path.join(fig_dir, 'confusion_matrix_raw_%s.csv' % name), cm)
+
     if combine_kfolds:
         uncertainties = np.std(cm, axis=0)
         cm = np.sum(cm, axis=0)

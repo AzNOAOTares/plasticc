@@ -214,14 +214,14 @@ def create_all_hdf_files(args):
 
 
 def main():
-    machine = 6  # selecting machines 1 through 10
-    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'Tables', 'features', 'hdf_features_DDF_20180715')
+    data_release = '20180727'
+    field = 'WFD'
+    model = '%'
+
+    save_dir = os.path.join(ROOT_DIR, 'plasticc', 'Tables', 'features', 'hdf_features_{}_{}'.format(field, data_release))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    data_release = '20180715'
-    field = 'DDF'
-    model = '%'
     getter = GetData(data_release)
     nobjects = next(getter.get_lcs_headers(field=field, model=model, get_num_lightcurves=True, big=False))
     print("{} objects for model {} in field {}".format(nobjects, model, field))
@@ -240,7 +240,7 @@ def main():
     #     i += 1
 
     offset = 0
-    offset_next = 40
+    offset_next = 3000
     print(offset_next)
 
     # Multiprocessing
@@ -266,7 +266,7 @@ def main():
     #     save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
     #                           batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
     #
-    combine_hdf_files(save_dir, data_release, 'features_ddf_20180715.hdf5')
+    combine_hdf_files(save_dir, data_release, 'features_{}_{}.hdf5'.format(field, data_release))
 
 
 if __name__ == '__main__':
