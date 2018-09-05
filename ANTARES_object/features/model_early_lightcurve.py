@@ -35,8 +35,9 @@ def fit_early_lightcurve(outlc):
         tlc = outlc.get(pb)
         ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-        if len(ttime) <= 1 or not np.any(ttime < 0):
-            continue
+        # if len(ttime) <= 1 or not np.any(ttime < 0): # This should already be taken care of in previous filtering
+        #     continue
+
         tFluxRenorm = tFluxRenorm - np.median(tFluxRenorm[ttime < 0])
         # mask = ttime > -30
         # tFluxRenorm = tFluxRenorm[mask]
