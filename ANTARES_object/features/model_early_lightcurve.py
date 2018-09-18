@@ -35,10 +35,10 @@ def fit_early_lightcurve(outlc):
         tlc = outlc.get(pb)
         ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
 
-        # if len(ttime) <= 1 or not np.any(ttime < 0): # This should already be taken care of in previous filtering
-        #     continue
-
-        tFluxRenorm = tFluxRenorm - np.median(tFluxRenorm[ttime < 0])
+        if len(ttime) <= 1 or not np.any(ttime < 0):
+            tFluxRenorm = tFluxRenorm - min(tFluxRenorm)
+        else:
+            tFluxRenorm = tFluxRenorm - np.median(tFluxRenorm[ttime < 0])
         # mask = ttime > -30
         # tFluxRenorm = tFluxRenorm[mask]
         # ttime = ttime[mask]
@@ -49,11 +49,20 @@ def fit_early_lightcurve(outlc):
         fluxes[pb] = tFluxRenorm[earlymask]
         fluxerrs[pb] = tFluxErrRenorm[earlymask]
 
+    remove_pbs = []
     x0 = [-12]
     bounds = [(-25, 0)]
     for pb in fluxes:
-        x0 += [np.mean(fluxes[pb]), np.median(fluxes[pb])]
-        bounds += [(0, max(fluxes[pb])), (min(fluxes[pb]), max(fluxes[pb]))]
+        if fluxes[pb].size == 0:
+            remove_pbs.append(pb)
+        else:
+            x0 += [np.mean(fluxes[pb]), np.median(fluxes[pb])]
+            bounds += [(0, max(fluxes[pb])), (min(fluxes[pb]), max(fluxes[pb]))]
+
+    for pb in remove_pbs:
+        del times[pb]
+        del fluxes[pb]
+        del fluxerrs[pb]
 
     # optimise_result = minimize(fit_all_pb_light_curves, x0=x0, args=(times, fluxes, fluxerrs), bounds=bounds)
     # t0 = optimise_result.x[0]
@@ -109,16 +118,16 @@ def lnprob(params, t, flux, fluxerr):
 
 def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=None):
     nwalkers = 200
-    nsteps = 700
-    burn = 50
-    pos = np.array([x0 + [3, 0.1, 0.05, 0.1, 0.05] * np.random.randn(ndim) for i in range(nwalkers)])
+    nsteps = 500
+    burn = 5
+    pos = np.array([x0 + (([3] + len(times.keys()) * [0.1, 0.05]) * np.random.randn(ndim)) for i in range(nwalkers)])
     # print(pos[:,0])
 
     # print("DATA IS TO FOLLOW")
     # print("times")
     # print(times)
     # print("fluxes")
-    # print(fluxes)
+    # print(fluxes
     # print("fluxerrs")
     # print(fluxerrs)
 
