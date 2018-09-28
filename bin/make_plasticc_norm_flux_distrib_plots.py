@@ -15,6 +15,7 @@ import plasticc.database
 import make_index
 import plasticc.get_data
 import matplotlib.colors as mcl
+from matplotlib.colors import to_hex
 import astropy.table as at
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -22,7 +23,7 @@ from collections import OrderedDict
 import scipy.stats
 from scipy.stats import gaussian_kde, describe
 import astropy.io.fits as afits
-import pickle
+import seaborn as sns
 
 def main():
 
@@ -90,6 +91,7 @@ def main():
             sig_flux = None 
             snr      = None
             all_temp = None
+            sim_magobs = None
             allid    = None 
 
             nobj = 0
@@ -98,7 +100,10 @@ def main():
 
                 obsid, _, _ = head
                 lc = getter.convert_pandas_lc_to_recarray_lc(phot)
+                ind = (lc['sim_magobs'] <= 30. ) & (lc['photflag'] != 1024)
+                lc = lc[ind]
 
+                this_simmagobs = lc['sim_magobs']
                 sim = 10**(0.4*(27.5 - lc['sim_magobs'])) 
                 obs = lc['flux'] 
                 flux_err = lc['dflux']
@@ -137,11 +142,14 @@ def main():
                     sim_flux = sim
                     sig_flux = flux_err 
                     snr = sn
+                    sim_magobs = this_simmagobs
                 else:
                     obs_flux = np.concatenate((obs_flux, obs))
                     sim_flux = np.concatenate((sim_flux, sim))
                     sig_flux = np.concatenate((sig_flux, flux_err))
                     snr = np.concatenate((snr, sn))
+                    sim_magobs = np.concatenate((sim_magobs, this_simmagobs))
+        
             
             if nobj == 0:
                 continue
@@ -156,10 +164,8 @@ def main():
            
             norm_flux = (obs_flux - sim_flux)/sig_flux
 
-            #if not (sntypes.get(model) in ('RRLyrae', 'Mdwarf', 'BSR', 'String')):
-            #    continue 
-
             c = next(color)
+            c2 = to_hex(c, keep_alpha=False)
             stats = describe(norm_flux)
             all_stats.append((sntypes.get(model), model, stats[0], stats[2], stats[3], stats[1][0], stats[1][1], stats[4], stats[5]))
             print(sntypes.get(model), nobj, describe(norm_flux))
@@ -175,6 +181,13 @@ def main():
 
             ax1.plot(out_values, lpdf+i/10., color=c, label=label, lw=3)
             ax2.plot(out_values, lcdf+i/10, color=c, label=label, lw=3)
+            g1 = (sns.jointplot(sim_magobs, norm_flux, color=c2, kind='hex',\
+                    ylim=(-10.,10.), height=10).set_axis_labels("mag", r"$\frac{\Delta F}{\delta F}$ "+label))
+
+            fig5 = g1.fig
+            fig5.tight_layout()
+            pdf.savefig(fig5)
+            plt.close(fig5)
 
             if model < 80:
                 fig4 = plt.figure(figsize=(15, 10))
@@ -188,31 +201,32 @@ def main():
                 plt.close(fig4)
             ax3.plot(out_snr, lsn+i/10, color=c, label=label, lw=3)
 
+
         #ax1.set_xlim(-10, 10)
         #ax2.set_xlim(-10, 10)
         ax3.set_xscale('log')
-
+        
         ax1.axvline(0., color='grey', linestyle='--', lw=2)
         ax1.set_xlabel(r'Normalized Flux Difference $\frac{F_{O} - F_{S}}{\sigma}$')
         ax1.set_ylabel('PDF')
         ax1.legend(frameon=False, fontsize='small')
-
+        
         ax2.axvline(0., color='grey', linestyle='--', lw=2)
         ax2.set_xlabel(r'Normalized Flux Difference $\frac{F_{O} - F_{S}}{\sigma}$')
         ax2.set_ylabel('CDF')
         ax2.legend(frameon=False, fontsize='small')
-
+        
         ax3.set_xlabel('SNR')
         ax3.set_ylabel('PDF')
         ax3.legend(frameon=False, fontsize='small')
-
+        
         all_stats = at.Table(rows=all_stats, names=['model','sntype', 'nobs', 'mean','variance','min','max','skewness', 'kurtosis'])
         names = all_stats.dtype.names 
         for name in names[3:]:
             all_stats[name].format='%+.4f'
         print(all_stats)
         all_stats.write(f'{fig_dir}/normflux_stats_{data_release}_{out_field}.txt', format='ascii.fixed_width', delimiter=' ', overwrite=True)
-
+        
         pdf.savefig(fig1)
         pdf.savefig(fig2)
         pdf.savefig(fig3)
