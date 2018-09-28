@@ -1,7 +1,7 @@
 # Updated to match RK's mapping on 20180715 - GN
 
 def get_sntypes():
-    sntypes_map = {11: 'SNIa-Normal', 
+    sntypes_map = {1: 'SNIa-Normal',
                    2: 'SNCC-II', 
                    12: 'SNCC-II', 
                    14: 'SNCC-II', 
@@ -34,7 +34,7 @@ def get_sntypes():
 def aggregate_sntypes(reverse=False):
     if reverse:
         aggregate_map = {99: (61, 62, 63, 90, 92),
-                         11: (11,),
+                         1: (1,),
                          5: (3,13),
                          6: (2, 12, 14),
                          41: (41,),
@@ -50,7 +50,7 @@ def aggregate_sntypes(reverse=False):
                          94: (91, 93)
                          }
     else:
-        aggregate_map = {11: 11,
+        aggregate_map = {1: 1,
                          2: 6, 
                          3: 5,
                          12: 6,

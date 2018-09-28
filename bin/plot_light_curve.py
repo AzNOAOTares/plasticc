@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from ..plasticc import get_data
 
 
-def plot_light_curve(objid, data_release='20180407'):
+def plot_light_curve(objid, data_release='20180715'):
     getter = get_data.GetData(data_release)
     field, model, base, snid = objid.split('_')
     result = getter.get_lcs_data(field=field, snid=snid, model=model, base=base)

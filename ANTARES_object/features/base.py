@@ -604,7 +604,7 @@ class BaseMixin(object):
         self.colorMean = colorMean
         return colorMean
 
-    def historic_color(self, recompute=False, passbands=('u', 'g', 'r', 'i', 'z', 'Y')):
+    def get_historic_color(self, recompute=False, passbands=('u', 'g', 'r', 'i', 'z', 'Y')):
         historicColors = getattr(self, 'historicColors', None)
         if historicColors is not None:
             if not recompute:

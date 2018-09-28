@@ -5,11 +5,14 @@ import itertools
 from chainconsumer import ChainConsumer
 
 
-def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix', cmap=plt.cm.RdBu, fig_dir='.', name='', combine_kfolds=False):
+def plot_confusion_matrix(cm, classes, normalize=False, title=None, cmap=plt.cm.RdBu, fig_dir='.', name='', combine_kfolds=False):
     """
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
     """
+
+    np.savetxt(os.path.join(fig_dir, 'confusion_matrix_raw_%s.csv' % name), cm)
+
     if combine_kfolds:
         uncertainties = np.std(cm, axis=0)
         cm = np.sum(cm, axis=0)
@@ -50,7 +53,8 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
         plt.text(j, i, cell_text, horizontalalignment="center",
                  color="white" if abs(cm[i, j]) > thresh else "black", fontsize=18)
 
-    plt.tight_layout()
+    if title is not None:
+        plt.title(title)
     plt.ylabel('True label', fontsize=18)
     plt.xlabel('Predicted label', fontsize=18)
     plt.tight_layout()

@@ -350,9 +350,9 @@ def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=
     t0 = bestpars[0]
     bestpars = bestpars[1:]
 
-    for i, pb in enumerate(times):
-        if len(times[pb][times[pb] > t0]) == 0:
-            bestpars[i * 2] = 0  # set `a' to zero if no data points above t0
+    # for i, pb in enumerate(times):
+    #     if len(times[pb][times[pb] > t0]) == 0:
+    #         bestpars[i * 2] = 0  # set `a' to zero if no data points above t0
 
     best = {pb: np.append(bestpars[i * 2:i * 2 + 2], t0) for i, pb in enumerate(times)}
 
