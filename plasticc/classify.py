@@ -51,6 +51,7 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
 
     for i, objid in enumerate(features['objid']):
         field, model, base, snid = objid.astype(str).split('_')
+        print(i, len(features['objid']))
 
         if aggregate_classes:
             model = agg_map[int(model)]
@@ -140,7 +141,8 @@ def make_class_labels(models, model_names, X_train, y_train, X_test, y_test):
     for i, m in enumerate(models):
         model_labels.append("{}\ntrain: {}\ntest: {}".format(model_names[i], nobs_train[i], nobs_test[i]))
 
-    return model_labels, nobs_train, nobs_test
+    return model_names, nobs_train, nobs_test
+    #return model_labels, nobs_train, nobs_test
 
 
 def oversampling(models, X_train, y_train):
@@ -369,14 +371,14 @@ def classify(X, y, objids, classifier, models, sntypes_map, feature_names, fig_d
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'cadence_hackathon_minion1016_classify_20180727_WFD')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'cadence_hackathon_minion1016_classify_20180727_WFD_test3')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_WFD_20180727.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF_20180727.hdf5')
     sntypes_map = helpers.get_sntypes()
 
     data_release = '20180727'
-    field = 'WFD'
+    field = 'DDF'
     model = '%'
     passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
