@@ -27,7 +27,7 @@ from astropy.coordinates import SkyCoord, ICRS
 import gzip
 
 # default - this is for tracking so we know what the last version that went to Kaggle was
-data_release = '20180830'
+data_release = '20180901'
 
 
 def task(entry):
@@ -423,50 +423,49 @@ def main():
                     f.write(outbytes)
 
     else:
-        with MultiPool(processes=nthreads) as pool:
-
-            # these variables will set the accessed time and modified time to the same numbers for all batches
-            st_atime = None 
-            st_mtime = None
-
-            with tqdm(total=nmc) as pbar:
-                for batch in batches:
-                    # for test, the batches each get a separate file
-                    batch_key = batch[0]['object_id']
-                    batch_id = batch_map[batch_key]
-                    batchfile = outfile.replace('.csv', f'_batch{batch_id}.csv')
-                    batchfile = fixpath(batchfile, gzip=True)
-
-                    # for actual mutliprocessing, split up each file's indices into mini batches
-                    ind = np.arange(len(batch))
-                    mini_inds = np.array_split(ind, max(multiprocessing.cpu_count()-4, 0))
-                    mini_batches = [batch[x] for x in mini_inds]
-                    nbatch = 0
-
-                    # combine all the batches
-                    outlines = 'object_id,mjd,passband,flux,flux_err,detected_bool\n'
+        # these variables will set the accessed time and modified time to the same numbers for all batches
+        st_atime = None 
+        st_mtime = None
+        
+        with tqdm(total=nmc) as pbar:
+            for batch in batches:
+                # for test, the batches each get a separate file
+                batch_key = batch[0]['object_id']
+                batch_id = batch_map[batch_key]
+                batchfile = outfile.replace('.csv', f'_batch{batch_id}.csv')
+                batchfile = fixpath(batchfile, gzip=True)
+        
+                # for actual mutliprocessing, split up each file's indices into mini batches
+                ind = np.arange(len(batch))
+                mini_inds = np.array_split(ind, nthreads - 1)
+                mini_batches = [batch[x] for x in mini_inds]
+                nbatch = 0
+        
+                # combine all the batches
+                outlines = 'object_id,mjd,passband,flux,flux_err,detected_bool\n'
+                with MultiPool(processes=nthreads-1) as pool:
                     for result in pool.imap(task, mini_batches):
                         _, mini_nbatch, mini_batchlines = result
                         nbatch += mini_nbatch
                         outlines += '\n'.join(mini_batchlines)
                         outlines += '\n'
                         pbar.update(mini_nbatch)
-                    outbytes = outlines.encode()
-                    gc.collect()
-
-                    # do the output
-                    with gzip.open(batchfile, 'wb', compresslevel=9) as f:
-                        f.write(outbytes)
-
-                    # get the timestamps of the first batch file
-                    if st_atime is None:
-                       st = os.stat(batchfile)
-                       st_atime = st.st_atime
-                       st_mtime = st.st_mtime
-
-                    # change the timestamp of the output
-                    os.utime(batchfile, (st_atime, st_mtime))
-
+                outbytes = outlines.encode()
+                gc.collect()
+        
+                # do the output
+                with gzip.open(batchfile, 'wb', compresslevel=9) as f:
+                    f.write(outbytes)
+        
+                # get the timestamps of the first batch file
+                if st_atime is None:
+                   st = os.stat(batchfile)
+                   st_atime = st.st_atime
+                   st_mtime = st.st_mtime
+        
+                # change the timestamp of the output
+                os.utime(batchfile, (st_atime, st_mtime))
+        
     # remove and rename some columns from the metadata output
     # this isn't strictly necessary, since we choose exactly what columns to output
     # but this makes sure astropy also strips any metadata about the columns itself

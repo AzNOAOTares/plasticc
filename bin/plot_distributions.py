@@ -26,7 +26,7 @@ def get_class_distributions(field, sntype, getdata):
     n = 0
     mwebv_list, epoch_range_list = [], []
     cadence_list = {f: [] for f in ['i', 'r', 'Y', 'u', 'g', 'z']}
-    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'mwebv', 'sntype'], field=field, model=sntype, limit=1000)
+    result = getdata.get_lcs_data(columns=['objid', 'ptrobs_min', 'ptrobs_max', 'mwebv', 'sntype'], field=field, model=sntype, limit=500)
     print("GOT RESULTS", field, sntype)
     bad_mags = []
     for head, phot in result:
@@ -135,7 +135,7 @@ def autolabel(rects, ax):
 
 if __name__ == '__main__':
 
-    data_release = '20180830'
+    data_release = '20180901'
 
     fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', data_release)
     if not os.path.exists(fig_dir):
