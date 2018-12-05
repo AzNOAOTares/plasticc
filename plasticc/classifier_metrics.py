@@ -8,54 +8,64 @@ from sklearn.metrics import roc_curve, auc
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import average_precision_score
 from scipy import interp
+plt.rcParams['text.usetex']=True
+plt.rcParams['font.serif'] = ['Computer Modern Roman'] + plt.rcParams['font.serif']
 
 font = {'family': 'normal',
-        'size': 22}
+        'size': 34}
 
 matplotlib.rc('font', **font)
 
-COLORS = ['k', '#ff7f0e', '#2ca02c', '#d62728', '#1f77b4', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22',
-          '#17becf', '#911eb4', '#800000', '#aa6e28']
+COLORS = ['grey', 'tab:green', 'tab:orange', 'tab:blue', 'tab:red', 'tab:purple', 'tab:brown', '#aaffc3', 'tab:olive',
+          'tab:cyan', '#FF1493', 'navy', 'tab:pink', 'lightcoral', '#228B22', '#aa6e28', '#FFA07A']
 
 
 def compute_precision_recall(classes, y_test, y_pred_prob, name='', fig_dir='.', title=None):
+    if np.nonzero(y_test[:, 0])[0].size == 0:
+        start_index = 1
+    else:
+        start_index = 1
+
     nclasses = len(classes)
     # For each class
     precision = dict()
     recall = dict()
+    save_auc = dict()
     average_precision = dict()
-    for i in range(nclasses):
+    for i in range(start_index, nclasses):
         precision[i], recall[i], _ = precision_recall_curve(y_test[:, i], y_pred_prob[:, i])
         average_precision[i] = average_precision_score(y_test[:, i], y_pred_prob[:, i])
+        save_auc[classes[i]] = average_precision[i]
 
     # A "micro-average": quantifying score on all classes jointly
     precision["micro"], recall["micro"], _ = precision_recall_curve(y_test.ravel(), y_pred_prob.ravel())
     average_precision["micro"] = average_precision_score(y_test, y_pred_prob,
                                                          average="micro")
+    save_auc[classes[i]] = average_precision["micro"]
     print('Average precision score, micro-averaged over all classes: {0:0.2f}'
           .format(average_precision["micro"]))
 
-    plt.figure(figsize=(12, 12))
+    plt.figure(figsize=(12, 16))
     f_scores = np.linspace(0.2, 0.8, num=4)
     lines = []
     labels = []
     for f_score in f_scores:
         x = np.linspace(0.01, 1)
         y = f_score * x / (2 * x - f_score)
-        l, = plt.plot(x[y >= 0], y[y >= 0], color='gray', alpha=0.2)
-        plt.annotate('f1={0:0.1f}'.format(f_score), xy=(0.9, y[45] + 0.02))
+        # l, = plt.plot(x[y >= 0], y[y >= 0], color='gray', alpha=0.2)
+        # plt.annotate('f1={0:0.1f}'.format(f_score), xy=(0.9, y[45] + 0.02))
 
+    # lines.append(l)
+    # labels.append('iso-f1 curves')
+    l, = plt.plot(recall["micro"], precision["micro"], color='navy', linestyle=':', lw=2)
     lines.append(l)
-    labels.append('iso-f1 curves')
-    l, = plt.plot(recall["micro"], precision["micro"], color='gold', lw=2)
-    lines.append(l)
-    labels.append('micro-average Precision-recall (area = {0:0.2f})'
+    labels.append('micro-average ({0:0.2f})'
                   ''.format(average_precision["micro"]))
 
-    for i in range(nclasses):
+    for i in range(start_index, nclasses):
         l, = plt.plot(recall[i], precision[i], color=COLORS[i], lw=2)
         lines.append(l)
-        labels.append('{0} (area = {1:0.2f})'
+        labels.append('{0} ({1:0.2f})'
                       ''.format(classes[i], average_precision[i]))
 
     fig = plt.gcf()
@@ -64,78 +74,94 @@ def compute_precision_recall(classes, y_test, y_pred_prob, name='', fig_dir='.',
     plt.ylim([0.0, 1.05])
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.title(title, fontsize=22)
-    plt.legend(lines, labels, loc=(0, -.38), prop=dict(size=14), fontsize=12, frameon=False)
+    if title is not None:
+        plt.title(title, fontsize=34)
+    plt.legend(lines, labels, loc=(0.1, -.6), fontsize=24, frameon=True, ncol=2)
+    plt.tight_layout()
     figname = os.path.join(fig_dir, 'precision_%s.pdf' % name)
+    plt.savefig(figname)
     figname = os.path.join(fig_dir, 'precision_%s.png' % name)
     plt.savefig(figname)
+    plt.close()
 
-    return figname
+    return figname, save_auc
 
 
 def compute_multiclass_roc_auc(classes, y_test, y_pred_prob, name='', fig_dir='.', title=None):
+    if np.nonzero(y_test[:, 0])[0].size == 0:
+        start_index = 1
+    else:
+        start_index = 1
+
     nclasses = len(classes)
+
     # Compute ROC curve and ROC area for each class
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
-    for i in range(nclasses):
+    save_auc = dict()
+    for i in range(start_index, nclasses):
         fpr[i], tpr[i], _ = roc_curve(y_test[:, i], y_pred_prob[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
+        save_auc[classes[i]] = roc_auc[i]
 
     # Compute micro-average ROC curve and ROC area
     fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), y_pred_prob.ravel())
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+    save_auc['micro'] = roc_auc['micro']
 
     # Compute macro-average ROC curve and ROC area
 
     # First aggregate all false positive rates
-    all_fpr = np.unique(np.concatenate([fpr[i] for i in range(nclasses)]))
+    all_fpr = np.unique(np.concatenate([fpr[i] for i in range(start_index, nclasses)]))
 
     # Then interpolate all ROC curves at this points
     mean_tpr = np.zeros_like(all_fpr)
-    for i in range(nclasses):
+    for i in range(start_index, nclasses):
         mean_tpr += interp(all_fpr, fpr[i], tpr[i])
 
     # Finally average it and compute AUC
-    mean_tpr /= nclasses
+    mean_tpr /= len(classes[start_index:])
 
     fpr["macro"] = all_fpr
     tpr["macro"] = mean_tpr
     roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+    save_auc['macro'] = roc_auc['macro']
 
     # Plot all ROC curves
-    fig = plt.figure(figsize=(12, 12))
+    fig = plt.figure(figsize=(13, 12))
     plt.plot(fpr["micro"], tpr["micro"],
-             label='micro-average ROC curve (area = {0:0.2f})'
+             label='micro-average ({0:0.2f})'
                    ''.format(roc_auc["micro"]),
-             color='deeppink', linestyle=':', linewidth=4)
+             color='navy', linestyle=':', linewidth=4)
 
     plt.plot(fpr["macro"], tpr["macro"],
-             label='macro-average ROC curve (area = {0:0.2f})'
+             label='macro-average ({0:0.2f})'
                    ''.format(roc_auc["macro"]),
-             color='navy', linestyle=':', linewidth=4)
+             color='deeppink', linestyle=':', linewidth=4)
 
     lw = 2
     # colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
-    for i in range(nclasses):
+    for i in range(start_index, nclasses):
         plt.plot(fpr[i], tpr[i], lw=lw, color=COLORS[i],
-                 label='ROC curve of {0} (area = {1:0.2f})'
+                 label='{0} ({1:0.2f})'
                        ''.format(classes[i], roc_auc[i]))
 
-    plt.plot([0, 1], [0, 1], 'k--', lw=lw)
+    # plt.plot([0, 1], [0, 1], 'k--', lw=lw)
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate', fontsize=18)
-    plt.ylabel('True Positive Rate', fontsize=18)
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
     if title is not None:
-        plt.title(title, fontsize=22)
-    plt.legend(loc="lower right", frameon=False, fontsize=12)
+        plt.title(title, fontsize=34)
+    plt.legend(loc="lower right", frameon=True, fontsize=26)
+    plt.tight_layout()
     figname = os.path.join(fig_dir, 'roc_%s.pdf' % name)
+    plt.savefig(figname)
     figname = os.path.join(fig_dir, 'roc_%s.png' % name)
     plt.savefig(figname)
 
-    return figname
+    return figname, save_auc
 
 
 def plot_confusion_matrix(cm, classes, normalize=False, title=None, cmap=plt.cm.RdBu, fig_dir='.', name='', combine_kfolds=False, show_uncertainties=False):
@@ -155,6 +181,7 @@ def plot_confusion_matrix(cm, classes, normalize=False, title=None, cmap=plt.cm.
     else:
         print('Confusion matrix, without normalization')
 
+
     print(cm)
     # Multiply off diagonal by -1
     off_diag = ~np.eye(cm.shape[0], dtype=bool)
@@ -162,37 +189,51 @@ def plot_confusion_matrix(cm, classes, normalize=False, title=None, cmap=plt.cm.
     np.savetxt(os.path.join(fig_dir, 'confusion_matrix_%s.csv' % name), cm)
     print(cm)
 
-    fig = plt.figure(figsize=(15, 12))
-    plt.imshow(cm, interpolation='nearest', cmap=cmap, vmin=-1, vmax=1)
-    # plt.title(title)
-    cb = plt.colorbar()
-    cb.ax.set_yticklabels(cb.ax.get_yticklabels(), fontsize=15)
-    tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=90, fontsize=15)
-    plt.yticks(tick_marks, classes, fontsize=15)
+    cms = [cm]
+    deleterows = [False]
+    if np.all(np.isnan(cm[0])):
+        cmDelete = np.delete(cm, 0, 0)
+        cms.append(cmDelete)
+        deleterows.append(True)
 
-    fmt = '.2f' if normalize else 'd'
-    thresh = cm.max() / 2.
-    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        value = format(abs(cm[i, j]), fmt)
-        if combine_kfolds and show_uncertainties:
-            unc = format(uncertainties[i, j], fmt)
-            cell_text = r"{} $\pm$ {}".format(value, unc)
+    for cm, deleterow in zip(cms, deleterows):
+        fig = plt.figure(figsize=(15, 12))
+        plt.imshow(cm, interpolation='nearest', cmap=cmap, vmin=-1, vmax=1)
+        # plt.title(title)
+        cb = plt.colorbar()
+        cb.ax.set_yticklabels(cb.ax.get_yticklabels(), fontsize=27)
+        tick_marks = np.arange(len(classes))
+        plt.xticks(tick_marks, classes, rotation=90, fontsize=27)
+        if deleterow:
+            plt.yticks(tick_marks[:-1], classes[1:], fontsize=27)
         else:
-            cell_text = value
-        plt.text(j, i, cell_text, horizontalalignment="center",
-                 color="white" if abs(cm[i, j]) > thresh else "black", fontsize=18)
+            plt.yticks(tick_marks, classes, fontsize=27)
 
-    if title is not None:
-        plt.title(title, fontsize=22)
-    plt.ylabel('True label', fontsize=18)
-    plt.xlabel('Predicted label', fontsize=18)
-    plt.tight_layout()
-    figname = os.path.join(fig_dir, 'confusion_matrix_%s.pdf' % name)
-    figname = os.path.join(fig_dir, 'confusion_matrix_%s.png' % name)
-    plt.savefig(figname)
+        fmt = '.2f' if normalize else 'd'
+        thresh = 0.5  # cm.max() / 2.
+        for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+            value = format(abs(cm[i, j]), fmt)
+            if combine_kfolds and show_uncertainties:
+                unc = format(uncertainties[i, j], fmt)
+                cell_text = r"{} $\pm$ {}".format(value, unc)
+            else:
+                cell_text = value
+            if cell_text == 'nan':
+                cell_text = '-'
+            plt.text(j, i, cell_text, horizontalalignment="center",
+                     color="white" if abs(cm[i, j]) > thresh else "black", fontsize=26)
 
-    return figname
+        if title is not None:
+            plt.title(title, fontsize=33)
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        figname_pdf = os.path.join(fig_dir, 'confusion_matrix_%s.pdf' % name)
+        plt.savefig(figname_pdf, bbox_inches="tight")
+        if not deleterow:
+            figname_png = os.path.join(fig_dir, 'confusion_matrix_%s.png' % name)
+            plt.savefig(figname_png, bbox_inches="tight")
+
+    return figname_png
 
 
 def plot_feature_importance(classifier, feature_names, num_features, fig_dir, num_features_plot=50, name=''):
@@ -210,11 +251,11 @@ def plot_feature_importance(classifier, feature_names, num_features, fig_dir, nu
         n = num_features
     # Plot the feature importances of the forest
     fig = plt.figure(figsize=(20, 10))
-    plt.title("Feature importances")
     plt.bar(range(n), importances[indices][:n], color='#2ca02c', yerr=std[indices][:n], align="center")
     plt.xticks(range(n), feature_names[indices][:n], rotation=90)
-    plt.tick_params(axis='both', labelsize=13)
+    plt.tick_params(axis='both', labelsize=24)
     plt.xlim([-1, n])
+    plt.ylabel("Importance")
     plt.tight_layout()
     plt.savefig(os.path.join(fig_dir, 'feature_importance{}.pdf'.format(name)))
 

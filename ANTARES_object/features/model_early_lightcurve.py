@@ -3,9 +3,10 @@ from scipy.optimize import curve_fit, minimize
 import matplotlib.pyplot as plt
 import emcee
 from collections import OrderedDict
+import copy
 
 
-def fit_early_lightcurve(outlc):
+def fit_early_lightcurve(outlc, earlytime=10):
     """
     Return tsquarize fit to early light curve
     """
@@ -28,6 +29,7 @@ def fit_early_lightcurve(outlc):
     def fit_func(t, a, c, t0):
         return np.heaviside((t - t0), 1) * (a * (t - t0) ** 2) + c
 
+    copy.deepcopy(outlc)
     times = OrderedDict()
     fluxes = OrderedDict()
     fluxerrs = OrderedDict()
@@ -44,7 +46,7 @@ def fit_early_lightcurve(outlc):
         # ttime = ttime[mask]
         # tFluxErrRenorm = tFluxErrRenorm[mask]
 
-        earlymask = ttime < 10
+        earlymask = ttime <= earlytime
         times[pb] = ttime[earlymask]
         fluxes[pb] = tFluxRenorm[earlymask]
         fluxerrs[pb] = tFluxErrRenorm[earlymask]
@@ -72,7 +74,6 @@ def fit_early_lightcurve(outlc):
     ndim = len(x0)
 
     best = emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, np.array(x0), bounds)
-
     # best, covariance = curve_fit(fit_func, time, flux, sigma=fluxerr, p0=[max(flux), min(flux)])
 
     # best = fit_all_pb_lightcurves(time, flux, fluxerr)
@@ -96,7 +97,7 @@ def lnlike(params, times, fluxes, fluxerrs):
         # print(pb, a, c)
 
     # print('chi2', chi2, params)
-    return -chi2
+    return np.exp(-0.5*chi2)
 
 
 def lnprior(params):
@@ -104,8 +105,13 @@ def lnprior(params):
     t0 = params[0]
     pars = params[1:]
 
+    for par in pars:
+        if par > 1e3 or par < -1e3:
+            return -np.inf
+
     if -35 < t0 < 0:
         return 0.0
+
     return -np.inf
 
 
@@ -118,7 +124,7 @@ def lnprob(params, t, flux, fluxerr):
 
 def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=None):
     nwalkers = 200
-    nsteps = 500
+    nsteps = 700
     burn = 5
     pos = np.array([x0 + (([3] + len(times.keys()) * [0.1, 0.05]) * np.random.randn(ndim)) for i in range(nwalkers)])
     # print(pos[:,0])

@@ -11,76 +11,12 @@ import matplotlib as mpl
 rc('text', usetex=False)
 # rc('axes', unicode_minus=True)
 # rc('font', **{'family':'serif','serif':['Times New Roman']})
-
+from . import model_early_lightcurve
 
 class EarlyMixin(object):
     """
     Methods to derive early classification features for LAobjects
     """
-
-    def _fit_early_lightcurve(self, outlc):
-        """
-        Return tsquarize fit to early light curve
-        """
-
-        def fit_all_pb_light_curves(params, times, fluxes, fluxerrs):
-            print(params)
-            t0 = params[0]
-            pars = params[1:]
-
-            chi2 = 0
-            for i, pb in enumerate(times):
-                a, c = pars[i*2:i*2+2]
-
-                model = np.heaviside((times[pb] - t0), 1) * (a * (times[pb] - t0) ** 2) + c
-                chi2 += sum((fluxes[pb] - model) ** 2 / fluxerrs[pb] ** 2)
-
-            print(chi2)
-            return chi2
-
-        def fit_func(t, a, c, t0):
-            return np.heaviside((t - t0), 1) * (a * (t - t0) ** 2) + c
-
-        times = OrderedDict()
-        fluxes = OrderedDict()
-        fluxerrs = OrderedDict()
-        for i, pb in enumerate(outlc):
-            tlc = outlc.get(pb)
-            ttime, tFlux, tFluxErr, tFluxUnred, tFluxErrUnred, tFluxRenorm, tFluxErrRenorm, tphotflag, tzeropoint, tobsId = tlc
-
-            if len(ttime) <= 1 or not np.any(ttime < 0):
-                continue
-            tFluxUnred = tFluxUnred - np.median(tFluxUnred[ttime < 0])
-            # mask = ttime > -30
-            # tFluxUnred = tFluxUnred[mask]
-            # ttime = ttime[mask]
-            # tFluxErrUnred = tFluxErrUnred[mask]
-
-            times[pb] = ttime
-            fluxes[pb] = tFluxUnred
-            fluxerrs[pb] = tFluxErrUnred
-
-        x0 = [-12]
-        bounds = [(-20, 0)]
-        for pb in fluxes:
-            x0 += [np.mean(fluxes[pb]), np.median(fluxes[pb])]
-            bounds += [(0, max(fluxes[pb])), (min(fluxes[pb]), max(fluxes[pb]))]
-
-        # optimise_result = minimize(fit_all_pb_light_curves, x0=x0, args=(times, fluxes, fluxerrs), bounds=bounds)
-        # t0 = optimise_result.x[0]
-        # bestpars = optimise_result.x[1:]
-        # best = {pb: np.append(bestpars[i*2:i*2+2], t0) for i, pb in enumerate(times)}
-
-        ndim = len(x0)
-
-        best = emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, np.array(x0), bounds)
-
-        # best, covariance = curve_fit(fit_func, time, flux, sigma=fluxerr, p0=[max(flux), min(flux)])
-
-        # best = fit_all_pb_lightcurves(time, flux, fluxerr)
-        print('best', best)
-
-        return fit_func, best
 
     def get_early_rise_rate(self, recompute=False, plot=False, passbands=('u', 'g', 'r', 'i', 'z', 'Y')):
         """
@@ -103,7 +39,7 @@ class EarlyMixin(object):
         fit_func = getattr(self, 'early_fit_func', None)
         parameters = getattr(self, 'early_parameters', None)
         if fit_func is None or parameters is None:
-            fit_func, parameters = self._fit_early_lightcurve(outlc)
+            fit_func, parameters = model_early_lightcurve.fit_early_lightcurve(outlc)
             self.early_fit_func, self.early_parameters = fit_func, parameters
 
         if plot:
@@ -188,7 +124,7 @@ class EarlyMixin(object):
         fit_func = getattr(self, 'early_fit_func', None)
         parameters = getattr(self, 'early_parameters', None)
         if fit_func is None or parameters is None:
-            fit_func, parameters = self._fit_early_lightcurve(outlc)
+            fit_func, parameters = model_early_lightcurve.fit_early_lightcurve(outlc)
             self.early_fit_func, self.early_parameters = fit_func, parameters
 
         ignorepb = []
@@ -277,7 +213,6 @@ def lnprob(params, t, flux, fluxerr):
 
 
 def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=None):
-
     nwalkers = 200
     nsteps = 700
     burn = 50
@@ -297,7 +232,7 @@ def emcee_fit_all_pb_lightcurves(times, fluxes, fluxerrs, ndim, x0=None, bounds=
     # Ensure intial params within parameter bounds
     params = OrderedDict()
     params['t0'] = {'bounds': bounds[0], 'value': x0[0], 'scale': 1}
-    i = 0
+    i = 1
     for pb in times.keys():
         for name in ['a', 'c']:
             params[pb + ': ' + name] = {'bounds': bounds[i], 'value': x0[i], 'scale': 3}
