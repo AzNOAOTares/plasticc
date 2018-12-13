@@ -17,10 +17,11 @@ from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from mlxtend.classifier import EnsembleVoteClassifier
 from sklearn.model_selection import KFold, RandomizedSearchCV, RepeatedKFold
 from sklearn.externals import joblib
+from keras.utils import to_categorical
 
-from plasticc.read_features import get_features, get_feature_names
-from plasticc import helpers
-from plasticc.classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space
+from .read_features import get_features, get_feature_names
+from . import helpers
+from .classifier_metrics import plot_feature_importance, plot_confusion_matrix, plot_features_space, compute_multiclass_roc_auc, compute_precision_recall, plasticc_log_loss
 # from .pca_components import get_pca_features
 import seaborn as sns
 import pandas as pd
@@ -33,7 +34,6 @@ ROOT_DIR = '..'# os.getenv('PLASTICC_DIR')
 def get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=False, pca=False, helpers=None):
     X = []  # features
     y = []  # labels
-    objids = []
     agg_map = helpers.aggregate_sntypes()
 
     features = get_features(fpath, data_release, field, model, aggregate_classes=False, helpers=helpers)
@@ -51,7 +51,6 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
 
     for i, objid in enumerate(features['objid']):
         field, model, base, snid = objid.astype(str).split('_')
-        print(i, len(features['objid']))
 
         if aggregate_classes:
             model = agg_map[int(model)]
@@ -65,11 +64,9 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
             x.append(features[i][f])
         x = np.array(x)
         X.append(x)
-        objids.append(objid)
 
     X = np.array(X)
     y = np.array(y)
-    objids = np.array(objids)
 
     X = np.nan_to_num(X)
 
@@ -78,7 +75,6 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     mask = ~np.isnan(X).any(axis=1)
     X = X[mask]
     y = y[mask]
-    objids = objids[mask]
     print("Num objects after removing objects where any features are NaN: ", len(X))
 
     # Check for infinities
@@ -87,7 +83,6 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
     mask = ~np.logical_or(X < -1e30, X > 1e30).any(axis=1)
     X = X[mask]
     y = y[mask]
-    objids = objids[mask]
     print("Num objects after removing objects where any features are greater than 1e99: ", len(X))
 
     # Remove extreme values over 20 standard deviations from the median 1 times iteratively
@@ -102,12 +97,11 @@ def get_labels_and_features(fpath, data_release, field, model, feature_names, ag
                 pass
             X = X[mask]
             y = y[mask]
-            objids = objids[mask]
 
-    return X, y, feature_names, objids
+    return X, y, feature_names
 
 
-def remove_redundant_classes(X, y, objids, models, remove_models):
+def remove_redundant_classes(X, y, models, remove_models):
     # Remove models with fewer than 5 objects (as SMOTE can't work with that few objects)
     for m in models:
         nobs = len(X[y == m])
@@ -125,11 +119,10 @@ def remove_redundant_classes(X, y, objids, models, remove_models):
         mask = np.where(y != m)[0]
         X = X[mask]
         y = y[mask]
-        objids = objids[mask]
         if m in models:
             models.remove(m)
 
-    return X, y, objids, models, remove_models
+    return X, y, models, remove_models
 
 
 def make_class_labels(models, model_names, X_train, y_train, X_test, y_test):
@@ -139,10 +132,10 @@ def make_class_labels(models, model_names, X_train, y_train, X_test, y_test):
         nobs_train.append(len(X_train[y_train == m]))
         nobs_test.append(len(X_test[y_test == m]))
     for i, m in enumerate(models):
-        model_labels.append("{}\ntrain: {}\ntest: {}".format(model_names[i], nobs_train[i], nobs_test[i]))
+        model_labels.append(model_names[i])
+        # model_labels.append("{}\ntrain: {}\ntest: {}".format(model_names[i], nobs_train[i], nobs_test[i]))
 
-    return model_names, nobs_train, nobs_test
-    #return model_labels, nobs_train, nobs_test
+    return model_labels, nobs_train, nobs_test
 
 
 def oversampling(models, X_train, y_train):
@@ -157,30 +150,26 @@ def oversampling(models, X_train, y_train):
     return X_train, y_train
 
 
-def save_truth_tables(classifier, X_test, y_test, objids_test, name, models, fig_dir, numfold):
+def save_truth_tables(classifier, X_test, y_test, name, models, fig_dir, numfold):
     pred_proba = classifier.predict_proba(X_test)
     truth_table = np.zeros(pred_proba.shape)
     for i, m in enumerate(y_test):
         truth_table[i][models.index(m)] = 1
-    np.savetxt(os.path.join(fig_dir, 'predicted_prob_{}.csv'.format(name, numfold)), pred_proba)
-    np.savetxt(os.path.join(fig_dir, 'truth_table_{}.csv'.format(name, numfold)), truth_table)
-    np.savetxt(os.path.join(fig_dir, 'objids_{}.csv'.format(name, numfold)), objids_test.astype(str), fmt='%s')
+    np.savetxt(os.path.join(fig_dir, 'predicted_prob_{}_kfold_{}.csv'.format(name, numfold)), pred_proba)
+    np.savetxt(os.path.join(fig_dir, 'truth_table_{}_kfold_{}.csv'.format(name, numfold)), truth_table)
 
 
-def save_tree_diagram(classifier, feature_names, out_file='tree', fig_dir='.'):
-    dotfile = os.path.join(fig_dir, "{}.dot".format(out_file))
-    imagefile = os.path.join(fig_dir, "{}.pdf".format(out_file))
-
+def save_tree_diagram(classifier, feature_names, out_file='tree'):
     from sklearn.tree import export_graphviz
     export_graphviz(classifier.estimators_[3],
-                    out_file=dotfile,
+                    out_file="{}.dot".format(out_file),
                     feature_names=feature_names,
                     filled=True,
                     rounded=True)
     # import pydot
     # (graph,) = pydot.graph_from_dot_file('tree.dot')
     # graph.write_png('tree.png')
-    os.system('dot -Tpdf {0} -o {1}'.format(dotfile, imagefile))
+    # os.system('dot -Tpdf {0}.dot -o {0}.pdf'.format(out_file))
 
 
 def remove_objects_with_val(X, y, val):
@@ -199,8 +188,8 @@ def get_n_best_features(n, X, y, classifier, feature_names, num_features, fig_di
     c = classifier
     classifier = RandomForestClassifier(n_estimators=c.n_estimators, n_jobs=c.n_jobs, random_state=c.random_state, max_leaf_nodes=c.max_leaf_nodes, max_depth=c.max_depth, min_samples_split=c.min_samples_split, min_samples_leaf=c.min_samples_leaf, min_weight_fraction_leaf=c.min_weight_fraction_leaf, max_features=c.max_features)
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.60, shuffle=True, random_state=42)
-    sm = over_sampling.SMOTE(random_state=42, n_jobs=2)
-    X_train, y_train = sm.fit_sample(X_train, y_train)
+    # sm = over_sampling.SMOTE(random_state=42, n_jobs=2)
+    # X_train, y_train = sm.fit_sample(X_train, y_train)
     model_labels, nobs_train, nobs_test = make_class_labels(models, model_names, X_train, y_train, X_test, y_test)
     classifier.fit(X_train, y_train)
     y_pred = classifier.predict(X_test)
@@ -208,7 +197,10 @@ def get_n_best_features(n, X, y, classifier, feature_names, num_features, fig_di
     print("Accuracy is: {}/{} = {}".format(accuracy, len(y_pred), accuracy / len(y_pred)))
     cnf_matrix = confusion_matrix(y_test, y_pred)
     plot_feature_importance(classifier, feature_names, num_features, fig_dir)
-    plot_confusion_matrix(cnf_matrix, classes=model_labels, normalize=True, title='Normalized confusion matrix_%s' % name, fig_dir=fig_dir, name=name)
+    plot_confusion_matrix(cnf_matrix, classes=model_labels, normalize=True, title=None, fig_dir=fig_dir, name=name)
+
+    # Save tree diagram
+    save_tree_diagram(classifier, feature_names, out_file=os.path.join(fig_dir, 'tree_all_feat_{}'.format(name)))
 
     # Use top n features
     importances = classifier.feature_importances_
@@ -275,18 +267,20 @@ def hyper_parameter_tuning(X, y, classifier, models, sntypes_map, feature_names,
     # random_accuracy = evaluate(best_random, test_features, test_labels)
 
 
-def classify(X, y, objids, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=(), name='', k=1):
+def classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir='.', remove_models=(), name='', k=1):
     num_features = X.shape[1]
 
-    X, y, objids, models, remove_models = remove_redundant_classes(X, y, objids, models, remove_models)
+    X, y, models, remove_models = remove_redundant_classes(X, y, models, remove_models)
 
     model_names = [sntypes_map[model] for model in models]
 
     # Plot feature space before oversampling
     # plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir)
 
+    for i, f in enumerate(feature_names):
+        feature_names[i] = f.replace('_', ' ')
     # Get best features
-    n = 50
+    n = 30
     num_features, feature_names, X = get_n_best_features(n, X, y, classifier, feature_names, num_features, fig_dir, name, models, model_names)
 
     # Store each k fold info:
@@ -295,14 +289,14 @@ def classify(X, y, objids, classifier, models, sntypes_map, feature_names, fig_d
 
     # Split into train/test or k-fold
     if k == 1:
-        data = train_test_split(X, y, objids, train_size=0.60, shuffle=True, random_state=42)
+        data = train_test_split(X, y, train_size=0.60, shuffle=True, random_state=42)
     else:
         kfold = KFold(n_splits=k, shuffle=True, random_state=42)
         data = kfold.split(X=X, y=y)
 
     for numfold, datum in enumerate(data):
         if k == 1:
-            X_train, X_test, y_train, y_test, objids_train, objids_test = data
+            X_train, X_test, y_train, y_test = data
         else:
             train_idx, test_idx = datum
             X_train, X_test, y_train, y_test = X[train_idx], X[test_idx], y[train_idx], y[test_idx]
@@ -313,8 +307,8 @@ def classify(X, y, objids, classifier, models, sntypes_map, feature_names, fig_d
         # Class labels and count train/test objects
         model_labels, nobs_train, nobs_test = make_class_labels(models, model_names, X_train, y_train, X_test, y_test)
 
-        # SMOTE
-        X_train, y_train = oversampling(models, X_train, y_train)
+        # # SMOTE
+        # X_train, y_train = oversampling(models, X_train, y_train)
 
         if classifier == 'voting':
             clf1 = RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)
@@ -337,8 +331,8 @@ def classify(X, y, objids, classifier, models, sntypes_map, feature_names, fig_d
         np.set_printoptions(precision=2)
         print(cnf_matrix)
 
-        # Save probability arrays
-        save_truth_tables(classifier, X_test, y_test, objids_test, name, models, fig_dir, k)
+        # # Save probability arrays
+        # save_truth_tables(classifier, X_test, y_test, name, models, fig_dir, numfold)
 
         # Store kfold metrics
         kfold_cnf_matrices.append(cnf_matrix)
@@ -358,10 +352,21 @@ def classify(X, y, objids, classifier, models, sntypes_map, feature_names, fig_d
         cnf_matrix = kfold_cnf_matrices
     if hasattr(classifier, "feature_importances_"):
         plot_feature_importance(classifier, feature_names, num_features, fig_dir, num_features_plot=n, name=name + '_with_top_{}features'.format(n))
-    plot_confusion_matrix(cnf_matrix, classes=model_labels, normalize=True, title='Normalized confusion matrix_{}_with_top_{}'.format(name, n), fig_dir=fig_dir, name=name + '_with_top_{}features'.format(n), combine_kfolds=combine_kfolds)
+    plot_confusion_matrix(cnf_matrix, classes=model_labels, normalize=True, title='Random Forest 2 days since trigger', fig_dir=fig_dir, name=name + '_with_top_{}features'.format(n), combine_kfolds=combine_kfolds)
+
+    for i, c in enumerate(models):
+        y_test[y_test == c] = i
+    y_pred_proba = classifier.predict_proba(X_test)
+    compute_multiclass_roc_auc(model_labels, to_categorical(y_test, num_classes=len(models)), y_pred_proba, name=name, fig_dir=fig_dir, title='Random Forest 2 days since trigger')
+    compute_precision_recall(model_labels, to_categorical(y_test, num_classes=len(models)), y_pred_proba, name=name, fig_dir=fig_dir, title='Random Forest 2 days since trigger')
+
+    # Get Log loss
+    weights = [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2]
+    wlogloss = plasticc_log_loss(to_categorical(y_test, num_classes=len(models)), y_pred_proba, relative_class_weights=weights)
+    print("Weighted Log loss is: {}".format(wlogloss))
 
     # Save tree diagram
-    save_tree_diagram(classifier, feature_names, out_file='tree_{}'.format(name), fig_dir=fig_dir)
+    save_tree_diagram(classifier, feature_names, out_file='tree_{}'.format(name))
 
     # Plot feature space
     # X, y = remove_objects_with_val(X, y, val=-99)
@@ -371,22 +376,22 @@ def classify(X, y, objids, classifier, models, sntypes_map, feature_names, fig_d
 
 
 def main():
-    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'cadence_hackathon_minion1016_classify_20180727_WFD_test3')
+    fig_dir = os.path.join(ROOT_DIR, 'plasticc', 'Figures', 'classify_testing10')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_DDF_20180727.hdf5')
+    fpath = os.path.join(ROOT_DIR, 'plasticc', 'features_all_20180407.hdf5')
     sntypes_map = helpers.get_sntypes()
 
-    data_release = '20180727'
-    field = 'DDF'
+    data_release = '20180407'
+    field = 'WFD'
     model = '%'
     passbands = ('u', 'g', 'r', 'i', 'z', 'Y')
     # models = [1, 2, 3, 4, 5, 41, 42, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91]
-    # models = [1, 3, 6, 41, 45, 51, 60, 61, 62, 63, 64, 80, 81, 90, 91, 102, 103]
-    models = [1, 5, 6, 41, 43, 45, 50, 51, 60, 64, 70, 80, 81, 83, 84, 91, 93, 99]
+    models = [1, 3, 6, 41, 45, 50, 60, 61, 62, 63, 64, 80, 81, 90, 91, 102, 103]
+    # models = [1, 2, 41, 45, 50, 60, 63, 64, 80, 81, 91, 200]
     remove_models = []
     feature_names = get_feature_names(passbands, ignore=('objid',))
-    X, y, feature_names, objids = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False, helpers=helpers)
+    X, y, feature_names = get_labels_and_features(fpath, data_release, field, model, feature_names, aggregate_classes=True, pca=False, helpers=helpers)
 
     classifiers = [('RandomForest', RandomForestClassifier(n_estimators=50, n_jobs=-1, random_state=42)),
                    ('KNeighbors_10', KNeighborsClassifier(10)),
@@ -405,7 +410,7 @@ def main():
         fig_dir_classifier = os.path.join(fig_dir, name)
         if not os.path.exists(fig_dir_classifier):
             os.makedirs(fig_dir_classifier)
-        classify(X, y, objids, classifier, models, sntypes_map, feature_names, fig_dir_classifier, remove_models, name)
+        classify(X, y, classifier, models, sntypes_map, feature_names, fig_dir_classifier, remove_models, name)
 
 
 if __name__ == '__main__':

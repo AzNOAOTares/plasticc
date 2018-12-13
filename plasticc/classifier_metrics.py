@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -8,7 +9,7 @@ from sklearn.metrics import roc_curve, auc
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import average_precision_score
 from scipy import interp
-plt.rcParams['text.usetex']=True
+plt.rcParams['text.usetex'] = True
 plt.rcParams['font.serif'] = ['Computer Modern Roman'] + plt.rcParams['font.serif']
 
 font = {'family': 'normal',
@@ -16,15 +17,42 @@ font = {'family': 'normal',
 
 matplotlib.rc('font', **font)
 
-COLORS = ['grey', 'tab:green', 'tab:orange', 'tab:blue', 'tab:red', 'tab:purple', 'tab:brown', '#aaffc3', 'tab:olive',
+COLORS = ['tab:green', 'tab:orange', 'tab:blue', 'tab:red', 'tab:purple', 'tab:brown', '#aaffc3', 'tab:olive',
           'tab:cyan', '#FF1493', 'navy', 'tab:pink', 'lightcoral', '#228B22', '#aa6e28', '#FFA07A']
+
+
+def plasticc_log_loss(y_true, y_pred, relative_class_weights=None):
+    """
+    Implementation of weighted log loss used for the Kaggle challenge
+    """
+    if np.nonzero(y_true[:, 0])[0].size == 0:
+        start_index = 1
+    else:
+        start_index = 0
+    print(start_index)
+
+    predictions = y_pred.copy()
+
+    # sanitize predictions
+    epsilon = sys.float_info.epsilon  # this is machine dependent but essentially prevents log(0)
+    predictions = np.clip(predictions, epsilon, 1.0 - epsilon)
+    predictions = predictions / np.sum(predictions, axis=1)[:, np.newaxis]
+
+    predictions = np.log(predictions)
+    # multiplying the arrays is equivalent to a truth mask as y_true only contains zeros and ones
+    class_logloss = []
+    for i in range(start_index, predictions.shape[1]):
+        # average column wise log loss with truth mask applied
+        result = np.average(predictions[:, i][y_true[:, i] == 1])
+        class_logloss.append(result)
+    return -1 * np.average(class_logloss, weights=relative_class_weights[start_index:])
 
 
 def compute_precision_recall(classes, y_test, y_pred_prob, name='', fig_dir='.', title=None):
     if np.nonzero(y_test[:, 0])[0].size == 0:
         start_index = 1
     else:
-        start_index = 1
+        start_index = 0
 
     nclasses = len(classes)
     # For each class
@@ -87,11 +115,11 @@ def compute_precision_recall(classes, y_test, y_pred_prob, name='', fig_dir='.',
     return figname, save_auc
 
 
-def compute_multiclass_roc_auc(classes, y_test, y_pred_prob, name='', fig_dir='.', title=None):
+def compute_multiclass_roc_auc(classes, y_test, y_pred_prob, name='', fig_dir='.', title=None, logyscale=False):
     if np.nonzero(y_test[:, 0])[0].size == 0:
         start_index = 1
     else:
-        start_index = 1
+        start_index = 0
 
     nclasses = len(classes)
 
@@ -133,12 +161,12 @@ def compute_multiclass_roc_auc(classes, y_test, y_pred_prob, name='', fig_dir='.
     plt.plot(fpr["micro"], tpr["micro"],
              label='micro-average ({0:0.2f})'
                    ''.format(roc_auc["micro"]),
-             color='navy', linestyle=':', linewidth=4)
+             color='navy', linestyle=':', linewidth=6)
 
     plt.plot(fpr["macro"], tpr["macro"],
              label='macro-average ({0:0.2f})'
                    ''.format(roc_auc["macro"]),
-             color='deeppink', linestyle=':', linewidth=4)
+             color='deeppink', linestyle=':', linewidth=6)
 
     lw = 2
     # colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
@@ -147,9 +175,12 @@ def compute_multiclass_roc_auc(classes, y_test, y_pred_prob, name='', fig_dir='.
                  label='{0} ({1:0.2f})'
                        ''.format(classes[i], roc_auc[i]))
 
-    # plt.plot([0, 1], [0, 1], 'k--', lw=lw)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
+    # # plt.plot([0, 1], [0, 1], 'k--', lw=lw)
+    # plt.xlim([0.0, 1.0])
+    if logyscale:
+        plt.yscale("log")
+    else:
+        pass # plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     if title is not None:
@@ -251,7 +282,7 @@ def plot_feature_importance(classifier, feature_names, num_features, fig_dir, nu
         n = num_features
     # Plot the feature importances of the forest
     fig = plt.figure(figsize=(20, 10))
-    plt.bar(range(n), importances[indices][:n], color='#2ca02c', yerr=std[indices][:n], align="center")
+    plt.bar(range(n), importances[indices][:n], color='tab:blue', yerr=std[indices][:n], align="center")
     plt.xticks(range(n), feature_names[indices][:n], rotation=90)
     plt.tick_params(axis='both', labelsize=24)
     plt.xlim([-1, n])

@@ -33,7 +33,7 @@ class BaseMixin(object):
             filters = self.filters
             outlc = {}
 
-            # store the indices of each filter 
+            # store the indices of each filter
             for i, pb in enumerate(self.filters):
                 mask = np.where(self.passband == pb)[0]
                 m2 = self.time[mask].argsort()
