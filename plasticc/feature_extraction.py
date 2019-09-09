@@ -1,11 +1,13 @@
 import os
 import sys
 ROOT_DIR = os.getenv('PLASTICC_DIR')
+sys.path.append(os.path.join(ROOT_DIR, 'plasticc'))
+sys.path.append(os.path.join(ROOT_DIR, 'plasticc', 'plasticc'))
 import numpy as np
 import scipy
 import astropy.table as at
 from collections import OrderedDict
-from .get_data import GetData
+from get_data import GetData
 from ANTARES_object.LAobject import LAobject
 import h5py
 import multiprocessing as mp
@@ -214,7 +216,7 @@ def create_all_hdf_files(args):
 
 
 def main():
-    data_release = '20180727'
+    data_release = '20180901'
     field = 'WFD'
     model = '%'
 
@@ -239,9 +241,8 @@ def main():
     #     offset += batch_size
     #     i += 1
 
-    offset = 0
-    offset_next = 3000
-    print(offset_next)
+    offset = int(sys.argv[1])
+    offset_next = int(sys.argv[2])
 
     # Multiprocessing
     i_list = np.arange(offset, offset_next)
@@ -266,7 +267,7 @@ def main():
     #     save_antares_features(data_release=data_release, fname=fname_last, field_in=field, model_in=model,
     #                           batch_size=batch_size, offset=batch_size*i_list[-1], sort=sort, redo=redo)
     #
-    combine_hdf_files(save_dir, data_release, 'features_{}_{}.hdf5'.format(field, data_release))
+    #combine_hdf_files(save_dir, data_release, 'features_{}_{}.hdf5'.format(field, data_release))
 
 
 if __name__ == '__main__':
