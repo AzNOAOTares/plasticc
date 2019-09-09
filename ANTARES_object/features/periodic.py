@@ -7,6 +7,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 import warnings
 from gatspy import periodic
+warnings.simplefilter('never')
 
 
 class PeriodicMixin(object):
