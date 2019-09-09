@@ -11,8 +11,8 @@ import pandas as pd
 import astropy.table as at
 import astropy.io.fits as afits
 from collections import OrderedDict
-from . import database
-from . import helpers
+import database
+import helpers
 
 ROOT_DIR = os.getenv('PLASTICC_DIR')
 DATA_DIR = os.path.join(ROOT_DIR, 'plasticc_data')
