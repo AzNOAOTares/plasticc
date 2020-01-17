@@ -9,8 +9,8 @@ from sklearn.metrics import roc_curve, auc
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import average_precision_score
 from scipy import interp
-plt.rcParams['text.usetex'] = True
-plt.rcParams['font.serif'] = ['Computer Modern Roman'] + plt.rcParams['font.serif']
+#plt.rcParams['text.usetex'] = True
+#plt.rcParams['font.serif'] = ['Computer Modern Roman'] + plt.rcParams['font.serif']
 
 font = {'family': 'normal',
         'size': 34}
@@ -29,7 +29,6 @@ def plasticc_log_loss(y_true, y_pred, relative_class_weights=None):
         start_index = 1
     else:
         start_index = 0
-    print(start_index)
 
     predictions = y_pred.copy()
 
@@ -73,7 +72,7 @@ def compute_precision_recall(classes, y_test, y_pred_prob, name='', fig_dir='.',
     print('Average precision score, micro-averaged over all classes: {0:0.2f}'
           .format(average_precision["micro"]))
 
-    plt.figure(figsize=(12, 16))
+    plt.figure(figsize=(24, 32))
     f_scores = np.linspace(0.2, 0.8, num=4)
     lines = []
     labels = []
@@ -157,7 +156,7 @@ def compute_multiclass_roc_auc(classes, y_test, y_pred_prob, name='', fig_dir='.
     save_auc['macro'] = roc_auc['macro']
 
     # Plot all ROC curves
-    fig = plt.figure(figsize=(13, 12))
+    fig = plt.figure(figsize=(26, 24))
     plt.plot(fpr["micro"], tpr["micro"],
              label='micro-average ({0:0.2f})'
                    ''.format(roc_auc["micro"]),
@@ -213,12 +212,10 @@ def plot_confusion_matrix(cm, classes, normalize=False, title=None, cmap=plt.cm.
         print('Confusion matrix, without normalization')
 
 
-    print(cm)
     # Multiply off diagonal by -1
     off_diag = ~np.eye(cm.shape[0], dtype=bool)
     cm[off_diag] *= -1
     np.savetxt(os.path.join(fig_dir, 'confusion_matrix_%s.csv' % name), cm)
-    print(cm)
 
     cms = [cm]
     deleterows = [False]
@@ -228,7 +225,7 @@ def plot_confusion_matrix(cm, classes, normalize=False, title=None, cmap=plt.cm.
         deleterows.append(True)
 
     for cm, deleterow in zip(cms, deleterows):
-        fig = plt.figure(figsize=(15, 12))
+        fig = plt.figure(figsize=(30, 24))
         plt.imshow(cm, interpolation='nearest', cmap=cmap, vmin=-1, vmax=1)
         # plt.title(title)
         cb = plt.colorbar()
@@ -307,7 +304,7 @@ def scatter(x, colors, feature_names, models, sntypes_map):
     palette = np.array(sns.color_palette("hls", 10))
 
     # We create a scatter plot.
-    f = plt.figure(figsize=(8, 8))
+    f = plt.figure(figsize=(20, 30))
     ax = plt.subplot(aspect='equal')
     sc = ax.scatter(x[:,xaxisclass], x[:,yaxisclass], lw=0, s=10,
                     c=palette[colors.astype(np.int)], alpha=0.4)
@@ -340,14 +337,12 @@ def plot_features_space(models, sntypes_map, X, y, feature_names, fig_dir, add_s
 
     scatter(X, colors, feature_names, models, sntypes_map)
     plt.savefig(fname=os.path.join(fig_dir, 'feature_space_sns_%s' % add_save_name), dpi=120)
-    plt.show()
+    #plt.show()
 
-    print(X.shape, y.shape)
     for i in range(len(X[0])):
         mask = np.where(X[:,i] != 0)[0]
         X = X[mask]
         y = y[mask]
-    print(X.shape, y.shape)
 
     for i, f in enumerate(feature_names):
         feature_names[i] = "$" + f + "$"
